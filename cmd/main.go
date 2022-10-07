@@ -75,5 +75,5 @@ func main() {
 	v1 := api.Group("/v1")
 	routes.SearchRoutes(v1, searchService)
 
-	log.Fatal().Err(app.Listen(":3000")).Send()
+	log.Fatal().Err(app.Listen(cfg.Server.Addr())).Send()
 }

@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Logging  Logging  `yaml:"logging"`
 	Database Database `yaml:"database"`
+	Server   Server   `yaml:"server"`
 }
 
 type Database struct {
@@ -20,7 +21,7 @@ type Database struct {
 	Password string `yaml:"password"`
 }
 
-func (d *Database) ConnectionUrl() string {
+func (d Database) ConnectionUrl() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", d.Username, d.Password, d.Host, d.Port, d.Database)
 }
 
@@ -28,12 +29,20 @@ type Logging struct {
 	Level string `yaml:"level"`
 }
 
-func (l *Logging) LevelOrDefault() string {
+func (l Logging) LevelOrDefault() string {
 	level := strings.TrimSpace(l.Level)
 	if level == "" {
 		level = "INFO"
 	}
 	return strings.ToLower(level)
+}
+
+type Server struct {
+	Port int `yaml:"port"`
+}
+
+func (s Server) Addr() string {
+	return fmt.Sprintf(":%d", s.Port)
 }
 
 func NewConfig(path string) (*Config, error) {

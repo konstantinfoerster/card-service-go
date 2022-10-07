@@ -7,3 +7,6 @@ database:
   database: cardmanager
   username: tester
   password: tester
+
+server:
+  port: 3000

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/konstantinfoerster/card-service/internal/common/errors"
+	"github.com/konstantinfoerster/card-service/internal/common"
 	"github.com/konstantinfoerster/card-service/internal/search/domain"
 )
 
@@ -22,7 +22,7 @@ func New(repo domain.Repository) Service {
 func (s *service) SimpleSearch(name string, page domain.Page) (domain.PagedResult, error) {
 	r, err := s.repo.FindByName(name, page)
 	if err != nil {
-		return domain.PagedResult{}, errors.NewError(err, "unable-to-execute-simple-search")
+		return domain.PagedResult{}, common.NewUnknownError(err, "unable-to-execute-simple-search")
 	}
 	return r, nil
 }
