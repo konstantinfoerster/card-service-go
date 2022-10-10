@@ -14,6 +14,12 @@ func TestHasMore(t *testing.T) {
 		want  bool
 	}{
 		{
+			name:  "First page zero, has one more",
+			page:  domain.NewPage(0, 10),
+			total: 11,
+			want:  true,
+		},
+		{
 			name:  "First page, has one more",
 			page:  domain.NewPage(1, 10),
 			total: 11,
@@ -32,7 +38,7 @@ func TestHasMore(t *testing.T) {
 			want:  false,
 		},
 		{
-			name:  "First page, has less than requested",
+			name:  "Second page, has less than requested",
 			page:  domain.NewPage(2, 10),
 			total: 9,
 			want:  false,

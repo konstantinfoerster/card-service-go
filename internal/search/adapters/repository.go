@@ -5,50 +5,47 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/konstantinfoerster/card-service/internal/common/postgres"
+	"github.com/konstantinfoerster/card-service/internal/config"
 	"github.com/konstantinfoerster/card-service/internal/search/domain"
 	"strings"
 )
 
 type PostgresRepository struct {
-	db *postgres.DBConnection
+	db  *postgres.DBConnection
+	cfg config.Images
 }
 
-func NewRepository(connection *postgres.DBConnection) domain.Repository {
+func NewRepository(connection *postgres.DBConnection, cfg config.Images) domain.Repository {
 	return &PostgresRepository{
-		db: connection,
+		db:  connection,
+		cfg: cfg,
 	}
-}
-
-func Offset(page domain.Page) int {
-	return page.Page() * page.Size()
 }
 
 func (r *PostgresRepository) FindByName(name string, page domain.Page) (domain.PagedResult, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return domain.PagedResult{}, nil
+		return domain.NewEmptyResult(page), nil
 	}
 	ctx := context.TODO()
 	query := `
 		SELECT
-			DISTINCT face.name, image.image_path
+			face.name, NULLIF(CONCAT($4::text, max(image.image_path)), $4::text)
 		FROM
-			card
-		LEFT JOIN
 			card_face AS face
-		ON
-			card.id = face.card_id
 		LEFT JOIN
 			card_image as image
 		ON
 			face.card_id = image.card_id AND (face.id = image.face_id OR image.face_id IS NULL) 
 		WHERE
-			face.name ILIKE '%' || $1 || '%'
+			face.name ILIKE '%' || $1 || '%' AND image.lang_lang = 'eng'
+		GROUP BY
+			face.name
 		ORDER BY
 			face.name
 		LIMIT $2
 		OFFSET $3`
-	rows, err := r.db.Conn.Query(ctx, query, name, page.Size(), Offset(page))
+	rows, err := r.db.Conn.Query(ctx, query, name, page.Size(), offset(page), imageBasePath(r.cfg))
 	if err != nil {
 		return domain.PagedResult{}, fmt.Errorf("failed to execute paged card face select %w", err)
 	}
@@ -72,6 +69,17 @@ func (r *PostgresRepository) FindByName(name string, page domain.Page) (domain.P
 	}
 
 	return domain.NewPagedResult(result, total, page), nil
+}
+
+func offset(p domain.Page) int {
+	return (p.Page() - 1) * p.Size()
+}
+
+func imageBasePath(cfg config.Images) string {
+	if strings.HasSuffix(cfg.Host, "/") {
+		return cfg.Host
+	}
+	return cfg.Host + "/"
 }
 
 func (r *PostgresRepository) countByName(name string) (int, error) {

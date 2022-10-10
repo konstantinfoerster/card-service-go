@@ -11,6 +11,7 @@ type Config struct {
 	Logging  Logging  `yaml:"logging"`
 	Database Database `yaml:"database"`
 	Server   Server   `yaml:"server"`
+	Images   Images   `yaml:"images"`
 }
 
 type Database struct {
@@ -43,6 +44,10 @@ type Server struct {
 
 func (s Server) Addr() string {
 	return fmt.Sprintf(":%d", s.Port)
+}
+
+type Images struct {
+	Host string `yaml:"host"`
 }
 
 func NewConfig(path string) (*Config, error) {

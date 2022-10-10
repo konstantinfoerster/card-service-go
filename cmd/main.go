@@ -4,7 +4,9 @@ import (
 	"context"
 	"flag"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/konstantinfoerster/card-service/api/routes"
 	"github.com/konstantinfoerster/card-service/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service/internal/config"
@@ -63,13 +65,15 @@ func main() {
 		}
 	}(dbCon.Close)
 
-	rep := adapters.NewRepository(dbCon)
+	rep := adapters.NewRepository(dbCon, cfg.Images)
 	searchService := service.New(rep)
 
 	app := fiber.New()
+	app.Use(cors.New())
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
 	}))
+	app.Use(recover.New())
 
 	api := app.Group("/api")
 	v1 := api.Group("/v1")

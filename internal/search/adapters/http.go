@@ -20,10 +20,33 @@ func SimpleSearch(service service.Service) fiber.Handler {
 		if err != nil {
 			return httperr.RespondWithProblemJson(err, c)
 		}
-		return c.JSON(&fiber.Map{
-			"has_more": result.HasMore,
-			"total":    result.Total,
-			"data":     result.Result,
-		})
+		return c.JSON(NewPagedResult(result))
 	}
+}
+func NewPagedResult(pr domain.PagedResult) *PagedResult {
+	data := make([]*Card, len(pr.Result))
+	for i, c := range pr.Result {
+		data[i] = &Card{
+			Image: c.Image,
+			Name:  c.Name,
+		}
+	}
+	return &PagedResult{
+		Data:    data,
+		HasMore: pr.HasMore,
+		Total:   pr.Total,
+		Page:    pr.Page,
+	}
+}
+
+type PagedResult struct {
+	Data    []*Card `json:"data"`
+	HasMore bool    `json:"has_more"`
+	Total   int     `json:"total"`
+	Page    int     `json:"page"`
+}
+
+type Card struct {
+	Name  string `json:"name"`
+	Image string `json:"image,omitempty"`
 }
