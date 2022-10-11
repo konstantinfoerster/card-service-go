@@ -42,5 +42,5 @@ Just run `docker run --pull always --rm -i hadolint/hadolint < Dockerfile` to ch
 The lint aggregator [golangci-lint](https://golangci-lint.run/) can be used to apply best practice and find errors in
 your golang code.
 
-Just run `docker run --rm -v $(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -v` inside the root
+Just run `docker run --pull always  --rm -v $(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -v` inside the root
 dir of the project to start the linting process.
