@@ -14,17 +14,21 @@ func (p Page) Size() int {
 }
 
 func NewPage(page, size int) Page {
+	firstPage := 1
+	// TODO make size configurable
+	defaultPageSize := 10
+	maxPageSize := 100
+
 	if page <= 0 {
-		page = 1
+		page = firstPage
 	}
 	if size == 0 {
-		// TODO make size configurable
-		size = 10
+		size = defaultPageSize
 	}
-	// TODO make max page size configurable
-	if size > 200 {
-		size = 200
+	if size > maxPageSize {
+		size = maxPageSize
 	}
+
 	return Page{
 		p: page,
 		s: size,
@@ -46,6 +50,7 @@ func NewPagedResult(result []*Card, total int, page Page) PagedResult {
 	if result == nil {
 		result = make([]*Card, 0)
 	}
+
 	return PagedResult{
 		Result:  result,
 		Total:   total,
@@ -56,6 +61,7 @@ func NewPagedResult(result []*Card, total int, page Page) PagedResult {
 
 func HasMore(page Page, total int) bool {
 	count := page.Size() * page.Page()
+
 	return total > count
 }
 

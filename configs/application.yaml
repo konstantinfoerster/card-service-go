@@ -10,6 +10,13 @@ database:
 
 server:
   port: 3000
+  cookie:
+    # must be a 32 character string
+    encryption_key: ""
+
+oidc:
+  redirect_uri: http://localhost:8000/login/callback
+  session_cookie_name: SESSION
 
 images:
   host: http://localhost:8080

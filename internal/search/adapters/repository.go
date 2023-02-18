@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/konstantinfoerster/card-service/internal/common/postgres"
-	"github.com/konstantinfoerster/card-service/internal/config"
-	"github.com/konstantinfoerster/card-service/internal/search/domain"
 	"strings"
+
+	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/search/domain"
 )
 
 type PostgresRepository struct {
@@ -79,6 +80,7 @@ func imageBasePath(cfg config.Images) string {
 	if strings.HasSuffix(cfg.Host, "/") {
 		return cfg.Host
 	}
+
 	return cfg.Host + "/"
 }
 
@@ -100,6 +102,7 @@ func (r *PostgresRepository) countByName(name string) (int, error) {
 	if err := row.Scan(&count); err != nil {
 		return 0, fmt.Errorf("failed to execute count by name %w", err)
 	}
+
 	return count, nil
 }
 

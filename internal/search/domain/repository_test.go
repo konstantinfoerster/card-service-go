@@ -1,9 +1,10 @@
 package domain_test
 
 import (
-	"github.com/konstantinfoerster/card-service/internal/search/domain"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/konstantinfoerster/card-service-go/internal/search/domain"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHasMore(t *testing.T) {

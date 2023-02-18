@@ -5,7 +5,9 @@ type ErrorType struct {
 }
 
 var (
-	ErrorTypeUnknown = ErrorType{"unknown"}
+	ErrTypeUnknown       = ErrorType{"unknown"}       //nolint:gochecknoglobals
+	ErrTypeInvalidInput  = ErrorType{"invalid-input"} //nolint:gochecknoglobals
+	ErrTypeAuthorization = ErrorType{"authorization"} //nolint:gochecknoglobals
 )
 
 type AppError struct {
@@ -19,6 +21,7 @@ func (e AppError) Error() string {
 	if e.Err == nil {
 		return e.Msg
 	}
+
 	return e.Err.Error()
 }
 
@@ -26,10 +29,27 @@ func (e AppError) Unwrap() error {
 	return e.Err
 }
 
-func NewUnknownError(error error, key string) AppError {
+func NewAuthorizationError(err error, key string) AppError {
 	return AppError{
-		Err:       error,
+		Err:       err,
 		Key:       key,
-		ErrorType: ErrorTypeUnknown,
+		ErrorType: ErrTypeAuthorization,
+	}
+}
+
+func NewInvalidInputError(err error, key string, msg string) AppError {
+	return AppError{
+		Err:       err,
+		Key:       key,
+		Msg:       msg,
+		ErrorType: ErrTypeInvalidInput,
+	}
+}
+
+func NewUnknownError(err error, key string) AppError {
+	return AppError{
+		Err:       err,
+		Key:       key,
+		ErrorType: ErrTypeUnknown,
 	}
 }

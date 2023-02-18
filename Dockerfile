@@ -1,58 +1,36 @@
-# syntax=docker/dockerfile:1
-
 ##### BUILDER #####
 
-FROM golang:1.19-alpine3.16 as builder
+FROM golang:1.20-alpine3.17 as builder
 
 ## Task: copy source files
-COPY . /src
-WORKDIR /src
+COPY . /app
+WORKDIR /app
 
 ## Task: fetch project deps
-RUN go mod download
+RUN go mod download && go mod verify
 
 ## Task: build project
 ENV GOOS="linux"
 ENV GOARCH="amd64"
 ENV CGO_ENABLED="0"
 
-RUN go build -ldflags="-s -w" -o card-service cmd/main.go && chmod 0755 /src/card-service
-
-# hadolint ignore=DL3018
-RUN set -eux; \
-    apk add --no-progress --quiet --no-cache --upgrade --virtual .run-deps \
-    tzdata
-
-# hadolint ignore=DL4006,SC2183
-RUN set -eu +x; \
-    printf '%30s\n' | tr ' ' -; \
-    echo "RUNTIME DEPENDENCIES"; \
-    PKGNAME=$(apk info --depends .rundeps \
-        | sed '/^$/d;/depends/d' \
-        | sed -r 's/^(.*)\~.*/\1/g' \
-        | sort -u ); \
-    printf '%s\n' "${PKGNAME}" \
-        | while IFS= read -r pkg; do \
-                apk info --quiet --description --no-network "${pkg}" \
-                | sed -n '/description/p' \
-                | grep -v gettext-tiny \
-                | sed -r "s/($(echo "${pkg}" | sed -r 's/\+/\\+/g'))-(.*)\s.*/\1=\2/"; \
-                done \
-        | tee -a /usr/share/rundeps; \
-    printf '%30s\n' | tr ' ' -
+RUN go build -ldflags="-s -w" -o card-service cmd/main.go && chmod 0755 /app/card-service
 
 ##### TARGET #####
 
-FROM alpine:3.16
+FROM alpine:3.17
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"
 
-COPY --from=builder /src/card-service /usr/bin/
-COPY --from=builder /usr/share/rundeps /usr/share/rundeps
+COPY --from=builder /app/card-service /usr/bin/
 
+# hadolint ignore=DL3018
 RUN set -eux; \
-    xargs -a /usr/share/rundeps apk add --no-progress --quiet --no-cache --upgrade --virtual .run-deps
+    apk add --no-progress --quiet --no-cache --upgrade \
+        tzdata
+
+USER 65534
 
 CMD ["/usr/bin/card-service", "--config", "/config/application.yaml"]
 

@@ -1,8 +1,8 @@
-package service
+package application
 
 import (
-	"github.com/konstantinfoerster/card-service/internal/common"
-	"github.com/konstantinfoerster/card-service/internal/search/domain"
+	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/search/domain"
 )
 
 type Service interface {
@@ -24,5 +24,6 @@ func (s *service) SimpleSearch(name string, page domain.Page) (domain.PagedResul
 	if err != nil {
 		return domain.PagedResult{}, common.NewUnknownError(err, "unable-to-execute-simple-search")
 	}
+
 	return r, nil
 }

@@ -2,9 +2,11 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
+	"net"
 	"os"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -12,6 +14,7 @@ type Config struct {
 	Database Database `yaml:"database"`
 	Server   Server   `yaml:"server"`
 	Images   Images   `yaml:"images"`
+	Oidc     Oidc     `yaml:"oidc"`
 }
 
 type Database struct {
@@ -22,8 +25,8 @@ type Database struct {
 	Password string `yaml:"password"`
 }
 
-func (d Database) ConnectionUrl() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s", d.Username, d.Password, d.Host, d.Port, d.Database)
+func (d Database) ConnectionURL() string {
+	return fmt.Sprintf("postgres://%s:%s@%s/%s", d.Username, d.Password, net.JoinHostPort(d.Host, d.Port), d.Database)
 }
 
 type Logging struct {
@@ -35,15 +38,26 @@ func (l Logging) LevelOrDefault() string {
 	if level == "" {
 		level = "INFO"
 	}
+
 	return strings.ToLower(level)
 }
 
 type Server struct {
-	Port int `yaml:"port"`
+	Port   int    `yaml:"port"`
+	Cookie Cookie `yaml:"cookie"`
 }
 
 func (s Server) Addr() string {
 	return fmt.Sprintf(":%d", s.Port)
+}
+
+type Cookie struct {
+	EncryptionKey string `yaml:"encryption_key"` // must be a 32 character string
+}
+
+type Oidc struct {
+	RedirectURI       string `yaml:"redirect_uri"`
+	SessionCookieName string `yaml:"session_cookie_name"`
 }
 
 type Images struct {
@@ -53,7 +67,7 @@ type Images struct {
 func NewConfig(path string) (*Config, error) {
 	s, err := os.Stat(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read file info for %s, %w", path, err)
 	}
 	if s.IsDir() {
 		return nil, fmt.Errorf("'%s' is a directory, not a regular file", path)

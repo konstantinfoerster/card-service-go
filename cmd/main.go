@@ -3,27 +3,29 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/konstantinfoerster/card-service/api/routes"
-	"github.com/konstantinfoerster/card-service/internal/common/postgres"
-	"github.com/konstantinfoerster/card-service/internal/config"
-	"github.com/konstantinfoerster/card-service/internal/search/adapters"
-	"github.com/konstantinfoerster/card-service/internal/search/service"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/rs/zerolog/pkgerrors"
 	"os"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/konstantinfoerster/card-service-go/api/routes"
+	"github.com/konstantinfoerster/card-service-go/internal/common/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/search/adapters"
+	"github.com/konstantinfoerster/card-service-go/internal/search/application"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/pkgerrors"
 )
 
-var cfg *config.Config
-
-func init() {
+func setup() *config.Config {
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).
 		With().
@@ -36,8 +38,7 @@ func init() {
 	flag.StringVar(&configPath, "config", "./configs/application.yaml", "path to the configuration file")
 	flag.Parse()
 
-	var err error
-	cfg, err = config.NewConfig(configPath)
+	cfg, err := config.NewConfig(configPath)
 	if err != nil {
 		panic(err)
 	}
@@ -50,26 +51,35 @@ func init() {
 	log.Info().Msgf("OS\t\t %s", runtime.GOOS)
 	log.Info().Msgf("ARCH\t\t %s", runtime.GOARCH)
 	log.Info().Msgf("CPUs\t\t %d", runtime.NumCPU())
+
+	return cfg
 }
 
 func main() {
+	cfg := setup()
+
 	ctx := context.Background()
 	dbCon, err := postgres.Connect(ctx, cfg.Database)
 	if err != nil {
-		log.Panic().Err(err).Msg("failed to connect to the database")
+		log.Fatal().Err(err).Msg("failed to connect to the database")
 	}
-	defer func(toCloseFn func() error) {
-		cErr := toCloseFn()
-		if cErr != nil {
-			log.Error().Err(cErr).Msgf("Failed to close database connection")
-		}
-	}(dbCon.Close)
 
 	rep := adapters.NewRepository(dbCon, cfg.Images)
-	searchService := service.New(rep)
+	searchService := application.New(rep)
+
+	auth := oidc.NewOauthMiddleware(cfg.Oidc)
 
 	app := fiber.New()
-	app.Use(cors.New())
+	app.Use(encryptcookie.New(encryptcookie.Config{
+		Key: cfg.Server.Cookie.EncryptionKey,
+	}))
+	app.Use(cors.New(cors.Config{
+		AllowHeaders: "Origin,Content-Type,Accept,Content-Length,Accept-Language," +
+			"Accept-Encoding,Connection,Access-Control-Allow-Origin",
+		AllowOrigins:     "*",
+		AllowCredentials: true,
+		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+	}))
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
 	}))
@@ -77,7 +87,14 @@ func main() {
 
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
+	routes.LoginRoutes(v1, cfg.Oidc)
 	routes.SearchRoutes(v1, searchService)
+	routes.CardsRoutes(v1, auth)
 
-	log.Fatal().Err(app.Listen(cfg.Server.Addr())).Send()
+	if err = app.Listen(cfg.Server.Addr()); err != nil {
+		if cErr := dbCon.Close(); cErr != nil {
+			err = errors.Wrap(err, cErr.Error())
+		}
+		log.Fatal().Err(err).Send()
+	}
 }

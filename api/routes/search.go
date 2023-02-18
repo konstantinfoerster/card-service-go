@@ -2,11 +2,11 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service/internal/search/adapters"
-	"github.com/konstantinfoerster/card-service/internal/search/service"
+	"github.com/konstantinfoerster/card-service-go/internal/search/adapters"
+	"github.com/konstantinfoerster/card-service-go/internal/search/application"
 )
 
-// SearchRoutes all search related routes
-func SearchRoutes(app fiber.Router, service service.Service) {
+// SearchRoutes All search related routes.
+func SearchRoutes(app fiber.Router, service application.Service) {
 	app.Get("/search", adapters.SimpleSearch(service))
 }

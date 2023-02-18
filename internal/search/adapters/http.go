@@ -1,28 +1,37 @@
 package adapters
 
 import (
-	"github.com/gofiber/fiber/v2"
-	httperr "github.com/konstantinfoerster/card-service/internal/common/http"
-	"github.com/konstantinfoerster/card-service/internal/search/domain"
-	"github.com/konstantinfoerster/card-service/internal/search/service"
+	"fmt"
 	"strconv"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
+	"github.com/konstantinfoerster/card-service-go/internal/search/application"
+	"github.com/konstantinfoerster/card-service-go/internal/search/domain"
 )
 
 func NewPage(c *fiber.Ctx) domain.Page {
 	size, _ := strconv.Atoi(c.Query("size", "0"))
 	page, _ := strconv.Atoi(c.Query("page", "0"))
+
 	return domain.NewPage(page, size)
 }
 
-func SimpleSearch(service service.Service) fiber.Handler {
+func SimpleSearch(service application.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		result, err := service.SimpleSearch(c.Query("name"), NewPage(c))
 		if err != nil {
-			return httperr.RespondWithProblemJson(err, c)
+			return problemjson.RespondWithProblemJSON(err, c)
 		}
-		return c.JSON(NewPagedResult(result))
+
+		if err = c.JSON(NewPagedResult(result)); err != nil {
+			return problemjson.RespondWithProblemJSON(fmt.Errorf("failed to encode search result, %w", err), c)
+		}
+
+		return nil
 	}
 }
+
 func NewPagedResult(pr domain.PagedResult) *PagedResult {
 	data := make([]*Card, len(pr.Result))
 	for i, c := range pr.Result {
@@ -31,6 +40,7 @@ func NewPagedResult(pr domain.PagedResult) *PagedResult {
 			Name:  c.Name,
 		}
 	}
+
 	return &PagedResult{
 		Data:    data,
 		HasMore: pr.HasMore,
@@ -41,7 +51,7 @@ func NewPagedResult(pr domain.PagedResult) *PagedResult {
 
 type PagedResult struct {
 	Data    []*Card `json:"data"`
-	HasMore bool    `json:"has_more"`
+	HasMore bool    `json:"hasMore"`
 	Total   int     `json:"total"`
 	Page    int     `json:"page"`
 }
