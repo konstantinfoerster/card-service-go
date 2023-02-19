@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/common/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
 )
 
 func GetCard() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		user, err := oidc.UserFromCtx(c)
+		user, err := auth.UserFromCtx(c)
 		if err != nil {
 			return problemjson.RespondWithProblemJSON(err, c)
 		}

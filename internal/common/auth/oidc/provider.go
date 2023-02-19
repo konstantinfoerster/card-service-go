@@ -1,9 +1,7 @@
 package oidc
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,8 +11,8 @@ import (
 	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
-	"google.golang.org/api/idtoken"
 )
 
 type JSONWebToken struct {
@@ -32,47 +30,68 @@ type Claims struct {
 	Email string
 }
 
-func ExtractClaimsFromCookie(rawCookie string) (*Claims, error) {
-	jwtToken, err := JwtFromCookie(rawCookie)
-	if err != nil {
+func New(cfg config.Oidc) (*SupportedProvider, error) {
+	client := &http.Client{
+		Timeout: time.Second * time.Duration(5),
+	}
+
+	googleProvider := DefaultGoogleProviderConfiguration()
+	googleProvider.Client = client
+	sp := SupportedProvider{
+		provider: map[string]*Provider{
+			googleProvider.Name: googleProvider,
+		},
+	}
+
+	if err := sp.merge(cfg.Provider); err != nil {
 		return nil, err
 	}
 
-	p, err := FindProvider(jwtToken.Provider)
-	if err != nil {
-		return nil, err
-	}
-	claims, err := p.ValidateToken(context.Background(), jwtToken)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to validate jwt")
-
-		return nil, err
-	}
-
-	return claims, nil
+	return &sp, nil
 }
 
-func JwtFromCookie(cookie string) (*JSONWebToken, error) {
-	if cookie == "" {
-		return nil, common.NewAuthorizationError(fmt.Errorf("no running session found"), "no-session")
+type SupportedProvider struct {
+	provider map[string]*Provider
+}
+
+func (sp *SupportedProvider) merge(providers map[string]config.Provider) error {
+	for k, p := range providers {
+		k = strings.ToLower(k)
+		val, ok := sp.provider[k]
+		if !ok {
+			return common.NewUnknownError(fmt.Errorf("configured provider %s not supported", k), "unknown-provider")
+		}
+
+		if p.AuthURL != "" {
+			val.AuthURL = p.AuthURL
+		}
+		if p.TokenURL != "" {
+			val.TokenURL = p.TokenURL
+		}
+		if p.RevokeURL != "" {
+			val.RevokeURL = p.RevokeURL
+		}
+		if p.Scope != "" {
+			val.Scope = p.Scope
+		}
+		val.ClientID = p.ClientID
+		val.Secret = p.Secret
+
+		sp.provider[k] = val
 	}
-	rawJwt, err := base64.URLEncoding.DecodeString(cookie)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to decode base64 string")
 
-		return nil, common.NewUnknownError(err, "unable-to-decode-token")
+	return nil
+}
+
+func (sp *SupportedProvider) Find(key string) (*Provider, error) {
+	p, ok := sp.provider[key]
+	if ok {
+		return p, nil
 	}
 
-	var jwtToken JSONWebToken
-	decoder := json.NewDecoder(bytes.NewReader(rawJwt))
-	err = decoder.Decode(&jwtToken)
-	if err != nil {
-		log.Error().Err(err).Msgf("failed to decode jwt %s", rawJwt)
+	err := fmt.Errorf("provider %s not supported", key)
 
-		return nil, common.NewUnknownError(err, "unable-to-decode-token")
-	}
-
-	return &jwtToken, nil
+	return nil, common.NewInvalidInputError(err, "login-provider-not-supported", err.Error())
 }
 
 type Provider struct {
@@ -94,50 +113,6 @@ func (p *Provider) GetAuthURL(state string, redirectURL string) string {
 
 func (p *Provider) ValidateToken(ctx context.Context, token *JSONWebToken) (*Claims, error) {
 	return p.Validate(ctx, token, p.ClientID)
-}
-
-func getSupportedProvider(provider string) (*Provider, error) {
-	client := &http.Client{
-		Timeout: time.Second * time.Duration(5),
-	}
-	var pp = map[string]*Provider{
-		"google": {
-			Client: client,
-			// FIXME Put this into the config file
-			Name:      "google",
-			AuthURL:   "https://accounts.google.com/o/oauth2/auth",
-			TokenURL:  "https://accounts.google.com/o/oauth2/token",
-			RevokeURL: "https://oauth2.googleapis.com/revoke",
-			ClientID:  "",
-			Secret:    "",
-			Scope:     "openid email",
-			Validate: func(ctx context.Context, token *JSONWebToken, clientID string) (*Claims, error) {
-				payload, err := idtoken.Validate(ctx, token.IDToken, clientID)
-				if err != nil {
-					return nil, common.NewUnknownError(fmt.Errorf("id token invalid %w", err), "invalid-token")
-				}
-				email := payload.Claims["email"]
-				sub := payload.Claims["sub"]
-
-				claims := Claims{ID: sub.(string)}
-				if email != nil {
-					var ok bool
-					claims.Email, ok = email.(string)
-					if !ok {
-						return nil, fmt.Errorf("claims.email is not a string but %T", email)
-					}
-				}
-
-				return &claims, nil
-			},
-		},
-	}
-	p, ok := pp[provider]
-	if ok {
-		return p, nil
-	}
-
-	return nil, fmt.Errorf("provider %s not supported", provider)
 }
 
 func (p *Provider) getToken(ctx context.Context, code string, redirectURI string) (*JSONWebToken, error) {
@@ -231,13 +206,4 @@ func (p *Provider) postRequest(ctx context.Context, url string, data url.Values)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	return p.Client.Do(req)
-}
-
-func FindProvider(key string) (*Provider, error) {
-	p, err := getSupportedProvider(key)
-	if err != nil {
-		return nil, common.NewInvalidInputError(err, "login-provider-not-supported", err.Error())
-	}
-
-	return p, nil
 }

@@ -1,14 +1,10 @@
 package oidc
 
 import (
-	"fmt"
-
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
-
-const userContextKey = "userid"
 
 type Config struct {
 	Key       string
@@ -23,16 +19,16 @@ func (m *Middleware) Middleware() fiber.Handler {
 	return m.Handler
 }
 
-func NewOauthMiddleware(cfg config.Oidc) *Middleware {
+func NewOauthMiddleware(cfg config.Oidc, sp *SupportedProvider) *Middleware {
 	c := Config{
 		Key: cfg.SessionCookieName,
 		Extractor: func(ctx *fiber.Ctx, cookie string) (interface{}, error) {
-			claims, err := ExtractClaimsFromCookie(cookie)
+			claims, err := ExtractClaimsFromCookie(cookie, sp)
 			if err != nil {
 				return nil, err
 			}
 
-			return claims.ID, nil
+			return ClaimsToUser(claims), nil
 		},
 	}
 
@@ -63,28 +59,11 @@ func newTokenExtractHandler(config ...Config) fiber.Handler {
 		value, err := cfg.Extractor(c, key)
 
 		if err == nil && value != nil {
-			c.Locals(userContextKey, value)
+			c.Locals(auth.UserContextKey, value)
 
 			return c.Next()
 		}
 
 		return c.Status(fiber.StatusUnauthorized).SendString("Invalid or expired session")
 	}
-}
-
-type User struct {
-	ID string
-}
-
-var (
-	ErrNoUserInContext = common.NewAuthorizationError(fmt.Errorf("no user in context"), "no-user-found")
-)
-
-func UserFromCtx(ctx *fiber.Ctx) (User, error) {
-	u, ok := ctx.Locals(userContextKey).(User)
-	if ok {
-		return u, nil
-	}
-
-	return User{}, ErrNoUserInContext
 }

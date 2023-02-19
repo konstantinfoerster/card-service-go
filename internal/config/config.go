@@ -56,8 +56,18 @@ type Cookie struct {
 }
 
 type Oidc struct {
-	RedirectURI       string `yaml:"redirect_uri"`
-	SessionCookieName string `yaml:"session_cookie_name"`
+	RedirectURI       string              `yaml:"redirect_uri"`
+	SessionCookieName string              `yaml:"session_cookie_name"`
+	Provider          map[string]Provider `yaml:"provider"`
+}
+
+type Provider struct {
+	AuthURL   string `yaml:"auth_url"`
+	TokenURL  string `yaml:"token_url"`
+	RevokeURL string `yaml:"revoke_url"`
+	ClientID  string `yaml:"client_id"`
+	Secret    string `yaml:"secret"`
+	Scope     string `yaml:"scope"`
 }
 
 type Images struct {

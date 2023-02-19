@@ -14,7 +14,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/konstantinfoerster/card-service-go/api/routes"
-	"github.com/konstantinfoerster/card-service-go/internal/common/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/search/adapters"
@@ -66,8 +66,12 @@ func main() {
 
 	rep := adapters.NewRepository(dbCon, cfg.Images)
 	searchService := application.New(rep)
+	oidcProvider, err := oidc.New(cfg.Oidc)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to instantiate oidc provider")
+	}
 
-	auth := oidc.NewOauthMiddleware(cfg.Oidc)
+	authMiddleware := oidc.NewOauthMiddleware(cfg.Oidc, oidcProvider)
 
 	app := fiber.New()
 	app.Use(encryptcookie.New(encryptcookie.Config{
@@ -87,9 +91,9 @@ func main() {
 
 	api := app.Group("/api")
 	v1 := api.Group("/v1")
-	routes.LoginRoutes(v1, cfg.Oidc)
+	routes.LoginRoutes(v1, cfg.Oidc, oidcProvider)
 	routes.SearchRoutes(v1, searchService)
-	routes.CardsRoutes(v1, auth)
+	routes.CardsRoutes(v1, authMiddleware)
 
 	if err = app.Listen(cfg.Server.Addr()); err != nil {
 		if cErr := dbCon.Close(); cErr != nil {
