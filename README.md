@@ -8,9 +8,9 @@ Run `go run cmd/main.go` to start the web application with the default configura
 
 Flags:
 
-| Flag            | Usage                              | Default Value            | Description                                                                             |
-|-----------------|------------------------------------|--------------------------|-----------------------------------------------------------------------------------------|
-| `-c`,`--config` | `-c configs/application-prod.yaml` | configs/application.yaml | path to the configuration file                                                          |
+| Flag            | Usage                              | Default Value            | Description                    |
+|-----------------|------------------------------------|--------------------------|--------------------------------|
+| `-c`,`--config` | `-c configs/application-prod.yaml` | configs/application.yaml | path to the configuration file |
 
 ## Test
 
@@ -42,5 +42,5 @@ Just run `docker run --pull always --rm -i hadolint/hadolint < Dockerfile` to ch
 The lint aggregator [golangci-lint](https://golangci-lint.run/) can be used to apply best practice and find errors in
 your golang code.
 
-Just run `docker run --pull always  --rm -v $(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -v` inside the root
-dir of the project to start the linting process.
+Just run `docker run --pull always --rm -v $(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -v`
+inside the root dir of the project to start the linting process.

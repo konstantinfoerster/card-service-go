@@ -3,23 +3,22 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/konstantinfoerster/card-service-go/api/routes"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
+	"github.com/konstantinfoerster/card-service-go/internal/common/server"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/search/adapters"
-	"github.com/konstantinfoerster/card-service-go/internal/search/application"
-	"github.com/pkg/errors"
+	loginadapters "github.com/konstantinfoerster/card-service-go/internal/login/adapters"
+	searchadapters "github.com/konstantinfoerster/card-service-go/internal/search/adapters"
+	search "github.com/konstantinfoerster/card-service-go/internal/search/application"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
@@ -58,47 +57,38 @@ func setup() *config.Config {
 func main() {
 	cfg := setup()
 
+	if err := run(cfg); err != nil {
+		log.Fatal().Err(err).Send()
+	}
+}
+
+func run(cfg *config.Config) error {
 	ctx := context.Background()
 	dbCon, err := postgres.Connect(ctx, cfg.Database)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to connect to the database")
+		return fmt.Errorf("failed to connect to database %w", err)
 	}
+	defer commonio.Close(dbCon)
 
-	rep := adapters.NewRepository(dbCon, cfg.Images)
-	searchService := application.New(rep)
-	oidcProvider, err := oidc.New(cfg.Oidc)
+	rep := searchadapters.NewRepository(dbCon, cfg.Images)
+	searchService := search.New(rep)
+
+	client := &http.Client{
+		Timeout: time.Second * time.Duration(5),
+	}
+	provider, err := oidc.FromConfiguration(cfg.Oidc, client)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to instantiate oidc provider")
+		return fmt.Errorf("failed to load oidc provider, %w", err)
 	}
 
-	authMiddleware := oidc.NewOauthMiddleware(cfg.Oidc, oidcProvider)
+	authService := oidc.New(cfg.Oidc, provider)
 
-	app := fiber.New()
-	app.Use(encryptcookie.New(encryptcookie.Config{
-		Key: cfg.Server.Cookie.EncryptionKey,
-	}))
-	app.Use(cors.New(cors.Config{
-		AllowHeaders: "Origin,Content-Type,Accept,Content-Length,Accept-Language," +
-			"Accept-Encoding,Connection,Access-Control-Allow-Origin",
-		AllowOrigins:     "*",
-		AllowCredentials: true,
-		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
-	}))
-	app.Use(logger.New(logger.Config{
-		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
-	}))
-	app.Use(recover.New())
+	srv := server.NewHTTPServer(&cfg.Server).RegisterAPIRoutes(func(r fiber.Router) {
+		v1 := r.Group("/api").Group("/v1")
 
-	api := app.Group("/api")
-	v1 := api.Group("/v1")
-	routes.LoginRoutes(v1, cfg.Oidc, oidcProvider)
-	routes.SearchRoutes(v1, searchService)
-	routes.CardsRoutes(v1, authMiddleware)
+		loginadapters.Routes(v1, cfg.Oidc, authService)
+		searchadapters.Routes(v1, searchService)
+	})
 
-	if err = app.Listen(cfg.Server.Addr()); err != nil {
-		if cErr := dbCon.Close(); cErr != nil {
-			err = errors.Wrap(err, cErr.Error())
-		}
-		log.Fatal().Err(err).Send()
-	}
+	return srv.Run()
 }

@@ -1,6 +1,6 @@
 ##### BUILDER #####
 
-FROM golang:1.20-alpine3.17 as builder
+FROM golang:1.21-alpine3.18 as builder
 
 ## Task: copy source files
 COPY . /app
@@ -18,7 +18,7 @@ RUN go build -ldflags="-s -w" -o card-service cmd/main.go && chmod 0755 /app/car
 
 ##### TARGET #####
 
-FROM alpine:3.17
+FROM alpine:3.18
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"
@@ -40,5 +40,3 @@ LABEL org.opencontainers.image.title="Card-Manager Service" \
       org.opencontainers.image.source="https://github.com/konstantinfoerster/card-service-go.git" \
       org.opencontainers.image.vendor="Konstantin Förster" \
       org.opencontainers.image.authors="Konstantin Förster"
-
-

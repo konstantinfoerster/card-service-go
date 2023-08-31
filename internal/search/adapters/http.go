@@ -1,38 +1,37 @@
 package adapters
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
+	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
 	"github.com/konstantinfoerster/card-service-go/internal/search/application"
 	"github.com/konstantinfoerster/card-service-go/internal/search/domain"
 )
 
-func NewPage(c *fiber.Ctx) domain.Page {
-	size, _ := strconv.Atoi(c.Query("size", "0"))
+func Routes(r fiber.Router, appSvc application.Service) {
+	r.Get("/search", SimpleSearch(appSvc))
+}
+
+func SimpleSearch(service application.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result, err := service.SimpleSearch(c.Query("name"), newPage(c))
+		if err != nil {
+			return err
+		}
+
+		return commonhttp.RenderJSON(c, newPagedResult(result))
+	}
+}
+
+func newPage(c *fiber.Ctx) domain.Page {
+	size, _ := strconv.Atoi(c.Query("size", ""))
 	page, _ := strconv.Atoi(c.Query("page", "0"))
 
 	return domain.NewPage(page, size)
 }
 
-func SimpleSearch(service application.Service) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		result, err := service.SimpleSearch(c.Query("name"), NewPage(c))
-		if err != nil {
-			return problemjson.RespondWithProblemJSON(err, c)
-		}
-
-		if err = c.JSON(NewPagedResult(result)); err != nil {
-			return problemjson.RespondWithProblemJSON(fmt.Errorf("failed to encode search result, %w", err), c)
-		}
-
-		return nil
-	}
-}
-
-func NewPagedResult(pr domain.PagedResult) *PagedResult {
+func newPagedResult(pr domain.PagedResult) *PagedResult {
 	data := make([]*Card, len(pr.Result))
 	for i, c := range pr.Result {
 		data[i] = &Card{
@@ -44,7 +43,6 @@ func NewPagedResult(pr domain.PagedResult) *PagedResult {
 	return &PagedResult{
 		Data:    data,
 		HasMore: pr.HasMore,
-		Total:   pr.Total,
 		Page:    pr.Page,
 	}
 }
@@ -52,7 +50,6 @@ func NewPagedResult(pr domain.PagedResult) *PagedResult {
 type PagedResult struct {
 	Data    []*Card `json:"data"`
 	HasMore bool    `json:"hasMore"`
-	Total   int     `json:"total"`
 	Page    int     `json:"page"`
 }
 

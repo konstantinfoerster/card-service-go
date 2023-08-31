@@ -8,130 +8,136 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/common"
+	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/rs/zerolog/log"
 )
 
-type JSONWebToken struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	IDToken      string `json:"id_token"`
-	Scope        string `json:"scope"`
-	ExpiresIn    int    `json:"expires_in"`
-	Type         string `json:"token_type"`
-	Provider     string `json:"provider"`
-}
-
-type Claims struct {
-	ID    string
-	Email string
-}
-
-func New(cfg config.Oidc) (*SupportedProvider, error) {
-	client := &http.Client{
-		Timeout: time.Second * time.Duration(5),
-	}
-
-	googleProvider := DefaultGoogleProviderConfiguration()
-	googleProvider.Client = client
-	sp := SupportedProvider{
-		provider: map[string]*Provider{
-			googleProvider.Name: googleProvider,
+func TestProvider(cfg config.Provider, client *http.Client) Provider {
+	return &provider{
+		name:      "test",
+		authURL:   cfg.AuthURL,
+		tokenURL:  cfg.TokenURL,
+		revokeURL: cfg.RevokeURL,
+		client:    client,
+		clientID:  cfg.ClientID,
+		secret:    cfg.Secret,
+		scope:     cfg.Scope,
+		validate: func(ctx context.Context, token *JSONWebToken, clientID string) (*claims, error) {
+			return &claims{
+				ID:    "1",
+				Email: "test@localhost",
+			}, nil
 		},
 	}
-
-	if err := sp.merge(cfg.Provider); err != nil {
-		return nil, err
-	}
-
-	return &sp, nil
 }
 
-type SupportedProvider struct {
-	provider map[string]*Provider
+func FromConfiguration(cfg config.Oidc, client *http.Client) ([]Provider, error) {
+	if client == nil {
+		return nil, fmt.Errorf("http client must not be nil")
+	}
+
+	if len(cfg.Provider) == 0 {
+		return nil, fmt.Errorf("no provider configured")
+	}
+
+	pp := make([]Provider, 0)
+
+	for k, v := range cfg.Provider {
+		switch k {
+		case "google":
+			p, err := googleProvider(client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to configure google provider %w", err)
+			}
+
+			if err = apply(p, v); err != nil {
+				return nil, fmt.Errorf("failed to apply configuration for provider %s, %w", k, err)
+			}
+
+			pp = append(pp, p)
+		default:
+			return nil, fmt.Errorf("unsupported provider %s, only google provider is supported for now", k)
+		}
+	}
+
+	return pp, nil
 }
 
-func (sp *SupportedProvider) merge(providers map[string]config.Provider) error {
-	for k, p := range providers {
-		k = strings.ToLower(k)
-		val, ok := sp.provider[k]
-		if !ok {
-			return common.NewUnknownError(fmt.Errorf("configured provider %s not supported", k), "unknown-provider")
-		}
-
-		if p.AuthURL != "" {
-			val.AuthURL = p.AuthURL
-		}
-		if p.TokenURL != "" {
-			val.TokenURL = p.TokenURL
-		}
-		if p.RevokeURL != "" {
-			val.RevokeURL = p.RevokeURL
-		}
-		if p.Scope != "" {
-			val.Scope = p.Scope
-		}
-		val.ClientID = p.ClientID
-		val.Secret = p.Secret
-
-		sp.provider[k] = val
+func apply(p *provider, cfg config.Provider) error {
+	if cfg.AuthURL != "" {
+		p.authURL = cfg.AuthURL
 	}
+	if cfg.TokenURL != "" {
+		p.tokenURL = cfg.TokenURL
+	}
+	if cfg.RevokeURL != "" {
+		p.revokeURL = cfg.RevokeURL
+	}
+	if cfg.Scope != "" {
+		p.scope = cfg.Scope
+	}
+
+	if cfg.ClientID == "" {
+		return fmt.Errorf("provider %s, client id must not be empty", p.name)
+	}
+	p.clientID = cfg.ClientID
+
+	if cfg.Secret == "" {
+		return fmt.Errorf("provider %s, secret must not be empty", p.name)
+	}
+	p.secret = cfg.Secret
 
 	return nil
 }
 
-func (sp *SupportedProvider) Find(key string) (*Provider, error) {
-	p, ok := sp.provider[key]
-	if ok {
-		return p, nil
-	}
-
-	err := fmt.Errorf("provider %s not supported", key)
-
-	return nil, common.NewInvalidInputError(err, "login-provider-not-supported", err.Error())
+type Provider interface {
+	GetName() string
+	GetAuthURL(state string, redirectURL string) string
+	ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*claims, *JSONWebToken, error)
+	ValidateToken(ctx context.Context, token *JSONWebToken) (*claims, error)
+	RevokeToken(ctx context.Context, token string) error
 }
 
-type Provider struct {
-	Client    *http.Client
-	Name      string
-	AuthURL   string
-	TokenURL  string
-	RevokeURL string
-	ClientID  string
-	Secret    string
-	Scope     string
-	Validate  func(ctx context.Context, token *JSONWebToken, clientID string) (*Claims, error)
+type provider struct {
+	client    *http.Client
+	name      string
+	authURL   string
+	tokenURL  string
+	revokeURL string
+	clientID  string
+	secret    string
+	scope     string
+	validate  func(ctx context.Context, token *JSONWebToken, clientID string) (*claims, error)
 }
 
-func (p *Provider) GetAuthURL(state string, redirectURL string) string {
+func (p *provider) GetName() string {
+	return p.name
+}
+
+func (p *provider) GetAuthURL(state string, redirectURL string) string {
 	return fmt.Sprintf("%s?state=%s&client_id=%s&redirect_uri=%s&scope=%s&response_type=code&access_type=offline",
-		p.AuthURL, state, p.ClientID, redirectURL, p.Scope)
+		p.authURL, url.QueryEscape(state), url.QueryEscape(p.clientID), url.QueryEscape(redirectURL),
+		url.QueryEscape(p.scope))
 }
 
-func (p *Provider) ValidateToken(ctx context.Context, token *JSONWebToken) (*Claims, error) {
-	return p.Validate(ctx, token, p.ClientID)
+func (p *provider) ValidateToken(ctx context.Context, token *JSONWebToken) (*claims, error) {
+	return p.validate(ctx, token, p.clientID)
 }
 
-func (p *Provider) getToken(ctx context.Context, code string, redirectURI string) (*JSONWebToken, error) {
-	resp, err := p.postRequest(ctx, p.TokenURL, url.Values{ //nolint:bodyclose
+func (p *provider) getToken(ctx context.Context, code string, redirectURI string) (*JSONWebToken, error) {
+	resp, err := p.postRequest(ctx, p.tokenURL, url.Values{ //nolint:bodyclose
 		"code":          {code},
-		"client_id":     {p.ClientID},
-		"client_secret": {p.Secret},
+		"client_id":     {p.clientID},
+		"client_secret": {p.secret},
 		"redirect_uri":  {redirectURI},
 		"grant_type":    {"authorization_code"},
 	})
 	if err != nil {
 		return nil, common.NewUnknownError(err, "unable-to-execute-code-exchange-request")
 	}
-	defer func(toCloseFn func() error) {
-		cErr := toCloseFn()
-		if cErr != nil {
-			log.Error().Err(cErr).Msgf("Failed to close response body")
-		}
-	}(resp.Body.Close)
+	defer commonio.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		// TODO error struct
@@ -151,12 +157,12 @@ func (p *Provider) getToken(ctx context.Context, code string, redirectURI string
 		return nil, common.NewUnknownError(err, "unable-to-decode-code-exchange-response")
 	}
 
-	jwtToken.Provider = p.Name
+	jwtToken.Provider = p.name
 
 	return &jwtToken, nil
 }
 
-func (p *Provider) ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*Claims,
+func (p *provider) ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*claims,
 	*JSONWebToken, error) {
 	jwtToken, err := p.getToken(ctx, authCode, redirectURI)
 	if err != nil {
@@ -171,19 +177,14 @@ func (p *Provider) ExchangeCode(ctx context.Context, authCode string, redirectUR
 	return claims, jwtToken, nil
 }
 
-func (p *Provider) RevokeToken(ctx context.Context, token string) error {
-	resp, err := p.postRequest(ctx, p.RevokeURL, url.Values{ //nolint:bodyclose
+func (p *provider) RevokeToken(ctx context.Context, token string) error {
+	resp, err := p.postRequest(ctx, p.revokeURL, url.Values{ //nolint:bodyclose
 		"token": {token},
 	})
 	if err != nil {
 		return common.NewUnknownError(err, "unable-to-execute-token-revoke-request")
 	}
-	defer func(toCloseFn func() error) {
-		cErr := toCloseFn()
-		if cErr != nil {
-			log.Error().Err(cErr).Msgf("Failed to close response body")
-		}
-	}(resp.Body.Close)
+	defer commonio.Close(resp.Body)
 
 	if resp.StatusCode == http.StatusOK {
 		return nil
@@ -194,16 +195,16 @@ func (p *Provider) RevokeToken(ctx context.Context, token string) error {
 		return common.NewUnknownError(cErr, "unable-to-read-token-revoke-error-response")
 	}
 
-	return common.NewUnknownError(fmt.Errorf("token revoke endpoint error response %s", content),
+	return common.NewUnknownError(fmt.Errorf("token revoke endpoint return an error %s", content),
 		"revoke-token-endpoint-respond-with-error")
 }
 
-func (p *Provider) postRequest(ctx context.Context, url string, data url.Values) (*http.Response, error) {
+func (p *provider) postRequest(ctx context.Context, url string, data url.Values) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request, %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return p.Client.Do(req)
+	return p.client.Do(req)
 }

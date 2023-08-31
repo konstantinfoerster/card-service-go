@@ -35,23 +35,23 @@ func NewProblemJSON(title string, key string, status int) *ProblemJSON {
 	}
 }
 
-func RespondWithProblemJSON(err error, c *fiber.Ctx) error {
-	var appErr *common.AppError
+func RespondWithProblemJSON(c *fiber.Ctx, err error) error {
+	var appErr common.AppError
 	if !errors.As(err, &appErr) {
-		return internalError("internal-error", err, c)
+		return internalError(c, "internal-error", err)
 	}
 
 	switch appErr.ErrorType {
 	case common.ErrTypeInvalidInput:
-		return badRequest(appErr.Msg, appErr.Key, appErr, c)
+		return badRequest(c, appErr.Msg, appErr.Key, appErr)
 	case common.ErrTypeAuthorization:
-		return unauthorized(appErr.Key, appErr, c)
+		return unauthorized(c, appErr.Key, appErr)
 	default:
-		return internalError(appErr.Key, appErr, c)
+		return internalError(c, appErr.Key, appErr)
 	}
 }
 
-func unauthorized(key string, err error, c *fiber.Ctx) error {
+func unauthorized(c *fiber.Ctx, key string, err error) error {
 	statusCode := http.StatusUnauthorized
 	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
 
@@ -60,7 +60,7 @@ func unauthorized(key string, err error, c *fiber.Ctx) error {
 		JSON(NewProblemJSON(http.StatusText(statusCode), key, statusCode))
 }
 
-func badRequest(title string, key string, err error, c *fiber.Ctx) error {
+func badRequest(c *fiber.Ctx, title string, key string, err error) error {
 	statusCode := http.StatusBadRequest
 	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
 
@@ -69,7 +69,7 @@ func badRequest(title string, key string, err error, c *fiber.Ctx) error {
 		JSON(NewProblemJSON(title, key, statusCode))
 }
 
-func internalError(key string, err error, c *fiber.Ctx) error {
+func internalError(c *fiber.Ctx, key string, err error) error {
 	statusCode := http.StatusInternalServerError
 	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
 

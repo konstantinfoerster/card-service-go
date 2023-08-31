@@ -7,66 +7,72 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHasMore(t *testing.T) {
+func TestNewPage(t *testing.T) {
 	cases := []struct {
-		name    string
-		page    domain.Page
-		total   int
-		hasMore bool
+		name       string
+		page       domain.Page
+		expectPage domain.Page
 	}{
 		{
-			name:    "First page zero, has one more",
-			page:    domain.NewPage(0, 10),
-			total:   11,
-			hasMore: true,
+			name:       "Page 0 fallbacks to default",
+			page:       domain.NewPage(0, 10),
+			expectPage: domain.NewPage(1, 10),
 		},
 		{
-			name:    "First page, has one more",
-			page:    domain.NewPage(1, 10),
-			total:   11,
-			hasMore: true,
+			name:       "Size 0 fallbacks to default",
+			page:       domain.NewPage(1, 0),
+			expectPage: domain.NewPage(1, 10),
 		},
 		{
-			name:    "First page, has equal",
-			page:    domain.NewPage(1, 10),
-			total:   10,
-			hasMore: false,
-		},
-		{
-			name:    "First page, has nothing",
-			page:    domain.NewPage(1, 10),
-			total:   0,
-			hasMore: false,
-		},
-		{
-			name:    "Second page, has less than requested",
-			page:    domain.NewPage(2, 10),
-			total:   9,
-			hasMore: false,
-		},
-		{
-			name:    "Second page, has one more",
-			page:    domain.NewPage(2, 10),
-			total:   21,
-			hasMore: true,
-		},
-		{
-			name:    "Second page, has equal",
-			page:    domain.NewPage(2, 10),
-			total:   20,
-			hasMore: false,
-		},
-		{
-			name:    "Second page, has nothing",
-			page:    domain.NewPage(2, 10),
-			total:   0,
-			hasMore: false,
+			name:       "To large size fallbacks to limit",
+			page:       domain.NewPage(1, 1000),
+			expectPage: domain.NewPage(1, 100),
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.hasMore, domain.HasMore(tc.page, tc.total))
+			assert.Equal(t, tc.expectPage, tc.page)
+		})
+	}
+}
+
+func TestHasMore(t *testing.T) {
+	cases := []struct {
+		name       string
+		page       domain.Page
+		resultSize int
+		expectMore bool
+	}{
+		{
+			name:       "Has more if result is bigger then current page size",
+			page:       domain.NewPage(1, 10),
+			resultSize: 11,
+			expectMore: true,
+		},
+		{
+			name:       "Possibly more if result and page size is equal",
+			page:       domain.NewPage(1, 10),
+			resultSize: 10,
+			expectMore: true,
+		},
+		{
+			name:       "No more if result is zero",
+			page:       domain.NewPage(1, 10),
+			resultSize: 0,
+			expectMore: false,
+		},
+		{
+			name:       "No more if result is less then page size",
+			page:       domain.NewPage(2, 10),
+			resultSize: 9,
+			expectMore: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expectMore, domain.HasMore(tc.page, tc.resultSize))
 		})
 	}
 }

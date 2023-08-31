@@ -20,9 +20,13 @@ type User struct {
 
 func UserFromCtx(ctx *fiber.Ctx) (*User, error) {
 	u, ok := ctx.Locals(UserContextKey).(*User)
-	if ok {
+	if ok && u != nil {
 		return u, nil
 	}
 
-	return &User{}, ErrNoUserInContext
+	return nil, ErrNoUserInContext
+}
+
+func UserToCtx(ctx *fiber.Ctx, user *User) {
+	ctx.Locals(UserContextKey, user)
 }

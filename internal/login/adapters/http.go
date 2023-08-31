@@ -1,98 +1,118 @@
 package adapters
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
-	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
+	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 )
 
 const stateCookie = "TOKEN_STATE"
 const sessionCookie = "SESSION"
 
+// Routes All login and user related routes.
+func Routes(app fiber.Router, cfg config.Oidc, svc oidc.Service) {
+	authMiddleware := oidc.NewOauthMiddleware(cfg, svc)
+
+	app.Get("/login/:provider", Login(cfg, svc))
+	app.Post("/login/:provider/token", ExchangeCode(svc))
+	app.Post("/logout", Logout(svc))
+	app.Get("/user", authMiddleware, GetCurrentUser())
+}
+
 type AuthCode struct {
 	Code  string `json:"code" form:"code"`
 	State string `json:"state" form:"state"`
 }
 
-func Login(redirectURI string, sp *oidc.SupportedProvider) fiber.Handler {
+func Login(cfg config.Oidc, svc oidc.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		p, err := sp.Find(c.Params("provider"))
+		provider, err := requiredParam(c, "provider")
 		if err != nil {
-			return problemjson.RespondWithProblemJSON(err, c)
+			log.Error().Err(err).Msg("provider must not be empty")
+
+			return err
 		}
 
-		state := uuid.New().String()
-		maxAgeSeconds := 60
-		setCookie(c, stateCookie, state, maxAgeSeconds)
-
-		if err = c.Redirect(p.GetAuthURL(state, redirectURI), http.StatusFound); err != nil {
-			return problemjson.RespondWithProblemJSON(
-				fmt.Errorf("failed to redirect to authorization server, %w", err), c)
-		}
-
-		return nil
-	}
-}
-
-func ExchangeCode(redirectURI string, sp *oidc.SupportedProvider) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		cookie := c.Cookies(stateCookie)
-		defer clearCookie(c, stateCookie)
-
-		var body AuthCode
-		err := c.BodyParser(&body)
+		url, err := svc.GetAuthURL(provider)
 		if err != nil {
 			return err
 		}
 
-		if cookie == "" || body.State != cookie {
-			log.Error().Msgf("Found state %s but expected %s", body.State, cookie)
-			sErr := fmt.Errorf("invalid state")
-			err = common.NewInvalidInputError(sErr, "code-exchange-invalid-state", sErr.Error())
+		setCookie(c, stateCookie, url.State, cfg.StateCookieAge)
 
-			return problemjson.RespondWithProblemJSON(err, c)
-		}
-
-		defer clearCookie(c, stateCookie)
-
-		p, err := sp.Find(c.Params("provider"))
-		if err != nil {
-			return problemjson.RespondWithProblemJSON(err, c)
-		}
-
-		claims, jwtToken, err := p.ExchangeCode(context.Background(), body.Code, redirectURI)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to exchange code")
-
-			return problemjson.RespondWithProblemJSON(err, c)
-		}
-		token64, err := toBase64(jwtToken)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to marshal jwt")
-
-			return problemjson.RespondWithProblemJSON(err, c)
-		}
-
-		expiresMultiplier := 2
-		setCookie(c, sessionCookie, token64, jwtToken.ExpiresIn*expiresMultiplier)
-
-		if err = c.JSON(oidc.ClaimsToUser(claims)); err != nil {
-			return problemjson.RespondWithProblemJSON(fmt.Errorf("failed to encode claims, %w", err), c)
-		}
-
-		return nil
+		return c.Redirect(url.URL, http.StatusFound)
 	}
+}
+
+func ExchangeCode(svc oidc.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		provider, err := requiredParam(c, "provider")
+		if err != nil {
+			log.Error().Err(err).Msg("provider must not be empty")
+
+			return err
+		}
+
+		cookieValue := strings.TrimSpace(c.Cookies(stateCookie))
+		if cookieValue == "" {
+			sErr := fmt.Errorf("missing state")
+
+			return common.NewInvalidInputError(sErr, "code-exchange-missing-state", sErr.Error())
+		}
+
+		clearCookie(c, stateCookie)
+
+		var body AuthCode
+		if err = c.BodyParser(&body); err != nil {
+			return common.NewInvalidInputError(err, "code-exchange-invalid-body", "invalid body")
+		}
+
+		if cookieValue == "" || body.State != cookieValue {
+			sErr := fmt.Errorf("invalid state")
+
+			return common.NewInvalidInputError(sErr, "code-exchange-invalid-state", sErr.Error())
+		}
+
+		user, token, err := svc.Authenticate(provider, body.Code)
+		if err != nil {
+			return err
+		}
+
+		token64, err := toBase64(token)
+		if err != nil {
+			return err
+		}
+
+		expires := time.Second * time.Duration(2*token.ExpiresIn)
+		setCookie(c, sessionCookie, token64, expires)
+
+		return commonhttp.RenderJSON(c, contextUserToUser(user))
+	}
+}
+
+func requiredParam(c *fiber.Ctx, name string) (string, error) {
+	return required(c.Params(name), name)
+}
+
+func required(value, name string) (string, error) {
+	if strings.TrimSpace(value) == "" {
+		sErr := fmt.Errorf(name + "must not be empty")
+
+		return "", common.NewInvalidInputError(sErr, "required-parameter", sErr.Error())
+	}
+
+	return value, nil
 }
 
 func toBase64(jwtToken *oidc.JSONWebToken) (string, error) {
@@ -104,65 +124,78 @@ func toBase64(jwtToken *oidc.JSONWebToken) (string, error) {
 	return base64.URLEncoding.EncodeToString(rawJwToken), nil
 }
 
-func setCookie(c *fiber.Ctx, name string, value string, ageSeconds int) {
-	expire := time.Now().Add(time.Second * time.Duration(ageSeconds))
+func fromBase64(base64Token string) (*oidc.JSONWebToken, error) {
+	sToken, err := base64.URLEncoding.DecodeString(base64Token)
+	if err != nil {
+		return nil, common.NewInvalidInputError(err, "unable-to-decode-token", "invalid token encoding")
+	}
+
+	var token oidc.JSONWebToken
+	if err = json.Unmarshal(sToken, &token); err != nil {
+		return nil, common.NewInvalidInputError(err, "unable-to-parse-token", "invalid token format")
+	}
+
+	return &token, nil
+}
+
+// TODO restrict to specific path?
+func setCookie(c *fiber.Ctx, name string, value string, maxAge time.Duration) {
 	c.Cookie(&fiber.Cookie{
 		Name:     name,
 		Value:    value,
 		HTTPOnly: true,
-		MaxAge:   ageSeconds,
-		Expires:  expire,
+		MaxAge:   int(maxAge.Seconds()),
 		Secure:   true,
-		SameSite: "strict",
+		SameSite: fiber.CookieSameSiteStrictMode,
 	})
 }
 
 func clearCookie(c *fiber.Ctx, name string) {
-	oneDay := 86400 // one day
-	setCookie(c, name, "", -oneDay)
+	cookie := c.Cookies(name)
+	if cookie == "" {
+		return
+	}
+
+	setCookie(c, name, "invalid", 0)
 }
 
-func Logout(sp *oidc.SupportedProvider) fiber.Handler {
+func Logout(svc oidc.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		defer clearCookie(c, sessionCookie)
-		defer clearCookie(c, stateCookie)
+		clearCookie(c, stateCookie)
 
-		jwtToken, err := oidc.JwtFromCookie(c.Cookies(sessionCookie))
-		if err != nil {
+		cookieValue := strings.TrimSpace(c.Cookies(sessionCookie))
+		if cookieValue == "" {
 			return c.SendStatus(http.StatusOK)
 		}
+		clearCookie(c, sessionCookie)
 
-		p, err := sp.Find(jwtToken.Provider)
+		token, err := fromBase64(cookieValue)
 		if err != nil {
-			return c.SendStatus(http.StatusOK)
+			return err
 		}
 
-		err = p.RevokeToken(context.Background(), jwtToken.AccessToken)
+		provider, err := required(token.Provider, "provider")
 		if err != nil {
-			log.Error().Err(err).Msg("token revoke failed")
+			return err
+		}
 
-			return c.SendStatus(http.StatusOK)
+		err = svc.Logout(provider, token)
+		if err != nil {
+			return err
 		}
 
 		return c.SendStatus(http.StatusOK)
 	}
 }
 
-func GetUser() fiber.Handler {
+func GetCurrentUser() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		u, err := auth.UserFromCtx(c)
 		if err != nil {
-			return c.JSON(&User{
-				Username:      "Unknown",
-				Authenticated: false,
-			})
+			return c.SendStatus(http.StatusForbidden)
 		}
 
-		if err = c.JSON(contextUserToUser(u)); err != nil {
-			return problemjson.RespondWithProblemJSON(fmt.Errorf("failed to encode user, %w", err), c)
-		}
-
-		return nil
+		return commonhttp.RenderJSON(c, contextUserToUser(u))
 	}
 }
 
@@ -173,12 +206,10 @@ func contextUserToUser(u *auth.User) *User {
 	}
 
 	return &User{
-		Username:      username,
-		Authenticated: true,
+		Username: username,
 	}
 }
 
 type User struct {
-	Username      string `json:"username"`
-	Authenticated bool   `json:"authenticated"`
+	Username string `json:"username,omitempty"`
 }

@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -43,12 +44,13 @@ func (l Logging) LevelOrDefault() string {
 }
 
 type Server struct {
+	Host   string `yaml:"host"`
 	Port   int    `yaml:"port"`
 	Cookie Cookie `yaml:"cookie"`
 }
 
 func (s Server) Addr() string {
-	return fmt.Sprintf(":%d", s.Port)
+	return fmt.Sprintf("%s:%d", s.Host, s.Port)
 }
 
 type Cookie struct {
@@ -58,6 +60,7 @@ type Cookie struct {
 type Oidc struct {
 	RedirectURI       string              `yaml:"redirect_uri"`
 	SessionCookieName string              `yaml:"session_cookie_name"`
+	StateCookieAge    time.Duration       `yaml:"state_cookie_age"`
 	Provider          map[string]Provider `yaml:"provider"`
 }
 

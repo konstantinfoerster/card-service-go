@@ -1,5 +1,6 @@
 run:
   modules-download-mode: readonly
+  timeout: 15m
 
 linters:
   disable-all: true
@@ -16,7 +17,7 @@ linters:
     - asciicheck # check if code contains non-ASCII identifiers
     - asasalint # check for pass []any as any in variadic func(...any)
     - bidichk # checks for dangerous unicode sequences (redundant with asciicheck)
-    - bodyclose # checks for unclosed response body
+    # TODO many false positives - bodyclose # checks for unclosed response body
     - containedctx # checks if context.Context is used as struct field
     - contextcheck # check the function whether use a non-inherited context
     - cyclop # checks function and package cyclomatic complexity (redundant with gocognit)
@@ -154,7 +155,6 @@ linters-settings:
     all: true
 
 issues:
-  timeout: 5m
   max-same-issues: 0 # 0 = disabled, default is 3
   fix: false
   exclude-rules:

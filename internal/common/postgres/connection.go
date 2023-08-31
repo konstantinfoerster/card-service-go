@@ -20,7 +20,7 @@ type DBConnection struct {
 func Connect(ctx context.Context, config config.Database) (*DBConnection, error) {
 	c, err := pgxpool.ParseConfig(config.ConnectionURL())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config %w", err)
+		return nil, fmt.Errorf("failed to parse config from URL %w", err)
 	}
 	c.MaxConnLifetime = time.Second * time.Duration(5)
 	c.MaxConnIdleTime = time.Millisecond * time.Duration(500)

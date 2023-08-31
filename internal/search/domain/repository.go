@@ -38,31 +38,27 @@ func NewPage(page, size int) Page {
 type PagedResult struct {
 	Result  []*Card
 	HasMore bool
-	Total   int
 	Page    int
 }
 
 func NewEmptyResult(page Page) PagedResult {
-	return NewPagedResult(nil, 0, page)
+	return NewPagedResult(nil, page)
 }
 
-func NewPagedResult(result []*Card, total int, page Page) PagedResult {
+func NewPagedResult(result []*Card, page Page) PagedResult {
 	if result == nil {
 		result = make([]*Card, 0)
 	}
 
 	return PagedResult{
 		Result:  result,
-		Total:   total,
-		HasMore: HasMore(page, total),
+		HasMore: HasMore(page, len(result)),
 		Page:    page.Page(),
 	}
 }
 
-func HasMore(page Page, total int) bool {
-	count := page.Size() * page.Page()
-
-	return total > count
+func HasMore(page Page, resultSize int) bool {
+	return resultSize >= page.Size()
 }
 
 type Repository interface {
