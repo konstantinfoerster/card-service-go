@@ -1,4 +1,4 @@
-name: Check
+name: CI
 on:
   push:
     branches: [ main ]
@@ -62,3 +62,26 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: ${{ env.GO_LINT_VERSION }}
+  go-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Go build
+        run: go build ./...
+
+      - name: Go run all tests
+        # -count=1 disable test caching
+        run: go test -race -covermode=atomic -coverprofile=coverage.out -count=1 ./...
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
