@@ -1,5 +1,5 @@
 [![Test](https://github.com/konstantinfoerster/card-service-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/konstantinfoerster/card-service-go/actions/workflows/test.yml)
-[![Lint](https://github.com/konstantinfoerster/card-service-go/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/konstantinfoerster/card-service-go/actions/workflows/lint.yml)
+[![Lint](https://github.com/konstantinfoerster/card-service-go/actions/workflows/check.yml/badge.svg?branch=main)](https://github.com/konstantinfoerster/card-service-go/actions/workflows/check.yml)
 [![codecov](https://codecov.io/gh/konstantinfoerster/card-service-go/graph/badge.svg?token=I0TRRY5SZE)](https://codecov.io/gh/konstantinfoerster/card-service-go)
 
 # Card-Manager in Go
