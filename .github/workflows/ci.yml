@@ -62,6 +62,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: ${{ env.GO_LINT_VERSION }}
+          skip-cache: true
   go-build-test:
     runs-on: ubuntu-latest
     steps:
