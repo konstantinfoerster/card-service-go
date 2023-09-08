@@ -1,0 +1,5 @@
+.idea/
+.git/
+.github/
+configs/
+!configs/application.yaml

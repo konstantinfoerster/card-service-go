@@ -1,29 +1,37 @@
 package adapters
 
 import (
-	"github.com/gofiber/fiber/v2"
-	httperr "github.com/konstantinfoerster/card-service/internal/common/http"
-	"github.com/konstantinfoerster/card-service/internal/search/domain"
-	"github.com/konstantinfoerster/card-service/internal/search/service"
 	"strconv"
+
+	"github.com/gofiber/fiber/v2"
+	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
+	"github.com/konstantinfoerster/card-service-go/internal/search/application"
+	"github.com/konstantinfoerster/card-service-go/internal/search/domain"
 )
 
-func NewPage(c *fiber.Ctx) domain.Page {
-	size, _ := strconv.Atoi(c.Query("size", "0"))
+func Routes(r fiber.Router, appSvc application.Service) {
+	r.Get("/search", SimpleSearch(appSvc))
+}
+
+func SimpleSearch(service application.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		result, err := service.SimpleSearch(c.Query("name"), newPage(c))
+		if err != nil {
+			return err
+		}
+
+		return commonhttp.RenderJSON(c, newPagedResult(result))
+	}
+}
+
+func newPage(c *fiber.Ctx) domain.Page {
+	size, _ := strconv.Atoi(c.Query("size", ""))
 	page, _ := strconv.Atoi(c.Query("page", "0"))
+
 	return domain.NewPage(page, size)
 }
 
-func SimpleSearch(service service.Service) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		result, err := service.SimpleSearch(c.Query("name"), NewPage(c))
-		if err != nil {
-			return httperr.RespondWithProblemJson(err, c)
-		}
-		return c.JSON(NewPagedResult(result))
-	}
-}
-func NewPagedResult(pr domain.PagedResult) *PagedResult {
+func newPagedResult(pr domain.PagedResult) *PagedResult {
 	data := make([]*Card, len(pr.Result))
 	for i, c := range pr.Result {
 		data[i] = &Card{
@@ -31,18 +39,17 @@ func NewPagedResult(pr domain.PagedResult) *PagedResult {
 			Name:  c.Name,
 		}
 	}
+
 	return &PagedResult{
 		Data:    data,
 		HasMore: pr.HasMore,
-		Total:   pr.Total,
 		Page:    pr.Page,
 	}
 }
 
 type PagedResult struct {
 	Data    []*Card `json:"data"`
-	HasMore bool    `json:"has_more"`
-	Total   int     `json:"total"`
+	HasMore bool    `json:"hasMore"`
 	Page    int     `json:"page"`
 }
 
