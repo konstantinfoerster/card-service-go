@@ -29,6 +29,8 @@ jobs:
         git diff --exit-code go.mod
   go-sec:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
     env:
       GO111MODULE: on
     steps:
