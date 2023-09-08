@@ -6,30 +6,40 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 type httpRequest struct {
 	url     string
 	method  string
-	body    *[]byte
+	body    []byte
 	cookies []*http.Cookie
+	header  map[string]string
 }
 
 func NewRequest(options ...func(*httpRequest)) *http.Request {
-	r := &httpRequest{}
+	r := &httpRequest{
+		header:  make(map[string]string),
+		cookies: make([]*http.Cookie, 0),
+	}
 	for _, opt := range options {
 		opt(r)
 	}
 
 	var body io.Reader
 	if r.body != nil {
-		body = bytes.NewReader(*r.body)
+		body = bytes.NewReader(r.body)
 	}
 
 	req := httptest.NewRequest(r.method, r.url, body)
 
 	for _, c := range r.cookies {
 		req.AddCookie(c)
+	}
+
+	for k, v := range r.header {
+		req.Header.Set(k, v)
 	}
 
 	return req
@@ -49,7 +59,17 @@ func WithMethod(m string) func(*httpRequest) {
 
 func WithBody(body []byte) func(*httpRequest) {
 	return func(req *httpRequest) {
-		req.body = &body
+		req.body = body
+	}
+}
+
+func WithJSONBody(t *testing.T, v interface{}) func(*httpRequest) {
+	raw := ToJSON(t, v)
+
+	return func(req *httpRequest) {
+		req.header[fiber.HeaderContentType] = fiber.MIMEApplicationJSON
+
+		req.body = raw
 	}
 }
 

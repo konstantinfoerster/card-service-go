@@ -1,9 +1,7 @@
 package adapters_test
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
+	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
 	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
@@ -21,6 +20,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var staticTimeSvc = common.NewFakeTimeService(time.Now())
+
+const cookieEncryptionKey = "01234567890123456789012345678901"
 
 type mockOIDCService struct {
 	FakeGetAuthURL           func(provider string) (*oidc.RedirectURL, error)
@@ -69,30 +72,29 @@ func TestGetLoginURL(t *testing.T) {
 			}
 
 			return &oidc.RedirectURL{
-				URL:   "https://authserver.local",
+				URL:   "http://authserver.local",
 				State: "state-0",
 			}, nil
 		},
 	}
-	srv := defaultServer(svc)
+	srv := defaultServer(svc, staticTimeSvc)
+	req := commontest.NewRequest(
+		commontest.WithMethod(http.MethodGet),
+		commontest.WithURL("http://localhost/login/myProvider"),
+	)
 	expectedCookie := &http.Cookie{
-		Name:     "TOKEN_STATE",
-		Value:    "state-0",
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   5,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		Name:    "TOKEN_STATE",
+		Value:   "state-0",
+		Expires: expiresIn(5 * time.Second),
 	}
-	req := httptest.NewRequest(http.MethodGet, "https://localhost/login/myProvider", nil)
 
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
-	assert.Equal(t, "https://authserver.local", resp.Header.Get("Location"))
-	assertCookie(t, srv.Cfg.Cookie.EncryptionKey, expectedCookie, resp.Cookies()[0])
+	assert.Equal(t, "http://authserver.local", resp.Header.Get("Location"))
+	assertCookie(t, expectedCookie, resp.Cookies()[0])
 }
 
 func TestGetLoginURLError(t *testing.T) {
@@ -101,8 +103,11 @@ func TestGetLoginURLError(t *testing.T) {
 			return nil, fmt.Errorf("some error")
 		},
 	}
-	srv := defaultServer(svc)
-	req := httptest.NewRequest(http.MethodGet, "https://localhost/login/myProvider", nil)
+	srv := defaultServer(svc, staticTimeSvc)
+	req := commontest.NewRequest(
+		commontest.WithMethod(http.MethodGet),
+		commontest.WithURL("http://localhost/login/myProvider"),
+	)
 
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
@@ -112,6 +117,7 @@ func TestGetLoginURLError(t *testing.T) {
 }
 
 func TestPostExchangeCode(t *testing.T) {
+	sessionExpiresIn := 100
 	svc := &mockOIDCService{
 		FakeAuthenticate: func(provider string, authCode string) (*auth.User, *oidc.JSONWebToken, error) {
 			if provider != "myProvider" {
@@ -125,38 +131,32 @@ func TestPostExchangeCode(t *testing.T) {
 				Username: "myUser",
 			}
 			token := &oidc.JSONWebToken{
-				ExpiresIn: 5,
+				ExpiresIn: sessionExpiresIn,
 			}
 
 			return u, token, nil
 		},
 	}
-	srv := defaultServer(svc)
-	body := bytes.NewReader(commontest.ToJSON(t, loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"}))
-	req := httptest.NewRequest(http.MethodPost, "https://localhost/login/myProvider/token", body)
-	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-	req.AddCookie(&http.Cookie{
-		Name:  "TOKEN_STATE",
-		Value: encryptCookieValue(t, srv.Cfg.Cookie.EncryptionKey, "state-0"),
-	})
-	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{ExpiresIn: 5})
+	srv := defaultServer(svc, staticTimeSvc)
+	req := commontest.NewRequest(
+		commontest.WithMethod(http.MethodPost),
+		commontest.WithURL("http://localhost/login/myProvider/token"),
+		commontest.WithJSONBody(t, loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"}),
+		commontest.WithCookie(&http.Cookie{
+			Name:  "TOKEN_STATE",
+			Value: encryptCookieValue(t, "state-0"),
+		}),
+	)
+	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{ExpiresIn: sessionExpiresIn})
 	expectedSessionCookie := &http.Cookie{
-		Name:     "SESSION",
-		Value:    token,
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   10,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		Name:    "SESSION",
+		Value:   token,
+		Expires: expiresIn(time.Duration(sessionExpiresIn) * time.Second),
 	}
 	expectedTokenCookie := &http.Cookie{
-		Name:     "TOKEN_STATE",
-		Value:    "invalid",
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   0,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		Name:    "TOKEN_STATE",
+		Value:   "invalid",
+		Expires: expiresIn(-7 * 24 * time.Hour),
 	}
 
 	resp, err := srv.Test(req)
@@ -167,21 +167,21 @@ func TestPostExchangeCode(t *testing.T) {
 	assert.Equal(t, fiber.MIMEApplicationJSONCharsetUTF8, resp.Header.Get(fiber.HeaderContentType))
 	assert.Equal(t, &loginadapters.User{Username: "myUser"}, commontest.FromJSON[loginadapters.User](t, resp))
 	assert.Len(t, resp.Cookies(), 2)
-	assertCookie(t, srv.Cfg.Cookie.EncryptionKey, expectedTokenCookie, resp.Cookies()[0])
-	assertCookie(t, srv.Cfg.Cookie.EncryptionKey, expectedSessionCookie, resp.Cookies()[1])
+	assertCookie(t, expectedTokenCookie, resp.Cookies()[0])
+	assertCookie(t, expectedSessionCookie, resp.Cookies()[1])
 }
 
 func TestPostExchangeInvalidInput(t *testing.T) {
 	cases := []struct {
 		name       string
-		body       io.Reader
+		body       *loginadapters.AuthCode
 		stateValue string
 		svc        oidc.Service
 		statusCode int
 	}{
 		{
 			name:       "No state cookie",
-			body:       bytes.NewReader(commontest.ToJSON(t, loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"})),
+			body:       &loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"},
 			stateValue: "",
 			svc:        &mockOIDCService{},
 			statusCode: http.StatusBadRequest,
@@ -195,21 +195,21 @@ func TestPostExchangeInvalidInput(t *testing.T) {
 		},
 		{
 			name:       "Invalid body",
-			body:       bytes.NewReader(commontest.ToJSON(t, loginadapters.AuthCode{Code: "", State: ""})),
+			body:       &loginadapters.AuthCode{Code: "", State: ""},
 			stateValue: "state-0",
 			svc:        &mockOIDCService{},
 			statusCode: http.StatusBadRequest,
 		},
 		{
 			name:       "state mismatch",
-			body:       bytes.NewReader(commontest.ToJSON(t, loginadapters.AuthCode{Code: "myAuthCode", State: "state-1"})),
+			body:       &loginadapters.AuthCode{Code: "myAuthCode", State: "state-1"},
 			stateValue: "state-0",
 			svc:        &mockOIDCService{},
 			statusCode: http.StatusBadRequest,
 		},
 		{
 			name:       "Failed authentication",
-			body:       bytes.NewReader(commontest.ToJSON(t, loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"})),
+			body:       &loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"},
 			stateValue: "state-0",
 			svc: &mockOIDCService{
 				FakeAuthenticate: func(provider string, authCode string) (*auth.User, *oidc.JSONWebToken, error) {
@@ -222,13 +222,16 @@ func TestPostExchangeInvalidInput(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := defaultServer(tc.svc)
-			req := httptest.NewRequest(http.MethodPost, "https://localhost/login/myProvider/token", tc.body)
-			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+			srv := defaultServer(tc.svc, staticTimeSvc)
+			req := commontest.NewRequest(
+				commontest.WithMethod(http.MethodPost),
+				commontest.WithURL("http://localhost/login/myProvider/token"),
+				commontest.WithJSONBody(t, tc.body),
+			)
 			if tc.stateValue != "" {
 				req.AddCookie(&http.Cookie{
 					Name:  "TOKEN_STATE",
-					Value: encryptCookieValue(t, srv.Cfg.Cookie.EncryptionKey, tc.stateValue),
+					Value: encryptCookieValue(t, tc.stateValue),
 				})
 			}
 
@@ -249,18 +252,16 @@ func TestGetCurrentUser(t *testing.T) {
 			}, nil
 		},
 	}
-	srv := defaultServer(svc)
-	req := httptest.NewRequest(http.MethodGet, "https://localhost/user", nil)
+	srv := defaultServer(svc, staticTimeSvc)
 	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{})
-	req.AddCookie(&http.Cookie{
-		Name:     "SESSION",
-		Value:    encryptCookieValue(t, srv.Cfg.Cookie.EncryptionKey, token),
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   0,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-	})
+	req := commontest.NewRequest(
+		commontest.WithMethod(http.MethodGet),
+		commontest.WithURL("http://localhost/user"),
+		commontest.WithCookie(&http.Cookie{
+			Name:  "SESSION",
+			Value: encryptCookieValue(t, token),
+		}),
+	)
 
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
@@ -272,8 +273,8 @@ func TestGetCurrentUser(t *testing.T) {
 }
 
 func TestGetCurrentUserNotLoggedIn(t *testing.T) {
-	srv := defaultServer(&mockOIDCService{})
-	req := httptest.NewRequest(http.MethodGet, "https://localhost/user", nil)
+	srv := defaultServer(&mockOIDCService{}, staticTimeSvc)
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/user", nil)
 
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
@@ -288,39 +289,34 @@ func TestLogout(t *testing.T) {
 			return nil
 		},
 	}
-	srv := defaultServer(svc)
-	req := httptest.NewRequest(http.MethodPost, "https://localhost/logout", nil)
+	srv := defaultServer(svc, staticTimeSvc)
 	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{Provider: "myProvider"})
-	req.AddCookie(&http.Cookie{
-		Name:     "SESSION",
-		Value:    encryptCookieValue(t, srv.Cfg.Cookie.EncryptionKey, token),
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   0,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-	})
+	req := commontest.NewRequest(
+		commontest.WithMethod(http.MethodPost),
+		commontest.WithURL("http://localhost/logout"),
+		commontest.WithCookie(&http.Cookie{
+			Name:  "SESSION",
+			Value: encryptCookieValue(t, token),
+		}),
+	)
 	expectedSessionCookie := &http.Cookie{
-		Name:     "SESSION",
-		Value:    "invalid",
-		HttpOnly: true,
-		Path:     "/",
-		MaxAge:   0,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		Name:    "SESSION",
+		Value:   "invalid",
+		Expires: expiresIn(-7 * 24 * time.Hour),
 	}
+
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Len(t, resp.Cookies(), 1)
-	assertCookie(t, srv.Cfg.Cookie.EncryptionKey, expectedSessionCookie, resp.Cookies()[0])
+	assertCookie(t, expectedSessionCookie, resp.Cookies()[0])
 }
 
 func TestLogoutNoSession(t *testing.T) {
-	srv := defaultServer(&mockOIDCService{})
-	req := httptest.NewRequest(http.MethodPost, "https://localhost/logout", nil)
+	srv := defaultServer(&mockOIDCService{}, staticTimeSvc)
+	req := httptest.NewRequest(http.MethodPost, "http://localhost/logout", nil)
 
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
@@ -368,12 +364,12 @@ func TestLogoutError(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := defaultServer(tc.src)
-			req := httptest.NewRequest(http.MethodPost, "https://localhost/logout", nil)
+			srv := defaultServer(tc.src, staticTimeSvc)
+			req := httptest.NewRequest(http.MethodPost, "http://localhost/logout", nil)
 			value := tc.sessionValueFn(t)
 			req.AddCookie(&http.Cookie{
 				Name:  "SESSION",
-				Value: encryptCookieValue(t, srv.Cfg.Cookie.EncryptionKey, value),
+				Value: encryptCookieValue(t, value),
 			})
 
 			resp, err := srv.Test(req)
@@ -386,6 +382,8 @@ func TestLogoutError(t *testing.T) {
 }
 
 func assertErrorResponse(t *testing.T, resp *http.Response, expectedStatus int) {
+	t.Helper()
+
 	assert.Equal(t, expectedStatus, resp.StatusCode)
 	assert.Contains(t, resp.Header.Get(fiber.HeaderContentType), "application/json")
 
@@ -393,46 +391,58 @@ func assertErrorResponse(t *testing.T, resp *http.Response, expectedStatus int) 
 	assert.Equal(t, expectedStatus, result.Status)
 }
 
-func assertCookie(t *testing.T, encKey string, expected *http.Cookie, actual *http.Cookie) {
-	actual.Value = decryptCookieValue(t, encKey, actual.Value)
+func assertCookie(t *testing.T, expected *http.Cookie, actual *http.Cookie) {
+	t.Helper()
+
+	// these properties should always be set like this
+	expected.HttpOnly = true
+	expected.Path = "/api"
+	expected.Secure = true
+	expected.SameSite = http.SameSiteStrictMode
+
+	actual.Value = decryptCookieValue(t, actual.Value)
 	actual.Raw = ""
 	actual.RawExpires = ""
 	assert.Equal(t, expected, actual)
 }
 
-func decryptCookieValue(t *testing.T, encKey string, value string) string {
+func decryptCookieValue(t *testing.T, value string) string {
 	t.Helper()
 
-	v, err := encryptcookie.DecryptCookie(value, encKey)
+	v, err := encryptcookie.DecryptCookie(value, cookieEncryptionKey)
 	require.NoError(t, err)
 
 	return v
 }
 
-func encryptCookieValue(t *testing.T, encKey string, value string) string {
+func encryptCookieValue(t *testing.T, value string) string {
 	t.Helper()
 
-	v, err := encryptcookie.EncryptCookie(value, encKey)
+	v, err := encryptcookie.EncryptCookie(value, cookieEncryptionKey)
 	require.NoError(t, err)
 
 	return v
 }
 
-func defaultServer(service oidc.Service) *server.Server {
+func expiresIn(d time.Duration) time.Time {
+	return staticTimeSvc.Now().Add(d).Truncate(time.Second).UTC()
+}
+
+func defaultServer(svc oidc.Service, timeSvc common.TimeService) *server.Server {
 	cfg := &config.Server{
 		Cookie: config.Cookie{
-			EncryptionKey: "01234567890123456789012345678901",
+			EncryptionKey: cookieEncryptionKey,
 		},
 	}
 	srv := server.NewHTTPServer(cfg)
 
 	cfgOidc := config.Oidc{
-		StateCookieAge:    time.Second * 5,
+		StateCookieAge:    5 * time.Second,
 		SessionCookieName: "SESSION",
-		RedirectURI:       "https://localhost/home",
+		RedirectURI:       "http://localhost/home",
 	}
 	srv.RegisterAPIRoutes(func(r fiber.Router) {
-		loginadapters.Routes(r.Group("/"), cfgOidc, service)
+		loginadapters.Routes(r.Group("/"), cfgOidc, svc, timeSvc)
 	})
 
 	return srv

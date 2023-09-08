@@ -21,12 +21,12 @@ const stateCookie = "TOKEN_STATE"
 const sessionCookie = "SESSION"
 
 // Routes All login and user related routes.
-func Routes(app fiber.Router, cfg config.Oidc, svc oidc.Service) {
+func Routes(app fiber.Router, cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService) {
 	authMiddleware := oidc.NewOauthMiddleware(cfg, svc)
 
-	app.Get("/login/:provider", Login(cfg, svc))
-	app.Post("/login/:provider/token", ExchangeCode(svc))
-	app.Post("/logout", Logout(svc))
+	app.Get("/login/:provider", Login(cfg, svc, timeSvc))
+	app.Post("/login/:provider/token", ExchangeCode(svc, timeSvc))
+	app.Post("/logout", Logout(svc, timeSvc))
 	app.Get("/user", authMiddleware, GetCurrentUser())
 }
 
@@ -35,7 +35,7 @@ type AuthCode struct {
 	State string `json:"state" form:"state"`
 }
 
-func Login(cfg config.Oidc, svc oidc.Service) fiber.Handler {
+func Login(cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -49,13 +49,14 @@ func Login(cfg config.Oidc, svc oidc.Service) fiber.Handler {
 			return err
 		}
 
-		setCookie(c, stateCookie, url.State, cfg.StateCookieAge)
+		expires := timeSvc.Now().Add(cfg.StateCookieAge)
+		setCookie(c, stateCookie, url.State, expires)
 
 		return c.Redirect(url.URL, http.StatusFound)
 	}
 }
 
-func ExchangeCode(svc oidc.Service) fiber.Handler {
+func ExchangeCode(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -71,7 +72,7 @@ func ExchangeCode(svc oidc.Service) fiber.Handler {
 			return common.NewInvalidInputError(sErr, "code-exchange-missing-state", sErr.Error())
 		}
 
-		clearCookie(c, stateCookie)
+		clearCookie(c, stateCookie, timeSvc.Now())
 
 		var body AuthCode
 		if err = c.BodyParser(&body); err != nil {
@@ -94,10 +95,50 @@ func ExchangeCode(svc oidc.Service) fiber.Handler {
 			return err
 		}
 
-		expires := time.Second * time.Duration(2*token.ExpiresIn)
+		expires := timeSvc.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
 		setCookie(c, sessionCookie, token64, expires)
 
 		return commonhttp.RenderJSON(c, contextUserToUser(user))
+	}
+}
+
+func Logout(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		clearCookie(c, stateCookie, timeSvc.Now())
+
+		cookieValue := strings.TrimSpace(c.Cookies(sessionCookie))
+		if cookieValue == "" {
+			return c.SendStatus(http.StatusOK)
+		}
+		clearCookie(c, sessionCookie, timeSvc.Now())
+
+		token, err := fromBase64(cookieValue)
+		if err != nil {
+			return err
+		}
+
+		provider, err := required(token.Provider, "provider")
+		if err != nil {
+			return err
+		}
+
+		err = svc.Logout(provider, token)
+		if err != nil {
+			return err
+		}
+
+		return c.SendStatus(http.StatusOK)
+	}
+}
+
+func GetCurrentUser() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u, err := auth.UserFromCtx(c)
+		if err != nil {
+			return c.SendStatus(http.StatusForbidden)
+		}
+
+		return commonhttp.RenderJSON(c, contextUserToUser(u))
 	}
 }
 
@@ -138,65 +179,26 @@ func fromBase64(base64Token string) (*oidc.JSONWebToken, error) {
 	return &token, nil
 }
 
-// TODO restrict to specific path?
-func setCookie(c *fiber.Ctx, name string, value string, maxAge time.Duration) {
+func setCookie(c *fiber.Ctx, name string, value string, expires time.Time) {
 	c.Cookie(&fiber.Cookie{
 		Name:     name,
 		Value:    value,
 		HTTPOnly: true,
-		MaxAge:   int(maxAge.Seconds()),
 		Secure:   true,
+		Path:     "/api",
 		SameSite: fiber.CookieSameSiteStrictMode,
+		Expires:  expires,
 	})
 }
 
-func clearCookie(c *fiber.Ctx, name string) {
+func clearCookie(c *fiber.Ctx, name string, now time.Time) {
 	cookie := c.Cookies(name)
 	if cookie == "" {
 		return
 	}
 
-	setCookie(c, name, "invalid", 0)
-}
-
-func Logout(svc oidc.Service) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		clearCookie(c, stateCookie)
-
-		cookieValue := strings.TrimSpace(c.Cookies(sessionCookie))
-		if cookieValue == "" {
-			return c.SendStatus(http.StatusOK)
-		}
-		clearCookie(c, sessionCookie)
-
-		token, err := fromBase64(cookieValue)
-		if err != nil {
-			return err
-		}
-
-		provider, err := required(token.Provider, "provider")
-		if err != nil {
-			return err
-		}
-
-		err = svc.Logout(provider, token)
-		if err != nil {
-			return err
-		}
-
-		return c.SendStatus(http.StatusOK)
-	}
-}
-
-func GetCurrentUser() fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		u, err := auth.UserFromCtx(c)
-		if err != nil {
-			return c.SendStatus(http.StatusForbidden)
-		}
-
-		return commonhttp.RenderJSON(c, contextUserToUser(u))
-	}
+	minusOneWeek := now.Add(-7 * 24 * time.Hour)
+	setCookie(c, name, "invalid", minusOneWeek)
 }
 
 func contextUserToUser(u *auth.User) *User {

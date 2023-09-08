@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -78,15 +79,17 @@ type Images struct {
 }
 
 func NewConfig(path string) (*Config, error) {
-	s, err := os.Stat(path)
+	p := filepath.Clean(path)
+
+	s, err := os.Stat(p)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file info for %s, %w", path, err)
+		return nil, fmt.Errorf("failed to read file info for %s, %w", p, err)
 	}
 	if s.IsDir() {
-		return nil, fmt.Errorf("'%s' is a directory, not a regular file", path)
+		return nil, fmt.Errorf("'%s' is a directory, not a regular file", p)
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(p)
 	if err != nil {
 		return nil, fmt.Errorf("can't read config file: %w", err)
 	}

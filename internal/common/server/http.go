@@ -29,7 +29,7 @@ func NewHTTPServer(cfg *config.Server) *Server {
 	app.Use(cors.New(cors.Config{
 		AllowHeaders: "Origin,Content-Type,Accept,Content-Length,Accept-Language," +
 			"Accept-Encoding,Connection,Access-Control-Allow-Origin",
-		AllowOrigins:     "*",
+		AllowOrigins:     "http://localhost:8000", // FIXME that should be configurable
 		AllowCredentials: true,
 		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
 	}))

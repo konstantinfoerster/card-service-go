@@ -78,7 +78,7 @@ func jwtFromCookie(cookie string) (*JSONWebToken, error) {
 
 	rawJwt, err := base64.URLEncoding.DecodeString(cookie)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to decode base64 string")
+		log.Error().Err(err).Str("cookie", cookie).Msg("failed to decode base64 cookie")
 
 		return nil, common.NewUnknownError(err, "unable-to-decode-token")
 	}

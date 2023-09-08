@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
@@ -76,17 +77,18 @@ func run(cfg *config.Config) error {
 	client := &http.Client{
 		Timeout: time.Second * time.Duration(5),
 	}
-	provider, err := oidc.FromConfiguration(cfg.Oidc, client)
+	oidcProvider, err := oidc.FromConfiguration(cfg.Oidc, client)
 	if err != nil {
 		return fmt.Errorf("failed to load oidc provider, %w", err)
 	}
 
-	authService := oidc.New(cfg.Oidc, provider)
+	timeService := common.NewTimeService()
+	authService := oidc.New(cfg.Oidc, oidcProvider)
 
 	srv := server.NewHTTPServer(&cfg.Server).RegisterAPIRoutes(func(r fiber.Router) {
 		v1 := r.Group("/api").Group("/v1")
 
-		loginadapters.Routes(v1, cfg.Oidc, authService)
+		loginadapters.Routes(v1, cfg.Oidc, authService, timeService)
 		searchadapters.Routes(v1, searchService)
 	})
 

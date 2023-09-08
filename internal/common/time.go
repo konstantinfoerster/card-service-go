@@ -3,7 +3,7 @@ package common
 import "time"
 
 type TimeService interface {
-	CurrentTime() time.Time
+	Now() time.Time
 }
 
 func NewTimeService() TimeService {
@@ -13,7 +13,7 @@ func NewTimeService() TimeService {
 type clockService struct {
 }
 
-func (s *clockService) CurrentTime() time.Time {
+func (s *clockService) Now() time.Time {
 	return time.Now()
 }
 
@@ -27,6 +27,6 @@ type fakeClockService struct {
 	time time.Time
 }
 
-func (s *fakeClockService) CurrentTime() time.Time {
+func (s *fakeClockService) Now() time.Time {
 	return s.time
 }
