@@ -102,8 +102,7 @@ linters-settings:
   cyclop:
     # The maximal code complexity to report.
     # Default: 10
-    # TODO try to reduce to 30
-    max-complexity: 33
+    max-complexity: 10
     # The maximal average package complexity.
     # If it's higher than 0.0 (float) the check is enabled
     # Default: 0.0
@@ -117,11 +116,11 @@ linters-settings:
     # Checks the number of lines in a function.
     # If lower than 0, disable the check.
     # Default: 60
-    lines: 100
+    lines: 80
     # Checks the number of statements in a function.
     # If lower than 0, disable the check.
     # Default: 40
-    statements: 50
+    statements: 40
   gomnd:
     # List of function patterns to exclude from analysis.
     # Values always ignored: `time.Date`,
@@ -137,10 +136,6 @@ linters-settings:
       - flag.IntVar
       - time.Sleep
       - time.Duration
-    ignored-numbers:
-      - '500'
-      - '404'
-      - '400'
   tagliatelle:
     # Check the struck tag name case.
     case:
