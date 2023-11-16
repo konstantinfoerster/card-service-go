@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/stretchr/testify/assert"
 )
 

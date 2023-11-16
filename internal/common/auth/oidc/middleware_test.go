@@ -9,15 +9,18 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockUserService struct {
 	FakeGetAuthenticatedUser func() (*auth.User, error)
 }
+
+var _ oidc.UserService = (*mockUserService)(nil)
 
 func (s *mockUserService) GetAuthenticatedUser(_ string, _ *oidc.JSONWebToken) (*auth.User, error) {
 	if s.FakeGetAuthenticatedUser != nil {
@@ -38,11 +41,11 @@ func TestOauthMiddleware(t *testing.T) {
 		},
 	}
 	app := fiber.New()
-	app.Use(oidc.NewOauthMiddleware(config.Oidc{}, svc))
+	app.Use(oidc.NewOauthMiddleware(svc))
 	app.Get("/test", func(c *fiber.Ctx) error {
 		user, err := auth.UserFromCtx(c)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expectedUser, user)
 
 		return c.SendString("OK")
@@ -58,7 +61,7 @@ func TestOauthMiddleware(t *testing.T) {
 
 	resp, err := app.Test(req)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
@@ -71,11 +74,11 @@ func TestOauthMiddlewareUseConfiguredCookie(t *testing.T) {
 	}
 	cfg := config.Oidc{SessionCookieName: "MY_SESSION"}
 	app := fiber.New()
-	app.Use(oidc.NewOauthMiddleware(cfg, svc))
+	app.Use(oidc.NewOauthMiddleware(svc, oidc.FromConfig(cfg)))
 	app.Get("/test", func(c *fiber.Ctx) error {
 		user, err := auth.UserFromCtx(c)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, expectedUser, user)
 
 		return c.SendString("OK")
@@ -91,7 +94,7 @@ func TestOauthMiddlewareUseConfiguredCookie(t *testing.T) {
 
 	resp, err := app.Test(req)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
@@ -167,7 +170,7 @@ func TestOauthMiddlewareError(t *testing.T) {
 			app := fiber.New(fiber.Config{
 				ErrorHandler: problemjson.RespondWithProblemJSON,
 			})
-			app.Use(oidc.NewOauthMiddleware(cfg, tc.svc))
+			app.Use(oidc.NewOauthMiddleware(tc.svc, oidc.FromConfig(cfg)))
 			app.Get("/test", func(c *fiber.Ctx) error {
 				t.Fatalf("that should never be called")
 
@@ -182,7 +185,7 @@ func TestOauthMiddlewareError(t *testing.T) {
 
 			resp, err := app.Test(req)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 		})
 	}

@@ -8,8 +8,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type Server struct {
@@ -32,6 +32,7 @@ func NewHTTPServer(cfg *config.Server) *Server {
 		AllowOrigins:     "http://localhost:8000", // FIXME that should be configurable
 		AllowCredentials: true,
 		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+		MaxAge:           -1,
 	}))
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",

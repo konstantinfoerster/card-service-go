@@ -47,3 +47,8 @@ your golang code.
 
 Just run `docker run --pull always --rm -v $(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -v`
 inside the root dir of the project to start the linting process.
+
+# TODOs
+
+* rearrange the collection adapter parts
+  * maybe in different subdomains?

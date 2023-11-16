@@ -1,4 +1,4 @@
-package adapters
+package adapter
 
 import (
 	"encoding/base64"
@@ -12,8 +12,8 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,12 +22,12 @@ const sessionCookie = "SESSION"
 
 // Routes All login and user related routes.
 func Routes(app fiber.Router, cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService) {
-	authMiddleware := oidc.NewOauthMiddleware(cfg, svc)
+	authMiddleware := oidc.NewOauthMiddleware(svc, oidc.FromConfig(cfg))
 
-	app.Get("/login/:provider", Login(cfg, svc, timeSvc))
-	app.Post("/login/:provider/token", ExchangeCode(svc, timeSvc))
-	app.Post("/logout", Logout(svc, timeSvc))
-	app.Get("/user", authMiddleware, GetCurrentUser())
+	app.Get("/login/:provider", login(cfg, svc, timeSvc))
+	app.Post("/login/:provider/token", exchangeCode(svc, timeSvc))
+	app.Post("/logout", logout(svc, timeSvc))
+	app.Get("/user", authMiddleware, getCurrentUser())
 }
 
 type AuthCode struct {
@@ -35,7 +35,7 @@ type AuthCode struct {
 	State string `json:"state" form:"state"`
 }
 
-func Login(cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
+func login(cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -56,7 +56,7 @@ func Login(cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService) fiber.
 	}
 }
 
-func ExchangeCode(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
+func exchangeCode(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -67,9 +67,7 @@ func ExchangeCode(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 
 		cookieValue := strings.TrimSpace(c.Cookies(stateCookie))
 		if cookieValue == "" {
-			sErr := fmt.Errorf("missing state")
-
-			return common.NewInvalidInputError(sErr, "code-exchange-missing-state", sErr.Error())
+			return common.NewInvalidInputMsg("code-exchange-missing-state", "missing state")
 		}
 
 		clearCookie(c, stateCookie, timeSvc.Now())
@@ -80,9 +78,7 @@ func ExchangeCode(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 		}
 
 		if cookieValue == "" || body.State != cookieValue {
-			sErr := fmt.Errorf("invalid state")
-
-			return common.NewInvalidInputError(sErr, "code-exchange-invalid-state", sErr.Error())
+			return common.NewInvalidInputMsg("code-exchange-invalid-state", "invalid state")
 		}
 
 		user, token, err := svc.Authenticate(provider, body.Code)
@@ -102,7 +98,7 @@ func ExchangeCode(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 	}
 }
 
-func Logout(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
+func logout(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		clearCookie(c, stateCookie, timeSvc.Now())
 
@@ -131,7 +127,7 @@ func Logout(svc oidc.Service, timeSvc common.TimeService) fiber.Handler {
 	}
 }
 
-func GetCurrentUser() fiber.Handler {
+func getCurrentUser() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		u, err := auth.UserFromCtx(c)
 		if err != nil {

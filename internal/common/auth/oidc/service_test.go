@@ -13,8 +13,8 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,7 +53,7 @@ func TestUnsupportedProvider(t *testing.T) {
 			_, _, err := svc.Authenticate(tc.provider, "")
 
 			var appErr common.AppError
-			assert.ErrorAs(t, err, &appErr)
+			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
 
@@ -63,7 +63,7 @@ func TestUnsupportedProvider(t *testing.T) {
 			_, err := svc.GetAuthURL(tc.provider)
 
 			var appErr common.AppError
-			assert.ErrorAs(t, err, &appErr)
+			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
 
@@ -73,7 +73,7 @@ func TestUnsupportedProvider(t *testing.T) {
 			_, err := svc.GetAuthenticatedUser(tc.provider, nil)
 
 			var appErr common.AppError
-			assert.ErrorAs(t, err, &appErr)
+			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
 
@@ -83,7 +83,7 @@ func TestUnsupportedProvider(t *testing.T) {
 			err := svc.Logout(tc.provider, nil)
 
 			var appErr common.AppError
-			assert.ErrorAs(t, err, &appErr)
+			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
 	}
@@ -103,7 +103,7 @@ func TestGetAuthURL(t *testing.T) {
 	actualURL, err := svc.GetAuthURL("test")
 	expectedURL := "http://localhost/oauth2/auth?state=" + actualURL.State + "&client_id=client+id+0&redirect_uri=http%3A%2F%2Flocalhost&scope=openid+email&response_type=code&access_type=offline"
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, strings.TrimSpace(actualURL.State))
 	assert.Equal(t, expectedURL, actualURL.URL)
 }
@@ -130,7 +130,7 @@ func TestAuthenticate(t *testing.T) {
 
 	user, token, err := svc.Authenticate("test", "code-0")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "test", token.Provider)
 	assert.Equal(t, &auth.User{ID: "1", Username: "test@localhost"}, user)
 }
@@ -144,9 +144,9 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 	svc := oidc.New(config.Oidc{}, []oidc.Provider{oidc.TestProvider(pCfg, client)})
 
 	_, _, err := svc.Authenticate("test", "code-0")
-	assert.Error(t, err)
+	require.Error(t, err)
 	var appErr common.AppError
-	assert.ErrorAs(t, err, &appErr)
+	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, common.ErrTypeUnknown, appErr.ErrorType)
 }
 
@@ -155,7 +155,7 @@ func TestGetAuthenticatedUser(t *testing.T) {
 
 	user, err := svc.GetAuthenticatedUser("test", &oidc.JSONWebToken{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, &auth.User{ID: "1", Username: "test@localhost"}, user)
 }
 
@@ -172,7 +172,7 @@ func TestLogout(t *testing.T) {
 
 	err := svc.Logout("test", &oidc.JSONWebToken{AccessToken: "token-0"})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func startProviderServer(t *testing.T, expectedBody string) *httptest.Server {

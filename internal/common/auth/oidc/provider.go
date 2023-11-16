@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 func TestProvider(cfg config.Provider, client *http.Client) Provider {

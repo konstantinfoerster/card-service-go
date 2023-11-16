@@ -3,7 +3,7 @@ package domain_test
 import (
 	"testing"
 
-	"github.com/konstantinfoerster/card-service-go/internal/search/domain"
+	"github.com/konstantinfoerster/card-service-go/internal/collection/domain"
 	"github.com/stretchr/testify/assert"
 )
 

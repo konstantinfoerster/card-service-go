@@ -18,7 +18,7 @@ func TestUserFromCtx(t *testing.T) {
 
 		user, err := auth.UserFromCtx(c)
 
-		assert.NoError(t, err, auth.ErrNoUserInContext)
+		require.NoError(t, err)
 		assert.NotNil(t, user)
 
 		return nil
@@ -66,7 +66,7 @@ func TestUserFromCtxInvalidInput(t *testing.T) {
 				user, err := auth.UserFromCtx(c)
 
 				assert.Nil(t, user)
-				assert.ErrorIs(t, err, auth.ErrNoUserInContext)
+				require.ErrorIs(t, err, auth.ErrNoUserInContext)
 
 				return nil
 			})

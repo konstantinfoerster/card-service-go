@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	collectionadapter "github.com/konstantinfoerster/card-service-go/internal/collection/adapter"
+	collection "github.com/konstantinfoerster/card-service-go/internal/collection/application"
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
-	loginadapters "github.com/konstantinfoerster/card-service-go/internal/login/adapters"
-	searchadapters "github.com/konstantinfoerster/card-service-go/internal/search/adapters"
-	search "github.com/konstantinfoerster/card-service-go/internal/search/application"
+	loginadapter "github.com/konstantinfoerster/card-service-go/internal/login/adapter"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
@@ -71,9 +71,6 @@ func run(cfg *config.Config) error {
 	}
 	defer commonio.Close(dbCon)
 
-	rep := searchadapters.NewRepository(dbCon, cfg.Images)
-	searchService := search.New(rep)
-
 	client := &http.Client{
 		Timeout: time.Second * time.Duration(5),
 	}
@@ -85,11 +82,18 @@ func run(cfg *config.Config) error {
 	timeService := common.NewTimeService()
 	authService := oidc.New(cfg.Oidc, oidcProvider)
 
+	cardRepo := collectionadapter.NewCardRepository(dbCon, cfg.Images)
+	searchService := collection.NewSearchService(cardRepo)
+
+	collectionRep := collectionadapter.NewCollectionRepository(dbCon, cfg.Images)
+	collectService := collection.NewCollectService(collectionRep, cardRepo)
+
 	srv := server.NewHTTPServer(&cfg.Server).RegisterAPIRoutes(func(r fiber.Router) {
 		v1 := r.Group("/api").Group("/v1")
 
-		loginadapters.Routes(v1, cfg.Oidc, authService, timeService)
-		searchadapters.Routes(v1, searchService)
+		loginadapter.Routes(v1, cfg.Oidc, authService, timeService)
+		collectionadapter.SearchRoutes(v1, cfg.Oidc, authService, searchService)
+		collectionadapter.CollectRoutes(v1, cfg.Oidc, authService, collectService)
 	})
 
 	return srv.Run()

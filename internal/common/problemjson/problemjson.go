@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const problemJSONContentType = "application/problem+json"
+const ContentType = "application/problem+json"
 
 type ProblemJSON struct {
 	// A URI reference [RFC3986] that identifies the problem type.
@@ -56,8 +56,7 @@ func unauthorized(c *fiber.Ctx, key string, err error) error {
 	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
 
 	return c.Status(statusCode).
-		Type(problemJSONContentType).
-		JSON(NewProblemJSON(http.StatusText(statusCode), key, statusCode))
+		JSON(NewProblemJSON(http.StatusText(statusCode), key, statusCode), ContentType)
 }
 
 func badRequest(c *fiber.Ctx, title string, key string, err error) error {
@@ -65,8 +64,7 @@ func badRequest(c *fiber.Ctx, title string, key string, err error) error {
 	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
 
 	return c.Status(statusCode).
-		Type(problemJSONContentType).
-		JSON(NewProblemJSON(title, key, statusCode))
+		JSON(NewProblemJSON(title, key, statusCode), ContentType)
 }
 
 func internalError(c *fiber.Ctx, key string, err error) error {
@@ -74,6 +72,5 @@ func internalError(c *fiber.Ctx, key string, err error) error {
 	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
 
 	return c.Status(statusCode).
-		Type(problemJSONContentType).
-		JSON(NewProblemJSON(http.StatusText(statusCode), key, statusCode))
+		JSON(NewProblemJSON(http.StatusText(statusCode), key, statusCode), ContentType)
 }
