@@ -8,11 +8,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewHttpServerErrorHandler(t *testing.T) {
@@ -56,9 +57,9 @@ func TestNewHttpServerErrorHandler(t *testing.T) {
 			resp, err := srv.Test(req)
 			defer commontest.Close(t, resp)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.statusCode, resp.StatusCode)
-			assert.Contains(t, resp.Header.Get(fiber.HeaderContentType), "application/json")
+			assert.Equal(t, problemjson.ContentType, resp.Header.Get(fiber.HeaderContentType))
 			result := commontest.FromJSON[problemjson.ProblemJSON](t, resp)
 			assert.Equal(t, tc.statusCode, result.Status)
 			assert.NotEmpty(t, result.Key)
@@ -88,6 +89,6 @@ func TestNewHttpServerCookieEncryption(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEqual(t, "myValue", resp.Cookies()[0].Value)
 }

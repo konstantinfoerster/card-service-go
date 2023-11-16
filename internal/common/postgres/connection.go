@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 )
 
 type DBConnection struct {

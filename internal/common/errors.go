@@ -46,6 +46,14 @@ func NewInvalidInputError(err error, key string, msg string) AppError {
 	}
 }
 
+func NewInvalidInputMsg(key string, msg string) AppError {
+	return AppError{
+		Key:       key,
+		Msg:       msg,
+		ErrorType: ErrTypeInvalidInput,
+	}
+}
+
 func NewUnknownError(err error, key string) AppError {
 	return AppError{
 		Err:       err,

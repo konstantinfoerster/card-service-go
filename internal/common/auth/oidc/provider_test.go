@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFromConfiguration(t *testing.T) {
@@ -21,7 +22,7 @@ func TestFromConfiguration(t *testing.T) {
 
 	provider, err := oidc.FromConfiguration(cfg, &http.Client{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, provider, 1)
 }
 
@@ -78,7 +79,7 @@ func TestFromConfigurationMisconfigured(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := oidc.FromConfiguration(tc.cfg, tc.client)
 
-			assert.Error(t, err)
+			require.Error(t, err)
 		})
 	}
 }

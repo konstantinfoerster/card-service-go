@@ -1,6 +1,18 @@
 package domain
 
-// TODO Should this be part of the domain?
+import "fmt"
+
+type Card struct {
+	// ID unique card id
+	ID int
+	// Name the card face name
+	Name string
+	// Image the full image URL
+	Image string
+	// Amount how often this card is in a collection
+	Amount int
+}
+
 type Page struct {
 	p, s int
 }
@@ -61,6 +73,10 @@ func HasMore(page Page, resultSize int) bool {
 	return resultSize >= page.Size()
 }
 
-type Repository interface {
+var ErrCardNotFound = fmt.Errorf("card not found")
+
+type CardRepository interface {
+	ByID(id int) (*Card, error)
 	FindByName(name string, page Page) (PagedResult, error)
+	FindByNameAndCollector(name string, page Page, collector Collector) (PagedResult, error)
 }

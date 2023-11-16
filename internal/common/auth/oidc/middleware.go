@@ -9,18 +9,18 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/rs/zerolog/log"
 )
 
-type Config struct {
-	Key       string
-	Extractor func(*fiber.Ctx, string) (*auth.User, error)
+type MiddlewareConfig struct {
+	AllowEmptyCookie bool
+	Key              string
+	Extractor        func(*fiber.Ctx, string) (*auth.User, error)
 }
 
-func NewOauthMiddleware(cfg config.Oidc, svc UserService) fiber.Handler {
-	c := Config{
-		Key: cfg.SessionCookieName,
+func NewOauthMiddleware(svc UserService, options ...func(*MiddlewareConfig)) fiber.Handler {
+	c := MiddlewareConfig{
 		Extractor: func(ctx *fiber.Ctx, cookie string) (*auth.User, error) {
 			jwtToken, err := jwtFromCookie(cookie)
 			if err != nil {
@@ -31,12 +31,28 @@ func NewOauthMiddleware(cfg config.Oidc, svc UserService) fiber.Handler {
 		},
 	}
 
+	for _, optionFn := range options {
+		optionFn(&c)
+	}
+
 	return newTokenExtractHandler(c)
 }
 
-func newTokenExtractHandler(config ...Config) fiber.Handler {
+func FromConfig(cfg config.Oidc) func(*MiddlewareConfig) {
+	return func(c *MiddlewareConfig) {
+		c.Key = cfg.SessionCookieName
+	}
+}
+
+func AllowEmptyCookie() func(*MiddlewareConfig) {
+	return func(c *MiddlewareConfig) {
+		c.AllowEmptyCookie = true
+	}
+}
+
+func newTokenExtractHandler(config ...MiddlewareConfig) fiber.Handler {
 	// Init config
-	var cfg Config
+	var cfg MiddlewareConfig
 	if len(config) > 0 {
 		cfg = config[0]
 	}
@@ -52,6 +68,10 @@ func newTokenExtractHandler(config ...Config) fiber.Handler {
 		// Extract and verify key
 		key := c.Cookies(cfg.Key)
 		if key == "" {
+			if cfg.AllowEmptyCookie {
+				return c.Next()
+			}
+
 			return common.NewAuthorizationError(fmt.Errorf("unauthorized"), "unauthorized")
 		}
 

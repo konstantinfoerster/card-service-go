@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 )
 
 type RedirectURL struct {

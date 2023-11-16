@@ -8,8 +8,9 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
+	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -73,7 +74,7 @@ func (r *DatabaseRunner) Start() (*postgres.DBConnection, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer logs.Close()
+		defer commonio.Close(logs)
 
 		b, err := io.ReadAll(logs)
 		if err != nil {

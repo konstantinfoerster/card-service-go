@@ -1,4 +1,4 @@
-package adapters_test
+package adapter_test
 
 import (
 	"fmt"
@@ -12,11 +12,11 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
-	loginadapters "github.com/konstantinfoerster/card-service-go/internal/login/adapters"
+	loginadapter "github.com/konstantinfoerster/card-service-go/internal/login/adapter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +31,8 @@ type mockOIDCService struct {
 	FakeGetAuthenticatedUser func(provider string, token *oidc.JSONWebToken) (*auth.User, error)
 	FakeLogout               func(provider string, token *oidc.JSONWebToken) error
 }
+
+var _ oidc.Service = (*mockOIDCService)(nil)
 
 func (s *mockOIDCService) GetAuthURL(provider string) (*oidc.RedirectURL, error) {
 	if s.FakeGetAuthURL != nil {
@@ -91,7 +93,7 @@ func TestGetLoginURL(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusFound, resp.StatusCode)
 	assert.Equal(t, "http://authserver.local", resp.Header.Get("Location"))
 	assertCookie(t, expectedCookie, resp.Cookies()[0])
@@ -112,7 +114,7 @@ func TestGetLoginURLError(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assertErrorResponse(t, resp, http.StatusInternalServerError)
 }
 
@@ -141,7 +143,7 @@ func TestPostExchangeCode(t *testing.T) {
 	req := commontest.NewRequest(
 		commontest.WithMethod(http.MethodPost),
 		commontest.WithURL("http://localhost/login/myProvider/token"),
-		commontest.WithJSONBody(t, loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"}),
+		commontest.WithJSONBody(t, loginadapter.AuthCode{Code: "myAuthCode", State: "state-0"}),
 		commontest.WithCookie(&http.Cookie{
 			Name:  "TOKEN_STATE",
 			Value: encryptCookieValue(t, "state-0"),
@@ -162,10 +164,10 @@ func TestPostExchangeCode(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, fiber.MIMEApplicationJSONCharsetUTF8, resp.Header.Get(fiber.HeaderContentType))
-	assert.Equal(t, &loginadapters.User{Username: "myUser"}, commontest.FromJSON[loginadapters.User](t, resp))
+	assert.Equal(t, &loginadapter.User{Username: "myUser"}, commontest.FromJSON[loginadapter.User](t, resp))
 	assert.Len(t, resp.Cookies(), 2)
 	assertCookie(t, expectedTokenCookie, resp.Cookies()[0])
 	assertCookie(t, expectedSessionCookie, resp.Cookies()[1])
@@ -174,14 +176,14 @@ func TestPostExchangeCode(t *testing.T) {
 func TestPostExchangeInvalidInput(t *testing.T) {
 	cases := []struct {
 		name       string
-		body       *loginadapters.AuthCode
+		body       *loginadapter.AuthCode
 		stateValue string
 		svc        oidc.Service
 		statusCode int
 	}{
 		{
 			name:       "No state cookie",
-			body:       &loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"},
+			body:       &loginadapter.AuthCode{Code: "myAuthCode", State: "state-0"},
 			stateValue: "",
 			svc:        &mockOIDCService{},
 			statusCode: http.StatusBadRequest,
@@ -195,21 +197,21 @@ func TestPostExchangeInvalidInput(t *testing.T) {
 		},
 		{
 			name:       "Invalid body",
-			body:       &loginadapters.AuthCode{Code: "", State: ""},
+			body:       &loginadapter.AuthCode{Code: "", State: ""},
 			stateValue: "state-0",
 			svc:        &mockOIDCService{},
 			statusCode: http.StatusBadRequest,
 		},
 		{
 			name:       "state mismatch",
-			body:       &loginadapters.AuthCode{Code: "myAuthCode", State: "state-1"},
+			body:       &loginadapter.AuthCode{Code: "myAuthCode", State: "state-1"},
 			stateValue: "state-0",
 			svc:        &mockOIDCService{},
 			statusCode: http.StatusBadRequest,
 		},
 		{
 			name:       "Failed authentication",
-			body:       &loginadapters.AuthCode{Code: "myAuthCode", State: "state-0"},
+			body:       &loginadapter.AuthCode{Code: "myAuthCode", State: "state-0"},
 			stateValue: "state-0",
 			svc: &mockOIDCService{
 				FakeAuthenticate: func(provider string, authCode string) (*auth.User, *oidc.JSONWebToken, error) {
@@ -238,7 +240,7 @@ func TestPostExchangeInvalidInput(t *testing.T) {
 			resp, err := srv.Test(req)
 			defer commontest.Close(t, resp)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assertErrorResponse(t, resp, tc.statusCode)
 		})
 	}
@@ -266,10 +268,10 @@ func TestGetCurrentUser(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, fiber.MIMEApplicationJSONCharsetUTF8, resp.Header.Get(fiber.HeaderContentType))
-	assert.Equal(t, &loginadapters.User{Username: "myUser"}, commontest.FromJSON[loginadapters.User](t, resp))
+	assert.Equal(t, &loginadapter.User{Username: "myUser"}, commontest.FromJSON[loginadapter.User](t, resp))
 }
 
 func TestGetCurrentUserNotLoggedIn(t *testing.T) {
@@ -279,7 +281,7 @@ func TestGetCurrentUserNotLoggedIn(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assertErrorResponse(t, resp, http.StatusUnauthorized)
 }
 
@@ -308,7 +310,7 @@ func TestLogout(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Len(t, resp.Cookies(), 1)
 	assertCookie(t, expectedSessionCookie, resp.Cookies()[0])
@@ -321,7 +323,7 @@ func TestLogoutNoSession(t *testing.T) {
 	resp, err := srv.Test(req)
 	defer commontest.Close(t, resp)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
@@ -375,7 +377,7 @@ func TestLogoutError(t *testing.T) {
 			resp, err := srv.Test(req)
 			defer commontest.Close(t, resp)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assertErrorResponse(t, resp, tc.statusCode)
 		})
 	}
@@ -385,7 +387,7 @@ func assertErrorResponse(t *testing.T, resp *http.Response, expectedStatus int) 
 	t.Helper()
 
 	assert.Equal(t, expectedStatus, resp.StatusCode)
-	assert.Contains(t, resp.Header.Get(fiber.HeaderContentType), "application/json")
+	assert.Equal(t, problemjson.ContentType, resp.Header.Get(fiber.HeaderContentType))
 
 	result := commontest.FromJSON[problemjson.ProblemJSON](t, resp)
 	assert.Equal(t, expectedStatus, result.Status)
@@ -442,7 +444,7 @@ func defaultServer(svc oidc.Service, timeSvc common.TimeService) *server.Server 
 		RedirectURI:       "http://localhost/home",
 	}
 	srv.RegisterAPIRoutes(func(r fiber.Router) {
-		loginadapters.Routes(r.Group("/"), cfgOidc, svc, timeSvc)
+		loginadapter.Routes(r.Group("/"), cfgOidc, svc, timeSvc)
 	})
 
 	return srv

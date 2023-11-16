@@ -156,7 +156,7 @@ CREATE TABLE card_set
     code          VARCHAR(10) PRIMARY KEY NOT NULL CHECK ( code <> '' AND code = upper(code)),
     name          VARCHAR(255)            NOT NULL CHECK ( name <> '' ),
     type          card_set_type           NOT NULL, -- Enum
-    released      DATE, -- TODO check if not null is possible
+    released      DATE,                             -- TODO check if not null is possible
     total_count   INTEGER                 NOT NULL CHECK ( total_count >= 0 ),
     card_block_id INTEGER REFERENCES card_block (id),
     UNIQUE (code, card_block_id)
@@ -246,17 +246,16 @@ CREATE TABLE card_image
     image_path VARCHAR(255) NOT NULL CHECK ( image_path <> '' ),
     card_id    INTEGER      NOT NULL CHECK (card_id >= 0),
     face_id    INTEGER,
-    mime_type  VARCHAR(100) NOT NULL CHECK ( mime_type <> '' ),
+    mime_type  VARCHAR(100) NOT NULL CHECK (mime_type <> ''),
     lang_lang  CHAR(3) REFERENCES lang (lang),
     UNIQUE (image_path)
 );
 
-
---- Updates
--- ALTER TABLE card_image ADD mime_type VARCHAR(100);
--- UPDATE card_image SET mime_type = 'image/jpeg';
--- ALTER TABLE card_image ALTER COLUMN mime_type SET NOT NULL;
--- ALTER TABLE card_image ADD CHECK ( mime_type <> '' );
---
--- ALTER TABLE card_image ALTER COLUMN card_id SET NOT NULL;
--- ALTER TABLE card_image ADD CHECK (card_id >= 0);
+CREATE TABLE card_collection
+(
+    id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    card_id INTEGER      NOT NULL CHECK (card_id >= 0),
+    user_id VARCHAR(100) NOT NULL CHECK (user_id <> ''),
+    amount  INTEGER      NOT NULL DEFAULT 0 CHECK (amount >= 0 AND amount < 1000),
+    UNIQUE (card_id, user_id)
+);

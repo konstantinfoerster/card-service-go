@@ -11,7 +11,7 @@ linters:
     - govet # report suspicious code e.g. missing arguments in Printf
     - ineffassign # detect unused assignments to existing variables
     - staticcheck # static code analysis
-    - typecheck # parse and type-checks Go code
+    - unused # check for unused constants, variables, functions and types
 
     # additional linter
     - asciicheck # check if code contains non-ASCII identifiers
@@ -23,7 +23,7 @@ linters:
     - cyclop # checks function and package cyclomatic complexity (redundant with gocognit)
     - decorder # check declaration order and count of types, constants, variables and functions
     - dogsled # checks assignments with too many blank identifiers (e.g. x, , , _, := f())
-    - dupl # code clone detection
+    # - dupl # code clone detection
     - durationcheck # check for two durations multiplied together
     - errchkjson # checks types passed to the json encoding functions. Reports unsupported types.
     - errname # checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
@@ -69,11 +69,11 @@ linters:
     - tagliatelle # checks the struct tags
     - tenv # analyzer that detects using os.Setenv instead of t.Setenv since Go1.17
     - testableexamples # checks if examples are testable (have an expected output)
+    - testifylint # checks usage of github.com/stretchr/testify
     - testpackage # linter that makes you use a separate _test package
     - tparallel # detects inappropriate usage of t.Parallel() method in your Go test codes
     - unconvert # remove unnecessary type conversions
     - unparam # reports unused function parameters
-    - unused # check for unused constants, variables, functions and types
     - usestdlibvars # detects the possibility to use variables/constants from the Go standard library
     - wastedassign # finds wasted assignment statements.
     - whitespace # detection of leading and trailing whitespace

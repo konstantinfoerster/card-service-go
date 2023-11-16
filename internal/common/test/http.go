@@ -8,7 +8,11 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
+	"github.com/stretchr/testify/require"
 )
+
+const CookieEncryptionKey = "01234567890123456789012345678901"
 
 type httpRequest struct {
 	url     string
@@ -80,6 +84,17 @@ func WithCookie(cookie *http.Cookie) func(*httpRequest) {
 		}
 
 		req.cookies = append(req.cookies, cookie)
+	}
+}
+
+func WithEncryptedCookie(t *testing.T, cookie http.Cookie) func(*httpRequest) {
+	return func(req *httpRequest) {
+		v, err := encryptcookie.EncryptCookie(cookie.Value, CookieEncryptionKey)
+		require.NoError(t, err)
+
+		cookie.Value = v
+
+		req.cookies = append(req.cookies, &cookie)
 	}
 }
 
