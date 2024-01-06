@@ -1,0 +1,28 @@
+{{- define "card_list" -}}
+  {{- if .Page.Data -}}
+      {{ $length := len .Page.Data }}
+      {{ range $index, $card :=.Page.Data -}}
+        <div class="image-wrapper"
+             title="{{ .Name}}"
+        >
+          <img
+              data-testid="card-{{$index}}"
+              width="260"
+              height="362"
+                  {{/*                      {{if .Image}}src="{{ .Image}}"{{end}}*/}}
+              alt="{{ $card.Name}}"
+          />
+            {{/*                <div>{{ .Name}}</div>*/}}
+
+            {{ if $.User }}{{ template  "collect_action" . }}{{end}}
+        </div>
+        {{- if and ($.Page.HasMore) (isLastIndex $index $length) -}}
+          <div class="last-img"
+               hx-get="/api/v1/cards?name={{ $.Query.Name}}&page={{ $.Page.NextPage }}"
+               hx-trigger="revealed"
+               hx-swap="outerHTML"
+          ></div>
+        {{- end -}}
+      {{- end}}
+  {{ end }}
+{{end}}

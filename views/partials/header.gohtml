@@ -1,0 +1,49 @@
+<header class="primary-header flex">
+  <div>
+    <a  href="/" hx-target=".content">
+      <img class="logo" alt="Logo" src="">
+    </a>
+  </div>
+  <nav class="primary-navigation flex">
+    <ul>
+      <li>
+        {{if .User}}<a href="/mycards">My Cards</a>{{end}}
+      </li>
+    </ul>
+    <form action="/cards"
+          method="GET"
+          hx-get="/cards"
+          hx-target="main"
+          hx-push-url="true"
+    >
+      <input
+          placeholder="Eager Cadet"
+          type="search"
+          name="name"
+          value="{{ .Query.Name}}"
+      >
+    </form>
+
+    {{if .User}}
+      <div data-testid="user-profile-btn">
+        <button>
+            {{ .User.Initials}}
+        </button>
+
+        <ul>
+          <li>Logged in as {{ .User.Username}}</li>
+          <li><a href="/api/v1/logout">Logout</a></li>
+        </ul>
+      </div>
+    {{else}}
+      <div data-testid="user-login-btn">
+        <a
+            class="login-with-google"
+            href="/api/v1/login/google"
+        >
+          Login with Google
+        </a>
+      </div>
+    {{end}}
+  </nav>
+</header>

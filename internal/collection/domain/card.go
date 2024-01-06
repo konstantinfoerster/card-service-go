@@ -75,7 +75,7 @@ func HasMore(page Page, resultSize int) bool {
 
 var ErrCardNotFound = fmt.Errorf("card not found")
 
-type CardRepository interface {
+type SearchRepository interface {
 	ByID(id int) (*Card, error)
 	FindByName(name string, page Page) (PagedResult, error)
 	FindByNameAndCollector(name string, page Page, collector Collector) (PagedResult, error)

@@ -7,7 +7,6 @@ import (
 
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
 )
 
@@ -34,17 +33,7 @@ func NewFakeUserService() oidc.UserService {
 }
 
 func defaultServer() *server.Server {
-	cfg := &config.Config{
-		Server: config.Server{
-			Cookie: config.Cookie{
-				EncryptionKey: "01234567890123456789012345678901",
-			},
-		},
-	}
-
-	srv := server.NewHTTPServer(&cfg.Server)
-
-	return srv
+	return server.NewHTTPTestServer()
 }
 
 func TestMain(m *testing.M) {

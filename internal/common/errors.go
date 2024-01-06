@@ -1,5 +1,7 @@
 package common
 
+import "github.com/pkg/errors"
+
 type ErrorType struct {
 	t string
 }
@@ -13,25 +15,25 @@ var (
 type AppError struct {
 	Key       string
 	Msg       string
-	Err       error
+	Cause     error
 	ErrorType ErrorType
 }
 
 func (e AppError) Error() string {
-	if e.Err == nil {
+	if e.Cause == nil {
 		return e.Msg
 	}
 
-	return e.Err.Error()
+	return e.Cause.Error()
 }
 
 func (e AppError) Unwrap() error {
-	return e.Err
+	return e.Cause
 }
 
 func NewAuthorizationError(err error, key string) AppError {
 	return AppError{
-		Err:       err,
+		Cause:     errors.WithStack(err),
 		Key:       key,
 		ErrorType: ErrTypeAuthorization,
 	}
@@ -39,7 +41,7 @@ func NewAuthorizationError(err error, key string) AppError {
 
 func NewInvalidInputError(err error, key string, msg string) AppError {
 	return AppError{
-		Err:       err,
+		Cause:     errors.WithStack(err),
 		Key:       key,
 		Msg:       msg,
 		ErrorType: ErrTypeInvalidInput,
@@ -48,6 +50,7 @@ func NewInvalidInputError(err error, key string, msg string) AppError {
 
 func NewInvalidInputMsg(key string, msg string) AppError {
 	return AppError{
+		Cause:     errors.New(msg),
 		Key:       key,
 		Msg:       msg,
 		ErrorType: ErrTypeInvalidInput,
@@ -56,7 +59,7 @@ func NewInvalidInputMsg(key string, msg string) AppError {
 
 func NewUnknownError(err error, key string) AppError {
 	return AppError{
-		Err:       err,
+		Cause:     errors.WithStack(err),
 		Key:       key,
 		ErrorType: ErrTypeUnknown,
 	}

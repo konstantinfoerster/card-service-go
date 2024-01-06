@@ -24,22 +24,15 @@ var cardRepo = mocks.MockCardRepository{
 
 func TestCollectItem(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	i, err := domain.NewItem(1)
+	i, err := domain.NewItem(1, 2)
 	require.NoError(t, err)
 	collectionRepo := mocks.MockCollectionRepository{
-		MockAdd: func(item domain.Item, collector domain.Collector) error {
+		MockUpsert: func(item domain.Item, collector domain.Collector) error {
 			if item.ID != i.ID && collector.ID != c.ID {
 				return fmt.Errorf("exptcted item %d and collector %s, but got %d and %s", i.ID, c.ID, item.ID, collector.ID)
 			}
 
 			return nil
-		},
-		MockCount: func(itemID int, collector domain.Collector) (int, error) {
-			if itemID != i.ID && collector.ID != c.ID {
-				return 0, fmt.Errorf("exptcted item %d and collector %s, but got %d and %s", i.ID, c.ID, itemID, collector.ID)
-			}
-
-			return 2, nil
 		},
 	}
 	svc := application.NewCollectService(&collectionRepo, &cardRepo)
@@ -53,13 +46,13 @@ func TestCollectItem(t *testing.T) {
 
 func TestCollectNoneExistingItem(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	noneExistingItem, err := domain.NewItem(1000)
+	noneExistingItem, err := domain.NewItem(1000, 0)
 	require.NoError(t, err)
 	svc := application.NewCollectService(nil, &cardRepo)
 
 	collect, err := svc.Collect(noneExistingItem, c)
 
-	assert.Equal(t, domain.CollectableResult{}, collect)
+	assert.Equal(t, domain.Item{}, collect)
 	var appErr common.AppError
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, common.ErrTypeInvalidInput, appErr.ErrorType)

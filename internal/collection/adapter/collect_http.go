@@ -16,7 +16,6 @@ func CollectRoutes(r fiber.Router, cfg config.Oidc, oidcSvc oidc.UserService, co
 
 	r.Get("/mycards", authMiddleware, searchInPersonalCollection(collectSvc))
 	r.Post("/mycards", authMiddleware, collect(collectSvc))
-	r.Delete("/mycards", authMiddleware, remove(collectSvc))
 }
 
 func searchInPersonalCollection(svc application.CollectService) fiber.Handler {
@@ -26,12 +25,35 @@ func searchInPersonalCollection(svc application.CollectService) fiber.Handler {
 			return err
 		}
 
-		result, err := svc.Search(c.Query("name"), newPage(c), collector(user))
+		searchTerm := c.Query("name")
+
+		result, err := svc.Search(searchTerm, newPage(c), collector(user))
 		if err != nil {
 			return err
 		}
 
-		return commonhttp.RenderJSON(c, newPagedResult(result))
+		pagedResult := newPagedResult(result)
+
+		if commonhttp.AcceptsHTML(c) || commonhttp.IsHTMX(c) {
+			data := fiber.Map{
+				"Query": Query{
+					Name: searchTerm,
+				},
+				"Page": pagedResult,
+			}
+
+			if commonhttp.IsHTMX(c) {
+				if c.Query("page") == "" {
+					return commonhttp.RenderPartial(c, "search_result", data)
+				}
+
+				return commonhttp.RenderPartial(c, "card_list", data)
+			}
+
+			return commonhttp.RenderLayout(c, "mycards", data)
+		}
+
+		return commonhttp.RenderJSON(c, pagedResult)
 	}
 }
 
@@ -47,59 +69,21 @@ func collect(svc application.CollectService) fiber.Handler {
 			return common.NewInvalidInputMsg("invalid-body", "failed to parse body")
 		}
 
-		it, err := domain.NewItem(body.ID)
+		it, err := domain.NewItem(body.ID, body.Amount)
 		if err != nil {
 			return err
 		}
 
-		result, err := svc.Collect(it, collector(user))
+		item, err := svc.Collect(it, collector(user))
 		if err != nil {
 			return err
 		}
 
-		return commonhttp.RenderJSON(c, newCollectableResult(result))
-	}
-}
-
-func remove(svc application.CollectService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		user, err := auth.UserFromCtx(c)
-		if err != nil {
-			return common.NewAuthorizationError(err, "unauthorized")
+		if commonhttp.IsHTMX(c) {
+			return commonhttp.RenderPartial(c, "collect_action", newItem(item.ID, item.Amount))
 		}
 
-		var body Item
-		if err = c.BodyParser(&body); err != nil {
-			return common.NewInvalidInputMsg("invalid-body", "failed to parse body")
-		}
-
-		it, err := domain.NewItem(body.ID)
-		if err != nil {
-			return err
-		}
-
-		result, err := svc.Remove(it, collector(user))
-		if err != nil {
-			return err
-		}
-
-		return commonhttp.RenderJSON(c, newCollectableResult(result))
-	}
-}
-
-type Item struct {
-	ID int `json:"id"`
-}
-
-type CollectableResult struct {
-	ID     int `json:"id"`
-	Amount int `json:"amount"`
-}
-
-func newCollectableResult(r domain.CollectableResult) *CollectableResult {
-	return &CollectableResult{
-		ID:     r.ID,
-		Amount: r.Amount,
+		return commonhttp.RenderJSON(c, item)
 	}
 }
 

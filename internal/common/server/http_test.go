@@ -8,7 +8,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/common"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
@@ -17,11 +16,6 @@ import (
 )
 
 func TestNewHttpServerErrorHandler(t *testing.T) {
-	cfg := &config.Server{
-		Cookie: config.Cookie{
-			EncryptionKey: "01234567890123456789012345678901",
-		},
-	}
 	cases := []struct {
 		name       string
 		appErr     common.AppError
@@ -46,8 +40,8 @@ func TestNewHttpServerErrorHandler(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := server.NewHTTPServer(cfg)
-			srv.RegisterAPIRoutes(func(app fiber.Router) {
+			srv := server.NewHTTPTestServer()
+			srv.RegisterRoutes(func(app fiber.Router) {
 				app.Get("/", func(c *fiber.Ctx) error {
 					return tc.appErr
 				})
@@ -68,13 +62,8 @@ func TestNewHttpServerErrorHandler(t *testing.T) {
 }
 
 func TestNewHttpServerCookieEncryption(t *testing.T) {
-	cfg := &config.Server{
-		Cookie: config.Cookie{
-			EncryptionKey: "01234567890123456789012345678901",
-		},
-	}
-	srv := server.NewHTTPServer(cfg)
-	srv.RegisterAPIRoutes(func(app fiber.Router) {
+	srv := server.NewHTTPTestServer()
+	srv.RegisterRoutes(func(app fiber.Router) {
 		app.Get("/", func(c *fiber.Ctx) error {
 			c.Cookie(&fiber.Cookie{
 				Name:  "TEST",

@@ -40,7 +40,7 @@ func TestUnsupportedProvider(t *testing.T) {
 			errType:  common.ErrTypeInvalidInput,
 		},
 		{
-			name:     "empty provider",
+			name:     "space only provider",
 			provider: "  ",
 			errType:  common.ErrTypeInvalidInput,
 		},
@@ -80,7 +80,7 @@ func TestUnsupportedProvider(t *testing.T) {
 		t.Run("Logout - "+tc.name, func(t *testing.T) {
 			svc := oidc.New(config.Oidc{}, []oidc.Provider{oidc.TestProvider(config.Provider{}, nil)})
 
-			err := svc.Logout(tc.provider, nil)
+			err := svc.Logout(&oidc.JSONWebToken{Provider: tc.provider})
 
 			var appErr common.AppError
 			require.ErrorAs(t, err, &appErr)
@@ -170,7 +170,7 @@ func TestLogout(t *testing.T) {
 	}
 	svc := oidc.New(config.Oidc{}, []oidc.Provider{oidc.TestProvider(pCfg, client)})
 
-	err := svc.Logout("test", &oidc.JSONWebToken{AccessToken: "token-0"})
+	err := svc.Logout(&oidc.JSONWebToken{AccessToken: "token-0", Provider: "test"})
 
 	require.NoError(t, err)
 }

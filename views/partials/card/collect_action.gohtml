@@ -1,0 +1,19 @@
+{{ define "collect_action" }}
+<div hx-target="this" hx-swap="innterHTML">
+  <span>{{ .Amount }}</span>
+  <button
+      style="width: 20px; height: 20px"
+      hx-post="/mycards"
+      hx-vals='{ "id": {{ .ID }},"amount": {{ .NextAmount }} }'
+      data-testid="add-card-btn"
+  > +
+  </button>
+  <button
+      style="width: 20px; height: 20px"
+      {{ if .Amount  }}data-testid="remove-card-btn"{{ else }}disabled{{ end }}
+      hx-post="/mycards"
+      hx-vals='{ "id": {{ .ID }},"amount": {{ .PreviousAmount }} }'
+  > -
+  </button>
+</div>
+{{ end }}

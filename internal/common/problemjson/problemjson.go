@@ -43,11 +43,11 @@ func RespondWithProblemJSON(c *fiber.Ctx, err error) error {
 
 	switch appErr.ErrorType {
 	case common.ErrTypeInvalidInput:
-		return badRequest(c, appErr.Msg, appErr.Key, appErr)
+		return badRequest(c, appErr.Msg, appErr.Key, err)
 	case common.ErrTypeAuthorization:
-		return unauthorized(c, appErr.Key, appErr)
+		return unauthorized(c, appErr.Key, err)
 	default:
-		return internalError(c, appErr.Key, appErr)
+		return internalError(c, appErr.Key, err)
 	}
 }
 

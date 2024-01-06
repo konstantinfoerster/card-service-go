@@ -12,7 +12,7 @@ type MockCardRepository struct {
 	MockFindByNameAndCollector func(name string, page domain.Page, collector domain.Collector) (domain.PagedResult, error)
 }
 
-var _ domain.CardRepository = (*MockCardRepository)(nil)
+var _ domain.SearchRepository = (*MockCardRepository)(nil)
 
 func (r *MockCardRepository) ByID(id int) (*domain.Card, error) {
 	if r.MockByID == nil {

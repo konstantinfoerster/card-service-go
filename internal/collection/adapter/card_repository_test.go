@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var cardRepository domain.CardRepository
+var cardRepository domain.SearchRepository
 
 func TestIntegrationCardRepository(t *testing.T) {
 	if testing.Short() {
@@ -235,7 +235,7 @@ func findByNameAndCollectorNoImageURL(t *testing.T) {
 	assert.Equal(t, "http://localhost/images/noFace.png", result.Result[1].Image)
 }
 
-func newCardRepository(t *testing.T, con *postgres.DBConnection) domain.CardRepository {
+func newCardRepository(t *testing.T, con *postgres.DBConnection) domain.SearchRepository {
 	t.Helper()
 
 	require.NotNil(t, con)

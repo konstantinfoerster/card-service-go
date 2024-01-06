@@ -1,0 +1,10 @@
+{{- define "search_result" -}}
+    {{- if .Page.Data -}}
+      <p data-testid="search-result-txt">Search result for <b>{{ .Query.Name}}</b></p>
+      <div class="flex flex-wrap image-list">
+          {{template "card_list" .}}
+      </div>
+    {{else}}
+      <p>Nothing found</p>
+    {{ end }}
+{{end}}
