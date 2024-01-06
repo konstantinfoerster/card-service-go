@@ -45,18 +45,11 @@ func RenderJSON(c *fiber.Ctx, data interface{}) error {
 }
 
 func IsHTMX(c *fiber.Ctx) bool {
-
 	return strings.ToLower(c.Get(HeaderHTMXRequest)) == "true"
 }
 
 func AcceptsHTML(c *fiber.Ctx) bool {
-
 	return strings.Contains(c.Get(fiber.HeaderAccept), fiber.MIMETextHTML)
-}
-
-func AcceptsJSON(c *fiber.Ctx) bool {
-
-	return strings.Contains(c.Get(fiber.HeaderAccept), fiber.MIMEApplicationJSON)
 }
 
 func NewClientUser(u *auth.User) *ClientUser {

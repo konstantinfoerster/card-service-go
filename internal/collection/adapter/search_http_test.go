@@ -105,7 +105,6 @@ func TestSearch(t *testing.T) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsFullHTML(t, body)
 				commontest.AssertContainsLogin(t, body)
-				assert.NotContains(t, body, "class=\"last-img\"")
 				assert.Contains(t, body, "data-testid=\"search-result-txt\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
 			},
@@ -120,7 +119,6 @@ func TestSearch(t *testing.T) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsPartialHTML(t, body)
 				assert.Contains(t, body, "data-testid=\"search-result-txt\"")
-				assert.NotContains(t, body, "class=\"last-img\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
 			},
 		},
@@ -135,8 +133,30 @@ func TestSearch(t *testing.T) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsPartialHTML(t, body)
 				assert.NotContains(t, body, "data-testid=\"search-result-txt\"")
-				assert.Contains(t, body, "class=\"last-img\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
+			},
+		},
+		{
+			name: "htmx with lazy loading marker",
+			header: func(req *http.Request) {
+				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
+			},
+			page:                "size=1",
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, resp *http.Response) {
+				body := commontest.ToString(t, resp)
+				assert.Contains(t, body, "class=\"last-img\"")
+			},
+		},
+		{
+			name: "htmx without lazy loading marker",
+			header: func(req *http.Request) {
+				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
+			},
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, resp *http.Response) {
+				body := commontest.ToString(t, resp)
+				assert.NotContains(t, body, "class=\"last-img\"")
 			},
 		},
 	}

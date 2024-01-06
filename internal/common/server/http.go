@@ -35,8 +35,8 @@ func NewHTTPTestServer() *Server {
 func NewHTTPServer(cfg *config.Server) *Server {
 	engine := html.New(cfg.TemplateDirOrDefault(), ".gohtml")
 	engine.AddFunc(
-		"isLastIndex", func(index int, len int) bool {
-			return index+1 == len
+		"isLastIndex", func(index, length int) bool {
+			return index+1 == length
 		},
 	)
 
