@@ -82,11 +82,11 @@ func run(cfg *config.Config) error {
 	timeService := common.NewTimeService()
 	authService := oidc.New(cfg.Oidc, oidcProvider)
 
-	cardRepo := collectionadapter.NewCardRepository(dbCon, cfg.Images)
-	searchService := collection.NewSearchService(cardRepo)
+	searchRepo := collectionadapter.NewSearchRepository(dbCon, cfg.Images)
+	searchService := collection.NewSearchService(searchRepo)
 
 	collectionRep := collectionadapter.NewCollectionRepository(dbCon, cfg.Images)
-	collectService := collection.NewCollectService(collectionRep, cardRepo)
+	collectService := collection.NewCollectService(collectionRep, searchRepo)
 
 	srv := server.NewHTTPServer(&cfg.Server).RegisterRoutes(func(r fiber.Router) {
 		r.Static("/public", "./public")

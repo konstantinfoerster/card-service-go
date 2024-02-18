@@ -20,7 +20,7 @@ type cardPostgresRepository struct {
 	cfg config.Images
 }
 
-func NewCardRepository(connection *postgres.DBConnection, cfg config.Images) domain.SearchRepository {
+func NewSearchRepository(connection *postgres.DBConnection, cfg config.Images) domain.SearchRepository {
 	return &cardPostgresRepository{
 		db:  connection,
 		cfg: cfg,

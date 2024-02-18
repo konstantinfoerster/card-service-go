@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var cardRepository domain.SearchRepository
+var serchRepository domain.SearchRepository
 
 func TestIntegrationCardRepository(t *testing.T) {
 	if testing.Short() {
@@ -21,7 +21,7 @@ func TestIntegrationCardRepository(t *testing.T) {
 
 	runner := commontest.NewRunner()
 	runner.Run(t, func(t *testing.T) {
-		cardRepository = newCardRepository(t, runner.Connection())
+		serchRepository = newCardRepository(t, runner.Connection())
 
 		t.Run("find by id", findByID)
 		t.Run("find by id with none existing id", findByNoneExistingID)
@@ -38,21 +38,21 @@ func TestIntegrationCardRepository(t *testing.T) {
 }
 
 func findByID(t *testing.T) {
-	result, err := cardRepository.ByID(1)
+	result, err := serchRepository.ByID(1)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Dummy Card 1", result.Name)
 }
 
 func findByNoneExistingID(t *testing.T) {
-	result, err := cardRepository.ByID(1000)
+	result, err := serchRepository.ByID(1000)
 
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, domain.ErrCardNotFound)
 }
 
 func findByName(t *testing.T) {
-	result, err := cardRepository.FindByName("ummy Card", domain.NewPage(1, 3))
+	result, err := serchRepository.FindByName("ummy Card", domain.NewPage(1, 3))
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Page)
@@ -67,7 +67,7 @@ func findByName(t *testing.T) {
 }
 
 func findByNameLastPage(t *testing.T) {
-	result, err := cardRepository.FindByName("Dummy Card", domain.NewPage(2, 3))
+	result, err := serchRepository.FindByName("Dummy Card", domain.NewPage(2, 3))
 
 	require.NoError(t, err)
 	assert.False(t, result.HasMore)
@@ -106,7 +106,7 @@ func findByNameDoubleFace(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := cardRepository.FindByName(tc.searchTerm, domain.NewPage(1, 10))
+			result, err := serchRepository.FindByName(tc.searchTerm, domain.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Len(t, result.Result, tc.resultSize)
@@ -115,7 +115,7 @@ func findByNameDoubleFace(t *testing.T) {
 }
 
 func findByNameNoImageURL(t *testing.T) {
-	result, err := cardRepository.FindByName("No Image Card", domain.NewPage(1, 5))
+	result, err := serchRepository.FindByName("No Image Card", domain.NewPage(1, 5))
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 2)
@@ -148,7 +148,7 @@ func findByNameNoResult(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := cardRepository.FindByName(tc.searchTerm, domain.NewPage(1, 10))
+			result, err := serchRepository.FindByName(tc.searchTerm, domain.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Equal(t, 1, result.Page)
@@ -160,7 +160,7 @@ func findByNameNoResult(t *testing.T) {
 
 func findByNameAndCollector(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	result, err := cardRepository.FindByNameAndCollector("ummy Card", domain.NewPage(1, 3), c)
+	result, err := serchRepository.FindByNameAndCollector("ummy Card", domain.NewPage(1, 3), c)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 3)
@@ -211,7 +211,7 @@ func findByNameAndCollectorDoubleFace(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := domain.Collector{ID: "myUser"}
-			result, err := cardRepository.FindByNameAndCollector(tc.searchTerm, domain.NewPage(1, 10), c)
+			result, err := serchRepository.FindByNameAndCollector(tc.searchTerm, domain.NewPage(1, 10), c)
 
 			require.NoError(t, err)
 			assert.Len(t, result.Result, tc.resultSize)
@@ -225,7 +225,7 @@ func findByNameAndCollectorDoubleFace(t *testing.T) {
 
 func findByNameAndCollectorNoImageURL(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	result, err := cardRepository.FindByNameAndCollector("No Image Card", domain.NewPage(1, 10), c)
+	result, err := serchRepository.FindByNameAndCollector("No Image Card", domain.NewPage(1, 10), c)
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 2)
@@ -244,5 +244,5 @@ func newCardRepository(t *testing.T, con *postgres.DBConnection) domain.SearchRe
 		Host: "http://localhost",
 	}
 
-	return adapter.NewCardRepository(con, cfg)
+	return adapter.NewSearchRepository(con, cfg)
 }
