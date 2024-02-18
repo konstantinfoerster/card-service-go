@@ -15,6 +15,10 @@ func DashboardRoutes(r fiber.Router, cfg config.Oidc, oidcSvc oidc.UserService) 
 
 func dashboard() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		return commonhttp.RenderLayout(c, "dashboard", nil)
+		if commonhttp.IsHTMX(c) {
+			return commonhttp.RenderPartial(c, "dashboard", nil)
+		}
+
+		return commonhttp.RenderPage(c, "dashboard", nil)
 	}
 }

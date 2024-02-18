@@ -106,12 +106,12 @@ func TestSearchCollected(t *testing.T) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsFullHTML(t, body)
 				commontest.AssertContainsProfile(t, body)
-				assert.Contains(t, body, "data-testid=\"search-result-txt\"")
+				assert.Contains(t, body, "data-testid=\"mycards-list\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
 			},
 		},
 		{
-			name: "htmx",
+			name: "htmx first page",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -119,12 +119,12 @@ func TestSearchCollected(t *testing.T) {
 			assertContent: func(t *testing.T, resp *http.Response) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsPartialHTML(t, body)
-				assert.Contains(t, body, "data-testid=\"search-result-txt\"")
+				assert.Contains(t, body, "data-testid=\"mycards-list\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
 			},
 		},
 		{
-			name: "htmx paged",
+			name: "htmx next paged",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -133,7 +133,7 @@ func TestSearchCollected(t *testing.T) {
 			assertContent: func(t *testing.T, resp *http.Response) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsPartialHTML(t, body)
-				assert.NotContains(t, body, "data-testid=\"search-result-txt\"")
+				assert.NotContains(t, body, "data-testid=\"mycards-list\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
 			},
 		},
@@ -146,7 +146,7 @@ func TestSearchCollected(t *testing.T) {
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
 				body := commontest.ToString(t, resp)
-				assert.Contains(t, body, "class=\"last-img\"")
+				assert.Contains(t, body, "hidden-card")
 			},
 		},
 		{
@@ -157,7 +157,7 @@ func TestSearchCollected(t *testing.T) {
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
 				body := commontest.ToString(t, resp)
-				assert.NotContains(t, body, "class=\"last-img\"")
+				assert.NotContains(t, body, "class=\"hidden-card\"")
 			},
 		},
 	}

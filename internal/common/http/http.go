@@ -12,7 +12,7 @@ import (
 
 const HeaderHTMXRequest = "HX-Request"
 
-func RenderLayout(c *fiber.Ctx, tmplName string, data fiber.Map) error {
+func RenderPage(c *fiber.Ctx, tmplName string, data fiber.Map) error {
 	if data == nil {
 		data = fiber.Map{}
 	}
@@ -20,6 +20,7 @@ func RenderLayout(c *fiber.Ctx, tmplName string, data fiber.Map) error {
 	user, _ := auth.UserFromCtx(c)
 
 	data["User"] = NewClientUser(user)
+	data["activePage"] = tmplName
 
 	return c.Render(tmplName, data, "layouts/main")
 }
@@ -32,6 +33,8 @@ func RenderPartial(c *fiber.Ctx, tmplName string, data any) error {
 	if mData, ok := data.(fiber.Map); ok {
 		user, _ := auth.UserFromCtx(c)
 		mData["User"] = NewClientUser(user)
+		mData["activePage"] = tmplName
+		mData["partial"] = true
 	}
 
 	return c.Render(tmplName, data)

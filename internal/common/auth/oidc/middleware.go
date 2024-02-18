@@ -11,9 +11,9 @@ import (
 )
 
 type MiddlewareConfig struct {
-	AllowEmptyCookie bool
-	Key              string
 	Extractor        func(*fiber.Ctx, string) (*auth.User, error)
+	Key              string
+	AllowEmptyCookie bool
 }
 
 func NewOauthMiddleware(svc UserService, options ...func(*MiddlewareConfig)) fiber.Handler {

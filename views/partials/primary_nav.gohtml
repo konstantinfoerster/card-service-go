@@ -1,0 +1,31 @@
+<ul aria-label="Primary" role="list" class="nav-list">
+    {{- if .User -}}
+      <li><a
+            href="/mycards"
+            hx-get="/mycards"
+            hx-target="main"
+            hx-push-url="true"
+            class="nav-link{{if eq .activePage "mycards"}} active{{end}}"
+        >My Cards</a>
+      </li>
+    {{- end -}}
+  <li class="visible-mobile">
+    <ul role="list">
+        {{- if .User -}}
+          <li>
+            <div class="pb-2">Logged in as {{.User.Username}}</div>
+          </li>
+          <li><a class="btn btn-secondary w-100" href="/api/v1/logout">Logout</a></li>
+        {{- else -}}
+          <li>
+            <a data-testid="user-login-btn"
+               class="btn btn-default btn-small"
+               href="/api/v1/login/google"
+            >
+              Login with Google
+            </a>
+          </li>
+        {{- end -}}
+    </ul>
+  </li>
+</ul>

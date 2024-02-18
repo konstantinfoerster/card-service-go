@@ -10,6 +10,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
+	"github.com/rs/zerolog/log"
 )
 
 func SearchRoutes(r fiber.Router, cfg config.Oidc, authSvc oidc.UserService, searchSvc application.SearchService) {
@@ -24,7 +25,9 @@ func search(svc application.SearchService) fiber.Handler {
 		user, _ := auth.UserFromCtx(c)
 
 		searchTerm := c.Query("name")
-		result, err := svc.Search(c.Query("name"), newPage(c), collector(user))
+		page := newPage(c)
+		log.Debug().Msgf("search for card with name %s on page %#v", searchTerm, page)
+		result, err := svc.Search(c.Query("name"), page, collector(user))
 		if err != nil {
 			return err
 		}
@@ -40,14 +43,17 @@ func search(svc application.SearchService) fiber.Handler {
 
 			if commonhttp.IsHTMX(c) {
 				if c.Query("page") == "" {
-					return commonhttp.RenderPartial(c, "search_result", data)
+					return commonhttp.RenderPartial(c, "search", data)
 				}
 
 				return commonhttp.RenderPartial(c, "card_list", data)
 			}
 
-			return commonhttp.RenderLayout(c, "search", data)
+			return commonhttp.RenderPage(c, "search", data)
 		}
+
+		log.Debug().Msgf("render json page %v, more = %v, size = %d",
+			pagedResult.Page, pagedResult.HasMore, len(pagedResult.Data))
 
 		return commonhttp.RenderJSON(c, pagedResult)
 	}

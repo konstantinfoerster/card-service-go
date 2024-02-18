@@ -1,49 +1,58 @@
-<header class="primary-header flex">
-  <div>
-    <a  href="/" hx-target=".content">
-      <img class="logo" alt="Logo" src="">
+<header class="primary-header">
+  <div class="nav-wrapper">
+    <a href="/"  hx-get="/" hx-target="main" hx-push-url="true" class="logo">
+      <!-- <img alt="Logo" src="">-->
+      CM
     </a>
-  </div>
-  <nav class="primary-navigation flex">
-    <ul>
-      <li>
-        {{if .User}}<a href="/mycards">My Cards</a>{{end}}
-      </li>
-    </ul>
-    <form action="/cards"
-          method="GET"
-          hx-get="/cards"
-          hx-target="main"
-          hx-push-url="true"
-    >
-      <input
-          placeholder="Eager Cadet"
-          type="search"
-          name="name"
-          value="{{ .Query.Name}}"
+    <nav class="primary-navigation" id="primary-navigation">
+      {{- template "partials/primary_nav" . -}}
+    </nav>
+    <div class="nav-actions">
+      <form action="/cards"
+            method="GET"
+            hx-get="/cards"
+            hx-target="main"
+            hx-push-url="true"
       >
-    </form>
-
-    {{if .User}}
-      <div data-testid="user-profile-btn">
-        <button>
-            {{ .User.Initials}}
-        </button>
-
-        <ul>
-          <li>Logged in as {{ .User.Username}}</li>
-          <li><a href="/api/v1/logout">Logout</a></li>
-        </ul>
-      </div>
-    {{else}}
-      <div data-testid="user-login-btn">
-        <a
-            class="login-with-google"
-            href="/api/v1/login/google"
+        <input
+            placeholder="Eager Cadet"
+            type="search"
+            name="name"
+            value="{{ .Query.Name}}"
+            class="nav-search"
+            autocomplete="off"
+        >
+      </form>
+      {{- if .User -}}
+        <div data-testid="user-profile-btn" class="visible-desktop">
+          <button class="btn btn-outline-primary btn-profile" id="btn-profile" aria-controls="profile"
+                  aria-expanded="false">
+            <span class="fw-bold">{{ .User.Initials}}</span>
+          </button>
+          <ul class="profile-menu" role="list">
+            <li>
+              <div class="pb-2">Logged in as {{ .User.Username}}</div>
+            </li>
+            <li><a class="btn btn-secondary w-100" href="/api/v1/logout">Logout</a></li>
+          </ul>
+        </div>
+      {{- else -}}
+        <a data-testid="user-login-btn"
+           class="btn btn-default btn-small visible-desktop"
+           href="/api/v1/login/google"
         >
           Login with Google
         </a>
-      </div>
-    {{end}}
-  </nav>
+      {{- end -}}
+
+      <button class="nav-toggle visible-mobile" aria-controls="primary-navigation" aria-expanded="false">
+        <span class="visually-hidden">Menu</span>
+        <svg class="hamburger" viewBox="0 0 100 100">
+          <rect class="line top" width="80" height="10" x="10" y="25" rx="5"></rect>
+          <rect class="line middle" width="80" height="10" x="10" y="45" rx="5"></rect>
+          <rect class="line bottom" width="80" height="10" x="10" y="65" rx="5"></rect>
+        </svg>
+      </button>
+    </div>
+  </div>
 </header>

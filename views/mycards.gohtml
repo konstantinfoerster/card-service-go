@@ -1,2 +1,8 @@
 {{define "title"}}My Cards{{end}}
-{{template "search_result" .}}
+{{- if .Page.Data -}}
+  <div class="grid" data-testid="mycards-list">
+      {{template "card_list" .}}
+  </div>
+{{else}}
+  <p>Nothing here</p>
+{{end}}

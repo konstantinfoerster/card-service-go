@@ -110,7 +110,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx",
+			name: "htmx first page",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -123,7 +123,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx paged",
+			name: "htmx next page",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -145,7 +145,7 @@ func TestSearch(t *testing.T) {
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
 				body := commontest.ToString(t, resp)
-				assert.Contains(t, body, "class=\"last-img\"")
+				assert.Contains(t, body, "hidden-card")
 			},
 		},
 		{
@@ -156,7 +156,7 @@ func TestSearch(t *testing.T) {
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
 				body := commontest.ToString(t, resp)
-				assert.NotContains(t, body, "class=\"last-img\"")
+				assert.NotContains(t, body, "hidden-card")
 			},
 		},
 	}
@@ -220,7 +220,7 @@ func TestSearchWithUser(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx",
+			name: "htmx first page",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},

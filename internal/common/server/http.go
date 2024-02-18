@@ -42,7 +42,7 @@ func NewHTTPServer(cfg *config.Server) *Server {
 
 	app := fiber.New(fiber.Config{
 		Views: engine,
-		// FIXME that does not handle text/html requests
+		// FIXME error handler does not handle text/html requests
 		ErrorHandler: problemjson.RespondWithProblemJSON,
 	})
 

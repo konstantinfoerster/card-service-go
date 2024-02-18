@@ -44,13 +44,13 @@ func searchInPersonalCollection(svc application.CollectService) fiber.Handler {
 
 			if commonhttp.IsHTMX(c) {
 				if c.Query("page") == "" {
-					return commonhttp.RenderPartial(c, "search_result", data)
+					return commonhttp.RenderPartial(c, "mycards", data)
 				}
 
 				return commonhttp.RenderPartial(c, "card_list", data)
 			}
 
-			return commonhttp.RenderLayout(c, "mycards", data)
+			return commonhttp.RenderPage(c, "mycards", data)
 		}
 
 		return commonhttp.RenderJSON(c, pagedResult)
