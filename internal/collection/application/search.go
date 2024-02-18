@@ -10,10 +10,10 @@ type SearchService interface {
 }
 
 type searchService struct {
-	repo domain.CardRepository
+	repo domain.SearchRepository
 }
 
-func NewSearchService(repo domain.CardRepository) SearchService {
+func NewSearchService(repo domain.SearchRepository) SearchService {
 	return &searchService{
 		repo: repo,
 	}

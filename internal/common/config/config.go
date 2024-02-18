@@ -45,13 +45,22 @@ func (l Logging) LevelOrDefault() string {
 }
 
 type Server struct {
-	Host   string `yaml:"host"`
-	Port   int    `yaml:"port"`
-	Cookie Cookie `yaml:"cookie"`
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	Cookie      Cookie `yaml:"cookie"`
+	TemplateDir string `yaml:"template_path"`
 }
 
 func (s Server) Addr() string {
 	return fmt.Sprintf("%s:%d", s.Host, s.Port)
+}
+
+func (s Server) TemplateDirOrDefault() string {
+	if s.TemplateDir == "" {
+		return "./views"
+	}
+
+	return s.TemplateDir
 }
 
 type Cookie struct {
@@ -63,6 +72,14 @@ type Oidc struct {
 	SessionCookieName string              `yaml:"session_cookie_name"`
 	StateCookieAge    time.Duration       `yaml:"state_cookie_age"`
 	Provider          map[string]Provider `yaml:"provider"`
+}
+
+func (o Oidc) SessionCookieNameOrDefault() string {
+	if o.SessionCookieName == "" {
+		return "SESSION"
+	}
+
+	return o.SessionCookieName
 }
 
 type Provider struct {

@@ -4,43 +4,34 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 )
 
+// Collector user who interacts with his collection.
 type Collector struct {
 	ID string
 }
 
+// Item a collectable item.
 type Item struct {
-	ID int
+	ID     int
+	Amount int
 }
 
-func NewItem(id int) (Item, error) {
+func NewItem(id int, amount int) (Item, error) {
 	if id <= 0 {
 		return Item{}, common.NewInvalidInputMsg("invalid-item-id", "invalid id")
 	}
 
+	if amount < 0 {
+		return Item{}, common.NewInvalidInputMsg("invalid-item-amount", "amount cannot be negative")
+	}
+
 	return Item{
-		ID: id,
+		ID:     id,
+		Amount: amount,
 	}, nil
 }
 
-type CollectableResult struct {
-	Item
-	Amount int
-}
-
-func NewCollectableResult(item Item, amount int) CollectableResult {
-	if amount < 0 {
-		amount = 0
-	}
-
-	return CollectableResult{
-		Item:   item,
-		Amount: amount,
-	}
-}
-
 type CollectionRepository interface {
-	FindByName(name string, page Page, collector Collector) (PagedResult, error)
-	Add(item Item, collector Collector) error
+	FindCollectedByName(name string, page Page, collector Collector) (PagedResult, error)
+	Upsert(item Item, collector Collector) error
 	Remove(itemID int, collector Collector) error
-	Count(itemID int, collector Collector) (int, error)
 }

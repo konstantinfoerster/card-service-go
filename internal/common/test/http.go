@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
+	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,6 +68,18 @@ func WithBody(body []byte) func(*httpRequest) {
 	}
 }
 
+func WithAccept(mimeType string) func(*httpRequest) {
+	return func(req *httpRequest) {
+		req.header[fiber.HeaderAccept] = mimeType
+	}
+}
+
+func HTMXRequest() func(*httpRequest) {
+	return func(req *httpRequest) {
+		req.header[commonhttp.HeaderHTMXRequest] = "true"
+	}
+}
+
 func WithJSONBody(t *testing.T, v interface{}) func(*httpRequest) {
 	raw := ToJSON(t, v)
 
@@ -107,4 +120,30 @@ func Close(t *testing.T, resp *http.Response) {
 
 		return
 	}
+}
+
+func AssertContainsPartialHTML(t *testing.T, val string) {
+	t.Helper()
+
+	require.NotContains(t, val, "<html")
+	require.NotContains(t, val, "<body")
+}
+
+func AssertContainsFullHTML(t *testing.T, val string) {
+	t.Helper()
+
+	require.Contains(t, val, "<html")
+	require.Contains(t, val, "<body")
+}
+
+func AssertContainsProfile(t *testing.T, val string) {
+	t.Helper()
+
+	require.Contains(t, val, "data-testid=\"user-profile-btn\"")
+}
+
+func AssertContainsLogin(t *testing.T, val string) {
+	t.Helper()
+
+	require.Contains(t, val, "data-testid=\"user-login-btn\"")
 }

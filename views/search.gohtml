@@ -1,0 +1,9 @@
+{{define "title"}}Search{{end}}
+{{- if .Page.Data -}}
+  <p data-testid="search-result-txt">Search result for <b>{{ .Query.Name}}</b></p>
+  <div class="grid">
+      {{template "card_list" .}}
+  </div>
+{{else}}
+  <p>Nothing found</p>
+{{end}}

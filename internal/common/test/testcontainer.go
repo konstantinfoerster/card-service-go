@@ -43,12 +43,27 @@ func (r *DatabaseRunner) Start() (*postgres.DBConnection, error) {
 	database := "cardmanager"
 
 	// TODO read env variables from config
+	var initScriptDirPermissions int64 = 0755
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres:15-alpine",
+		Image:        "postgres:16-alpine",
 		ExposedPorts: []string{"5432/tcp"},
-		Mounts: testcontainers.Mounts(
-			testcontainers.BindMount(dbDir, "/docker-entrypoint-initdb.d"),
-		),
+		Files: []testcontainers.ContainerFile{
+			{
+				HostFilePath:      filepath.Join(dbDir, "01-init.sh"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/01-init.sh",
+				FileMode:          initScriptDirPermissions,
+			},
+			{
+				HostFilePath:      filepath.Join(dbDir, "02-create-tables.sql"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/02-create-tables.sql",
+				FileMode:          initScriptDirPermissions,
+			},
+			{
+				HostFilePath:      filepath.Join(dbDir, "03-data.sql"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/03-data.sql",
+				FileMode:          initScriptDirPermissions,
+			},
+		},
 		Env: map[string]string{
 			"POSTGRES_DB":       "postgres",
 			"POSTGRES_PASSWORD": "test",
@@ -60,49 +75,54 @@ func (r *DatabaseRunner) Start() (*postgres.DBConnection, error) {
 		WaitingFor:      wait.ForLog("[1] LOG:  database system is ready to accept connections"),
 	}
 
-	postgresC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	r.container, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
 	if err != nil {
 		return nil, err
 	}
-	r.container = postgresC
 
-	if e := log.Debug(); e.Enabled() {
-		logs, err := postgresC.Logs(ctx)
-		if err != nil {
-			return nil, err
-		}
-		defer commonio.Close(logs)
-
-		b, err := io.ReadAll(logs)
-		if err != nil {
-			return nil, err
-		}
-
-		e.Msg(string(b))
+	if err = r.enableDebugIfRequired(ctx); err != nil {
+		return nil, err
 	}
 
-	ip, err := postgresC.Host(ctx)
+	ip, err := r.container.Host(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	mappedPort, err := postgresC.MappedPort(ctx, "5432")
+	mappedPort, err := r.container.MappedPort(ctx, "5432")
 	if err != nil {
 		return nil, err
 	}
 
-	dbConfig := config.Database{
+	return postgres.Connect(ctx, config.Database{
 		Username: username,
 		Password: password,
 		Host:     ip,
 		Port:     mappedPort.Port(),
 		Database: database,
+	})
+}
+
+func (r *DatabaseRunner) enableDebugIfRequired(ctx context.Context) error {
+	if e := log.Debug(); e.Enabled() {
+		logs, err := r.container.Logs(ctx)
+		if err != nil {
+			return err
+		}
+		defer commonio.Close(logs)
+
+		b, err := io.ReadAll(logs)
+		if err != nil {
+			return err
+		}
+
+		e.Msg(string(b))
 	}
 
-	return postgres.Connect(ctx, dbConfig)
+	return nil
 }
 
 func (r *DatabaseRunner) Stop() error {

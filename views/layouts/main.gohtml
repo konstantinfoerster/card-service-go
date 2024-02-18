@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>CM - {{block "title" .}}{{end}}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="referrer" content="no-referrer-when-downgrade"/>
+  <link rel="stylesheet" href="public/css/main.css">
+</head>
+<body>
+{{- template "partials/header" . -}}
+<main class="content" hx-history="false">
+    {{embed}}
+</main>
+{{- template "partials/footer" . -}}
+<script src="public/js/htmx-1.9.10.min.js"></script>
+<script>
+  (function () {
+    const primaryHeader = document.querySelector('.primary-header');
+    const navToggle = document.querySelector('.nav-toggle');
+    const primaryNav = document.querySelector('.primary-navigation');
+
+    navToggle.addEventListener('click', () => {
+      primaryHeader.toggleAttribute('data-overlay')
+
+      primaryNav.toggleAttribute('data-visible');
+
+      if (primaryNav.hasAttribute('data-visible')) {
+        navToggle.setAttribute('aria-expanded', 'true');
+        document.body.style.overflowY = 'hidden';
+      } else {
+        navToggle.setAttribute('aria-expanded', 'false');
+        document.body.style.overflowY = 'visible';
+      }
+    });
+
+    const profileToggle = document.querySelector('#btn-profile')
+    const profileMenu = document.querySelector('.profile-menu')
+    profileToggle.addEventListener('click', () => {
+      profileMenu.toggleAttribute('data-visible');
+      if (profileMenu.hasAttribute('data-visible')) {
+        profileToggle.setAttribute('aria-expanded', 'true');
+      } else {
+        profileToggle.setAttribute('aria-expanded', 'false');
+      }
+    })
+
+  })();
+</script>
+</body>
+</html>

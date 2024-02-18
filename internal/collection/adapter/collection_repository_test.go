@@ -13,8 +13,6 @@ import (
 
 var collectionRepo domain.CollectionRepository
 
-var noneExistingItem, _ = domain.NewItem(1000)
-
 func TestIntegrationCollectionRepository(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -29,19 +27,18 @@ func TestIntegrationCollectionRepository(t *testing.T) {
 
 		t.Run("find collected by name", findCollectedByName)
 		t.Run("add cards to collection", addCards)
-		t.Run("add none existing card", addNoneExistingCard)
+		t.Run("add none existing card should work", addNoneExistingCardNoError)
 		t.Run("remove cards from collection", removeCards)
-		t.Run("remove uncollected", removeUncollectedCard)
-		t.Run("count uncollected card", countNoneCollectedCard)
+		t.Run("remove uncollected should work", removeUncollectedCardNoError)
 	})
 }
 
 func findCollectedByName(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	result, err := collectionRepo.FindByName("ummy Card", domain.NewPage(1, 10), c)
+	result, err := collectionRepo.FindCollectedByName("ummy Card", domain.NewPage(1, 10), c)
 
 	require.NoError(t, err)
-	assert.Len(t, result.Result, 2)
+	require.Len(t, result.Result, 2)
 	assert.Equal(t, "Dummy Card 1", result.Result[0].Name)
 	assert.Equal(t, "http://localhost/images/dummyCard1.png", result.Result[0].Image)
 	assert.Equal(t, 3, result.Result[0].Amount)
@@ -52,55 +49,46 @@ func findCollectedByName(t *testing.T) {
 
 func addCards(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	item, err := domain.NewItem(9)
+	item, err := domain.NewItem(9, 2)
 	require.NoError(t, err)
 
-	err = collectionRepo.Add(item, c)
-	require.NoError(t, err)
-	err = collectionRepo.Add(item, c)
+	err = collectionRepo.Upsert(item, c)
 	require.NoError(t, err)
 
-	count, err := collectionRepo.Count(item.ID, c)
+	page, err := collectionRepo.FindCollectedByName("Uncollected Card 1", domain.NewPage(1, 10), c)
 	require.NoError(t, err)
 
-	assert.Equal(t, 2, count)
+	require.Len(t, page.Result, 1)
+	assert.Equal(t, 9, page.Result[0].ID)
+	assert.Equal(t, 2, page.Result[0].Amount)
 }
 
-func addNoneExistingCard(t *testing.T) {
+func addNoneExistingCardNoError(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
+	noneExistingItem, _ := domain.NewItem(1000, 1)
 
-	err := collectionRepo.Add(noneExistingItem, c)
+	err := collectionRepo.Upsert(noneExistingItem, c)
 
 	require.NoError(t, err)
 }
 
 func removeCards(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	itemID := 10
+	cardID := 10
 
-	err := collectionRepo.Remove(itemID, c)
-	require.NoError(t, err)
-	err = collectionRepo.Remove(itemID, c)
+	err := collectionRepo.Remove(cardID, c)
 	require.NoError(t, err)
 
-	count, err := collectionRepo.Count(itemID, c)
+	page, err := collectionRepo.FindCollectedByName("Remove Collected Card 1", domain.NewPage(1, 10), c)
 	require.NoError(t, err)
 
-	assert.Empty(t, count)
+	require.Empty(t, page.Result)
 }
 
-func removeUncollectedCard(t *testing.T) {
+func removeUncollectedCardNoError(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
+	noneExistingItem, _ := domain.NewItem(2000, 1)
 	err := collectionRepo.Remove(noneExistingItem.ID, c)
 
 	require.NoError(t, err)
-}
-
-func countNoneCollectedCard(t *testing.T) {
-	c := domain.Collector{ID: "myUser"}
-
-	count, err := collectionRepo.Count(0, c)
-
-	require.NoError(t, err)
-	assert.Empty(t, count)
 }

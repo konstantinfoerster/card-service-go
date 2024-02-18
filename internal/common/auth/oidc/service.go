@@ -9,11 +9,47 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
+	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
 )
+
+func NewRedirectURL(p Provider, redirectURI string) (*RedirectURL, error) {
+	stateBase64, err := NewState(p.GetName()).Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	return &RedirectURL{
+		URL:   p.GetAuthURL(stateBase64, redirectURI),
+		State: stateBase64,
+	}, nil
+}
 
 type RedirectURL struct {
 	URL   string
 	State string
+}
+
+func NewState(provider string) *State {
+	return &State{ID: uuid.New().String(), Provider: provider}
+}
+
+// DecodeState decode given base64 url encoded State.
+func DecodeState(value string) (*State, error) {
+	return commonhttp.DecodeBase64[State](value)
+}
+
+type State struct {
+	ID       string `json:"id"`
+	Provider string `json:"provider"`
+}
+
+func (s *State) Encode() (string, error) {
+	return commonhttp.EncodeBase64(s)
+}
+
+// DecodeToken decode given base64 url encoded JSONWebToken.
+func DecodeToken(value string) (*JSONWebToken, error) {
+	return commonhttp.DecodeBase64[JSONWebToken](value)
 }
 
 type JSONWebToken struct {
@@ -24,6 +60,10 @@ type JSONWebToken struct {
 	ExpiresIn    int    `json:"expires_in"`
 	Type         string `json:"token_type"`
 	Provider     string `json:"provider"`
+}
+
+func (t *JSONWebToken) Encode() (string, error) {
+	return commonhttp.EncodeBase64(t)
 }
 
 type claims struct {
@@ -46,7 +86,7 @@ type Service interface {
 	UserService
 	GetAuthURL(provider string) (*RedirectURL, error)
 	Authenticate(provider string, code string) (*auth.User, *JSONWebToken, error)
-	Logout(provider string, token *JSONWebToken) error
+	Logout(token *JSONWebToken) error
 }
 
 func New(cfg config.Oidc, provider []Provider) Service {
@@ -72,12 +112,7 @@ func (s *authFlowService) GetAuthURL(provider string) (*RedirectURL, error) {
 		return nil, err
 	}
 
-	stateID := uuid.New().String()
-
-	return &RedirectURL{
-		URL:   p.GetAuthURL(stateID, s.cfg.RedirectURI),
-		State: stateID,
-	}, nil
+	return NewRedirectURL(p, s.cfg.RedirectURI)
 }
 
 func (s *authFlowService) Authenticate(provider string, authCode string) (*auth.User, *JSONWebToken, error) {
@@ -109,8 +144,8 @@ func (s *authFlowService) GetAuthenticatedUser(provider string, token *JSONWebTo
 	return claimsToUser(claims), nil
 }
 
-func (s *authFlowService) Logout(provider string, token *JSONWebToken) error {
-	p, err := s.getProvider(provider)
+func (s *authFlowService) Logout(token *JSONWebToken) error {
+	p, err := s.getProvider(token.Provider)
 	if err != nil {
 		return err
 	}
@@ -133,7 +168,7 @@ func (s *authFlowService) getProvider(key string) (Provider, error) {
 		return p, nil
 	}
 
-	err := fmt.Errorf("provider %s not supported", key)
+	err := fmt.Errorf("provider '%s' not supported", key)
 
 	return nil, common.NewInvalidInputError(err, "login-provider-not-supported", err.Error())
 }

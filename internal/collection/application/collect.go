@@ -10,16 +10,15 @@ import (
 
 type CollectService interface {
 	Search(name string, page domain.Page, collector domain.Collector) (domain.PagedResult, error)
-	Collect(item domain.Item, collector domain.Collector) (domain.CollectableResult, error)
-	Remove(item domain.Item, collector domain.Collector) (domain.CollectableResult, error)
+	Collect(item domain.Item, collector domain.Collector) (domain.Item, error)
 }
 
 type collectService struct {
 	collectionRepo domain.CollectionRepository
-	cardRepo       domain.CardRepository
+	cardRepo       domain.SearchRepository
 }
 
-func NewCollectService(collectionRepo domain.CollectionRepository, cardRepo domain.CardRepository) CollectService {
+func NewCollectService(collectionRepo domain.CollectionRepository, cardRepo domain.SearchRepository) CollectService {
 	return &collectService{
 		collectionRepo: collectionRepo,
 		cardRepo:       cardRepo,
@@ -28,7 +27,7 @@ func NewCollectService(collectionRepo domain.CollectionRepository, cardRepo doma
 
 func (s *collectService) Search(name string, page domain.Page,
 	collector domain.Collector) (domain.PagedResult, error) {
-	r, err := s.collectionRepo.FindByName(name, page, collector)
+	r, err := s.collectionRepo.FindCollectedByName(name, page, collector)
 	if err != nil {
 		return domain.PagedResult{}, common.NewUnknownError(err, "unable-to-execute-search-in-collected")
 	}
@@ -36,39 +35,29 @@ func (s *collectService) Search(name string, page domain.Page,
 	return r, nil
 }
 
-func (s *collectService) Collect(item domain.Item, collector domain.Collector) (domain.CollectableResult, error) {
+func (s *collectService) Collect(item domain.Item, collector domain.Collector) (domain.Item, error) {
 	_, err := s.cardRepo.ByID(item.ID)
 	if err != nil {
 		if errors.Is(err, domain.ErrCardNotFound) {
 			msg := fmt.Sprintf("item with id %d not found", item.ID)
 
-			return domain.CollectableResult{}, common.NewInvalidInputError(err, "unable-to-find-item", msg)
+			return domain.Item{}, common.NewInvalidInputError(err, "unable-to-find-item", msg)
 		}
 
-		return domain.CollectableResult{}, common.NewUnknownError(err, "unable-to-find-item")
+		return domain.Item{}, common.NewUnknownError(err, "unable-to-find-item")
 	}
 
-	if err := s.collectionRepo.Add(item, collector); err != nil {
-		return domain.CollectableResult{}, common.NewUnknownError(err, "unable-to-add-item")
+	if item.Amount == 0 {
+		if err := s.collectionRepo.Remove(item.ID, collector); err != nil {
+			return domain.Item{}, common.NewUnknownError(err, "unable-to-remove-item")
+		}
+
+		return item, nil
 	}
 
-	amount, err := s.collectionRepo.Count(item.ID, collector)
-	if err != nil {
-		return domain.CollectableResult{}, common.NewUnknownError(err, "unable-to-count-items")
+	if err := s.collectionRepo.Upsert(item, collector); err != nil {
+		return domain.Item{}, common.NewUnknownError(err, "unable-to-upsert-item")
 	}
 
-	return domain.NewCollectableResult(item, amount), nil
-}
-
-func (s *collectService) Remove(item domain.Item, collector domain.Collector) (domain.CollectableResult, error) {
-	if err := s.collectionRepo.Remove(item.ID, collector); err != nil {
-		return domain.CollectableResult{}, common.NewUnknownError(err, "unable-to-remove-item")
-	}
-
-	amount, err := s.collectionRepo.Count(item.ID, collector)
-	if err != nil {
-		return domain.CollectableResult{}, common.NewUnknownError(err, "unable-to-count-items")
-	}
-
-	return domain.NewCollectableResult(item, amount), nil
+	return item, nil
 }

@@ -5,6 +5,10 @@
 
 Web application that help you to manage your card collection.
 
+## Requirements
+
+- go version >= 1.22
+
 ## Run locally
 
 Run `go run cmd/main.go` to start the web application with the default configuration file (configs/application.yaml).
@@ -12,14 +16,14 @@ Run `go run cmd/main.go` to start the web application with the default configura
 Flags:
 
 | Flag            | Usage                              | Default Value            | Description                    |
-|-----------------|------------------------------------|--------------------------|--------------------------------|
+| --------------- | ---------------------------------- | ------------------------ | ------------------------------ |
 | `-c`,`--config` | `-c configs/application-prod.yaml` | configs/application.yaml | path to the configuration file |
 
 ## Test
 
-* Run **all** tests with `go test -v ./...`
-* Run **unit tests** `go test -v -short ./...`
-* Run **integration tests** `go test -v -run Integration ./...`
+- Run **all** tests with `go test -v ./...`
+- Run **unit tests** `go test -v -short ./...`
+- Run **integration tests** `go test -v -run Integration ./...`
 
 **Integration tests** require **docker** to be installed.
 
@@ -50,5 +54,4 @@ inside the root dir of the project to start the linting process.
 
 # TODOs
 
-* rearrange the collection adapter parts
-  * maybe in different subdomains?
+- try testify suite

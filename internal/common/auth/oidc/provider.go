@@ -102,6 +102,7 @@ type Provider interface {
 
 type provider struct {
 	client    *http.Client
+	validate  func(ctx context.Context, token *JSONWebToken, clientID string) (*claims, error)
 	name      string
 	authURL   string
 	tokenURL  string
@@ -109,7 +110,6 @@ type provider struct {
 	clientID  string
 	secret    string
 	scope     string
-	validate  func(ctx context.Context, token *JSONWebToken, clientID string) (*claims, error)
 }
 
 func (p *provider) GetName() string {

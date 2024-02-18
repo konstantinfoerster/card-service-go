@@ -82,18 +82,24 @@ func run(cfg *config.Config) error {
 	timeService := common.NewTimeService()
 	authService := oidc.New(cfg.Oidc, oidcProvider)
 
-	cardRepo := collectionadapter.NewCardRepository(dbCon, cfg.Images)
-	searchService := collection.NewSearchService(cardRepo)
+	searchRepo := collectionadapter.NewSearchRepository(dbCon, cfg.Images)
+	searchService := collection.NewSearchService(searchRepo)
 
 	collectionRep := collectionadapter.NewCollectionRepository(dbCon, cfg.Images)
-	collectService := collection.NewCollectService(collectionRep, cardRepo)
+	collectService := collection.NewCollectService(collectionRep, searchRepo)
 
-	srv := server.NewHTTPServer(&cfg.Server).RegisterAPIRoutes(func(r fiber.Router) {
-		v1 := r.Group("/api").Group("/v1")
+	srv := server.NewHTTPServer(&cfg.Server).RegisterRoutes(func(r fiber.Router) {
+		r.Static("/public", "./public")
 
-		loginadapter.Routes(v1, cfg.Oidc, authService, timeService)
-		collectionadapter.SearchRoutes(v1, cfg.Oidc, authService, searchService)
-		collectionadapter.CollectRoutes(v1, cfg.Oidc, authService, collectService)
+		collectionadapter.DashboardRoutes(r, cfg.Oidc, authService)
+		collectionadapter.SearchRoutes(r, cfg.Oidc, authService, searchService)
+		collectionadapter.CollectRoutes(r, cfg.Oidc, authService, collectService)
+
+		apiV1 := r.Group("/api").Group("/v1")
+
+		loginadapter.Routes(apiV1, cfg.Oidc, authService, timeService)
+		collectionadapter.SearchRoutes(apiV1, cfg.Oidc, authService, searchService)
+		collectionadapter.CollectRoutes(apiV1, cfg.Oidc, authService, collectService)
 	})
 
 	return srv.Run()

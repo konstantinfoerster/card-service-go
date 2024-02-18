@@ -1,6 +1,6 @@
 ##### BUILDER #####
 
-FROM golang:1.21-alpine3.18 as builder
+FROM golang:1.22-alpine3.19 as builder
 
 ## Task: copy source files
 COPY . /app
@@ -18,7 +18,7 @@ RUN go build -ldflags="-s -w" -o card-service cmd/main.go && chmod 0755 /app/car
 
 ##### TARGET #####
 
-FROM alpine:3.18
+FROM alpine:3.19
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"
@@ -30,7 +30,7 @@ RUN set -eux; \
     apk add --no-progress --quiet --no-cache --upgrade \
         tzdata
 
-USER 65534
+USER nobody
 
 CMD ["/usr/bin/card-service", "--config", "/config/application.yaml"]
 
