@@ -5,17 +5,16 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Logging  Logging  `yaml:"logging"`
 	Database Database `yaml:"database"`
-	Server   Server   `yaml:"server"`
+	Logging  Logging  `yaml:"logging"`
 	Images   Images   `yaml:"images"`
+	Server   Server   `yaml:"server"`
 	Oidc     Oidc     `yaml:"oidc"`
 }
 
@@ -35,51 +34,27 @@ type Logging struct {
 	Level string `yaml:"level"`
 }
 
-func (l Logging) LevelOrDefault() string {
-	level := strings.TrimSpace(l.Level)
-	if level == "" {
-		level = "INFO"
-	}
-
-	return strings.ToLower(level)
-}
-
 type Server struct {
 	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
 	Cookie      Cookie `yaml:"cookie"`
 	TemplateDir string `yaml:"template_path"`
+	Port        int    `yaml:"port"`
 }
 
 func (s Server) Addr() string {
 	return fmt.Sprintf("%s:%d", s.Host, s.Port)
 }
 
-func (s Server) TemplateDirOrDefault() string {
-	if s.TemplateDir == "" {
-		return "./views"
-	}
-
-	return s.TemplateDir
-}
-
 type Cookie struct {
-	EncryptionKey string `yaml:"encryption_key"` // must be a 32 character string
+	// EncryptionKey a 32 character string
+	EncryptionKey string `yaml:"encryption_key"`
 }
 
 type Oidc struct {
+	Provider          map[string]Provider `yaml:"provider"`
 	RedirectURI       string              `yaml:"redirect_uri"`
 	SessionCookieName string              `yaml:"session_cookie_name"`
 	StateCookieAge    time.Duration       `yaml:"state_cookie_age"`
-	Provider          map[string]Provider `yaml:"provider"`
-}
-
-func (o Oidc) SessionCookieNameOrDefault() string {
-	if o.SessionCookieName == "" {
-		return "SESSION"
-	}
-
-	return o.SessionCookieName
 }
 
 type Provider struct {
@@ -111,13 +86,25 @@ func NewConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("can't read config file: %w", err)
 	}
 
-	config := &Config{}
-	err = yaml.Unmarshal(data, &config)
+	defaultConfig := Config{
+		Logging: Logging{
+			Level: "info",
+		},
+		Server: Server{
+			TemplateDir: "./views",
+		},
+		Oidc: Oidc{
+			SessionCookieName: "SESSION",
+			StateCookieAge:    time.Minute,
+		},
+	}
+
+	err = yaml.Unmarshal(data, &defaultConfig)
 	if err != nil {
 		return nil, fmt.Errorf("config unmarshal failed with: %w", err)
 	}
 
-	// TODO validate config content
+	// TODO: validate config content
 
-	return config, nil
+	return &defaultConfig, nil
 }

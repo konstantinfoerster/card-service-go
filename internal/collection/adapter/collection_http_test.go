@@ -1,69 +1,42 @@
 package adapter_test
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/adapter"
+	"github.com/konstantinfoerster/card-service-go/internal/collection/adapter/fakes"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/application"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/domain"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	oidcfakes "github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc/fakes"
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
+	"github.com/konstantinfoerster/card-service-go/internal/common/img"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type fakeCollectService struct {
-	collections map[string][]*domain.Card
-}
-
-func NewFakeCollectService() application.CollectService {
-	collectedCards := make([]*domain.Card, 0)
-	collectedCards = append(collectedCards, &domain.Card{ID: 1, Name: "Dummy Card 1", Amount: 0})
-	collectedCards = append(collectedCards, &domain.Card{ID: 2, Name: "Dummy Card 2", Amount: 3})
-	collectedCards = append(collectedCards, &domain.Card{ID: 3, Name: "Dummy Card 3", Amount: 5})
-
-	collections := map[string][]*domain.Card{
-		validUser: collectedCards,
-	}
-
-	return &fakeCollectService{
-		collections: collections,
-	}
-}
-
-func (s *fakeCollectService) Search(name string, page domain.Page, collector domain.Collector) (domain.PagedResult, error) {
-	result := make([]*domain.Card, 0)
-
-	collected := s.collections[collector.ID]
-	for _, c := range collected {
-		if strings.Contains(c.Name, name) {
-			result = append(result, c)
-		}
-	}
-
-	return domain.NewPagedResult(result, page), nil
-}
-
-func (s *fakeCollectService) Collect(item domain.Item, collector domain.Collector) (domain.Item, error) {
-	if collector.ID == validUser {
-		return item, nil
-	}
-
-	return domain.Item{}, fmt.Errorf("invalid user")
-}
-
-func collectServer() *server.Server {
+func collectServer(t *testing.T) *server.Server {
 	srv := defaultServer()
 
-	authSvc := NewFakeUserService()
-	collectSvc := NewFakeCollectService()
+	authSvc := oidcfakes.NewUserService(validUser)
+
+	repo, err := fakes.NewRepository(img.NewPHasher())
+	require.NoError(t, err)
+
+	collectSvc := application.NewCollectionService(repo, repo)
+
+	_, err = collectSvc.Collect(domain.Item{ID: 434, Amount: 1}, domain.Collector{ID: validUser.ID})
+	require.NoError(t, err)
+	_, err = collectSvc.Collect(domain.Item{ID: 514, Amount: 5}, domain.Collector{ID: validUser.ID})
+	require.NoError(t, err)
+	_, err = collectSvc.Collect(domain.Item{ID: 706, Amount: 3}, domain.Collector{ID: validUser.ID})
+	require.NoError(t, err)
 
 	srv.RegisterRoutes(func(r fiber.Router) {
 		adapter.CollectRoutes(r.Group("/"), config.Oidc{}, authSvc, collectSvc)
@@ -73,8 +46,8 @@ func collectServer() *server.Server {
 }
 
 func TestSearchCollected(t *testing.T) {
-	srv := collectServer()
-	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: validUser})
+	srv := collectServer(t)
+	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: validUser.ID})
 	cases := []struct {
 		name                string
 		header              func(req *http.Request)
@@ -83,21 +56,23 @@ func TestSearchCollected(t *testing.T) {
 		assertContent       func(t *testing.T, resp *http.Response)
 	}{
 		{
-			name:                "json",
+			name:                "default page as json",
 			header:              func(req *http.Request) {},
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
-				body := commontest.FromJSON[adapter.PagedResult](t, resp)
+				expected := []adapter.Card{
+					{Item: adapter.Item{ID: 434, Amount: 1}, Name: "Demonic Attorney"},
+					{Item: adapter.Item{ID: 706, Amount: 3}, Name: "Demonic Hordes"},
+					{Item: adapter.Item{ID: 514, Amount: 5}, Name: "Demonic Tutor"},
+				}
+				body := commontest.FromJSON[adapter.PagedResult[adapter.Card]](t, resp)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
-				assert.Len(t, body.Data, 3)
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 1, Amount: 0}, Name: "Dummy Card 1"}, body.Data[0])
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 2, Amount: 3}, Name: "Dummy Card 2"}, body.Data[1])
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 3, Amount: 5}, Name: "Dummy Card 3"}, body.Data[2])
+				assert.ElementsMatch(t, expected, body.Data)
 			},
 		},
 		{
-			name: "html",
+			name: "default page as html",
 			header: func(req *http.Request) {
 				req.Header.Set(fiber.HeaderAccept, fiber.MIMETextHTMLCharsetUTF8)
 			},
@@ -111,7 +86,7 @@ func TestSearchCollected(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx first page",
+			name: "defaut page as htmx",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -124,7 +99,22 @@ func TestSearchCollected(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx next paged",
+			name:                "second page as json",
+			header:              func(req *http.Request) {},
+			page:                "size=1&page=2",
+			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
+			assertContent: func(t *testing.T, resp *http.Response) {
+				expected := []adapter.Card{
+					{Item: adapter.Item{ID: 706, Amount: 3}, Name: "Demonic Hordes"},
+				}
+				body := commontest.FromJSON[adapter.PagedResult[adapter.Card]](t, resp)
+				assert.True(t, body.HasMore)
+				assert.Equal(t, 2, body.Page)
+				assert.ElementsMatch(t, expected, body.Data)
+			},
+		},
+		{
+			name: "second page as htmx",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -134,11 +124,11 @@ func TestSearchCollected(t *testing.T) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsPartialHTML(t, body)
 				assert.NotContains(t, body, "data-testid=\"mycards-list\"")
-				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-"), "expected 1 card in %s", body)
 			},
 		},
 		{
-			name: "htmx with lazy loading marker",
+			name: "htmx has lazy loading marker",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -150,7 +140,7 @@ func TestSearchCollected(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx without lazy loading marker",
+			name: "htmx has no lazy loading marker",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -166,7 +156,7 @@ func TestSearchCollected(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := commontest.NewRequest(
 				commontest.WithMethod(http.MethodGet),
-				commontest.WithURL("http://localhost/mycards?name=Dummy+Card&"+tc.page),
+				commontest.WithURL("http://localhost/mycards?name=Demonic&"+tc.page),
 				commontest.WithEncryptedCookie(t, http.Cookie{
 					Name:  "SESSION",
 					Value: token,
@@ -186,10 +176,10 @@ func TestSearchCollected(t *testing.T) {
 }
 
 func TestSearchCollectedNoSession(t *testing.T) {
-	srv := collectServer()
+	srv := collectServer(t)
 	req := commontest.NewRequest(
 		commontest.WithMethod(http.MethodGet),
-		commontest.WithURL("http://localhost/mycards?name=Dummy+Card"),
+		commontest.WithURL("http://localhost/mycards?name=Demonic"),
 	)
 
 	resp, err := srv.Test(req)
@@ -199,9 +189,9 @@ func TestSearchCollectedNoSession(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-func TestCollectItem(t *testing.T) {
-	srv := collectServer()
-	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: validUser})
+func TestCollectItemAdd(t *testing.T) {
+	srv := collectServer(t)
+	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: validUser.ID})
 	cases := []struct {
 		name                string
 		header              func(req *http.Request)
@@ -210,7 +200,7 @@ func TestCollectItem(t *testing.T) {
 		assertContent       func(t *testing.T, resp *http.Response)
 	}{
 		{
-			name:                "json add",
+			name:                "add via rest api",
 			header:              func(req *http.Request) {},
 			amount:              1,
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
@@ -220,7 +210,7 @@ func TestCollectItem(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx add",
+			name: "add via htmx",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -231,26 +221,9 @@ func TestCollectItem(t *testing.T) {
 				commontest.AssertContainsPartialHTML(t, body)
 
 				assert.Contains(t, body, "data-testid=\"add-card-btn\"", "expect to have add button")
-				assert.Contains(t, body, "data-testid=\"remove-card-btn\"", "expect to have remove button")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 2 }'", "expect to find add values")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 0 }'", "expect to find remove values")
-			},
-		},
-		{
-			name: "htmx remove",
-			header: func(req *http.Request) {
-				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
-			},
-			amount:              0,
-			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
-			assertContent: func(t *testing.T, resp *http.Response) {
-				body := commontest.ToString(t, resp)
-				commontest.AssertContainsPartialHTML(t, body)
-
-				assert.Contains(t, body, "data-testid=\"add-card-btn\"", "expect to have add button")
-				assert.NotContains(t, body, "data-testid=\"remove-card-btn\"", "expect to have disabled remove button")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 1 }'", "expect to find add values")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 0 }'", "expect to find remove values")
+				assert.Contains(t, body, "data-testid=\"remove-card-btn\"", "expect remove button")
+				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 2 }'", "expect add value attributes")
+				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 0 }'", "expect remove value attributes")
 			},
 		},
 	}
@@ -278,8 +251,73 @@ func TestCollectItem(t *testing.T) {
 	}
 }
 
+func TestCollectItemRemove(t *testing.T) {
+	srv := collectServer(t)
+	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: validUser.ID})
+	cases := []struct {
+		name                string
+		header              func(req *http.Request)
+		amount              int
+		expectedContentType string
+		assertContent       func(t *testing.T, resp *http.Response)
+	}{
+		{
+			name: "remove via htmx",
+			header: func(req *http.Request) {
+				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
+			},
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, resp *http.Response) {
+				body := commontest.ToString(t, resp)
+				commontest.AssertContainsPartialHTML(t, body)
+
+				assert.Contains(t, body, "data-testid=\"add-card-btn\"", "expect to have add button")
+				assert.NotContains(t, body, "data-testid=\"remove-card-btn\"", "expect disabled remove button")
+				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 1 }'", "expect add value attributes")
+				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 0 }'", "expect remove value attributes")
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// collect item
+			reqAdd := commontest.NewRequest(
+				commontest.WithMethod(http.MethodPost),
+				commontest.WithURL("http://localhost/mycards"),
+				commontest.WithEncryptedCookie(t, http.Cookie{
+					Name:  "SESSION",
+					Value: token,
+				}),
+				commontest.HTMXRequest(),
+				commontest.WithJSONBody(t, adapter.Item{ID: 1, Amount: 1}),
+			)
+			respAdd, _ := srv.Test(reqAdd)
+			defer commontest.Close(t, respAdd)
+			// remove collected item
+			reqRemove := commontest.NewRequest(
+				commontest.WithMethod(http.MethodPost),
+				commontest.WithURL("http://localhost/mycards"),
+				commontest.WithEncryptedCookie(t, http.Cookie{
+					Name:  "SESSION",
+					Value: token,
+				}),
+				commontest.WithJSONBody(t, adapter.Item{ID: 1, Amount: 0}),
+			)
+			tc.header(reqRemove)
+
+			resp, err := srv.Test(reqRemove)
+			defer commontest.Close(t, resp)
+
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.Equal(t, tc.expectedContentType, resp.Header.Get(fiber.HeaderContentType))
+			tc.assertContent(t, resp)
+		})
+	}
+}
+
 func TestCollectItemWithInvalidUser(t *testing.T) {
-	srv := collectServer()
+	srv := collectServer(t)
 	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: invalidUser})
 	req := commontest.NewRequest(
 		commontest.WithMethod(http.MethodPost),

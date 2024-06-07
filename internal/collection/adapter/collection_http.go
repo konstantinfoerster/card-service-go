@@ -11,14 +11,14 @@ import (
 	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
 )
 
-func CollectRoutes(r fiber.Router, cfg config.Oidc, oidcSvc oidc.UserService, collectSvc application.CollectService) {
-	authMiddleware := oidc.NewOauthMiddleware(oidcSvc, oidc.FromConfig(cfg))
+func CollectRoutes(r fiber.Router, cfg config.Oidc, oSvc oidc.UserService, cSvc application.CollectionService) {
+	authMiddleware := oidc.NewOauthMiddleware(oSvc, oidc.FromConfig(cfg))
 
-	r.Get("/mycards", authMiddleware, searchInPersonalCollection(collectSvc))
-	r.Post("/mycards", authMiddleware, collect(collectSvc))
+	r.Get("/mycards", authMiddleware, searchInPersonalCollection(cSvc))
+	r.Post("/mycards", authMiddleware, collect(cSvc))
 }
 
-func searchInPersonalCollection(svc application.CollectService) fiber.Handler {
+func searchInPersonalCollection(svc application.CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, err := auth.UserFromCtx(c)
 		if err != nil {
@@ -57,7 +57,7 @@ func searchInPersonalCollection(svc application.CollectService) fiber.Handler {
 	}
 }
 
-func collect(svc application.CollectService) fiber.Handler {
+func collect(svc application.CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, err := auth.UserFromCtx(c)
 		if err != nil {

@@ -1,3 +1,5 @@
+//go:build opencv
+
 package main
 
 import (
@@ -16,6 +18,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
+	"github.com/konstantinfoerster/card-service-go/internal/common/img"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
@@ -42,7 +45,7 @@ func setup() *config.Config {
 	if err != nil {
 		panic(err)
 	}
-	level, err := zerolog.ParseLevel(strings.ToLower(cfg.Logging.LevelOrDefault()))
+	level, err := zerolog.ParseLevel(strings.ToLower(cfg.Logging.Level))
 	if err != nil {
 		panic(err)
 	}
@@ -81,12 +84,14 @@ func run(cfg *config.Config) error {
 
 	timeService := common.NewTimeService()
 	authService := oidc.New(cfg.Oidc, oidcProvider)
+	detector := img.NewDetector()
+	hasher := img.NewPHasher()
 
 	searchRepo := collectionadapter.NewSearchRepository(dbCon, cfg.Images)
-	searchService := collection.NewSearchService(searchRepo)
+	searchService := collection.NewSearchService(searchRepo, detector, hasher)
 
 	collectionRep := collectionadapter.NewCollectionRepository(dbCon, cfg.Images)
-	collectService := collection.NewCollectService(collectionRep, searchRepo)
+	collectService := collection.NewCollectionService(collectionRep, searchRepo)
 
 	srv := server.NewHTTPServer(&cfg.Server).RegisterRoutes(func(r fiber.Router) {
 		r.Static("/public", "./public")
@@ -98,8 +103,6 @@ func run(cfg *config.Config) error {
 		apiV1 := r.Group("/api").Group("/v1")
 
 		loginadapter.Routes(apiV1, cfg.Oidc, authService, timeService)
-		collectionadapter.SearchRoutes(apiV1, cfg.Oidc, authService, searchService)
-		collectionadapter.CollectRoutes(apiV1, cfg.Oidc, authService, collectService)
 	})
 
 	return srv.Run()

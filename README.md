@@ -55,3 +55,4 @@ inside the root dir of the project to start the linting process.
 # TODOs
 
 - try testify suite
+- replace google oauth with golang.org/x/oauth2

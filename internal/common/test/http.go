@@ -3,6 +3,7 @@ package commontest
 import (
 	"bytes"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,11 +17,11 @@ import (
 const CookieEncryptionKey = "01234567890123456789012345678901"
 
 type httpRequest struct {
+	header  map[string]string
 	url     string
 	method  string
 	body    []byte
 	cookies []*http.Cookie
-	header  map[string]string
 }
 
 func NewRequest(options ...func(*httpRequest)) *http.Request {
@@ -65,6 +66,23 @@ func WithMethod(m string) func(*httpRequest) {
 func WithBody(body []byte) func(*httpRequest) {
 	return func(req *httpRequest) {
 		req.body = body
+	}
+}
+
+func WithMultipartFile(t *testing.T, f io.Reader, name string) func(*httpRequest) {
+	return func(req *httpRequest) {
+		body := new(bytes.Buffer)
+		mw := multipart.NewWriter(body)
+		w, err := mw.CreateFormFile("file", name)
+		require.NoError(t, err)
+
+		_, err = io.Copy(w, f)
+		require.NoError(t, err)
+		err = mw.Close()
+		require.NoError(t, err)
+
+		req.header[fiber.HeaderContentType] = mw.FormDataContentType()
+		req.body = body.Bytes()
 	}
 }
 
@@ -113,6 +131,10 @@ func WithEncryptedCookie(t *testing.T, cookie http.Cookie) func(*httpRequest) {
 
 func Close(t *testing.T, resp *http.Response) {
 	t.Helper()
+
+	if resp == nil {
+		return
+	}
 
 	err := resp.Body.Close()
 	if err != nil {

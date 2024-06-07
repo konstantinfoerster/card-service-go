@@ -8,6 +8,29 @@
       {{- template "partials/primary_nav" . -}}
     </nav>
     <div class="nav-actions">
+      <form action="/detect"
+            method="POST"
+            enctype="multipart/form-data"
+            hx-post="/detect"
+            hx-encoding="multipart/form-data"
+            hx-target="main"
+            hx-trigger="input change"
+            class="w-max-content"
+      >
+        <input class="visually-hidden" id="detect-file" type="file" 
+          name="file" accept="images/*;capture=camera">
+        <label class="btn btn-default btn-small btn-icon" for="detect-file"
+         title="Search for similar looking cards"
+        >
+          <svg viewBox="0 0 31 31">
+            <polygon stroke-width="2" stroke-miterlimit="10" 
+              points="21.5,9 20,7 12,7 10.5,9 4,9 4,25 28,25 28,9">
+              </polygon> 
+            <circle stroke-width="2" stroke-miterlimit="10" cx="16" cy="17" r="5"></circle>
+            <circle cx="8" cy="12" r="1"></circle>
+          </svg>
+        </label>
+      </form>
       <form action="/cards"
             method="GET"
             hx-get="/cards"

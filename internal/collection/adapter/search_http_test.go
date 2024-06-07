@@ -2,67 +2,32 @@ package adapter_test
 
 import (
 	"net/http"
+	"os"
+	"path"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/adapter"
+	"github.com/konstantinfoerster/card-service-go/internal/collection/adapter/fakes"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/application"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/domain"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	oidcfakes "github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc/fakes"
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
+	"github.com/konstantinfoerster/card-service-go/internal/common/img"
+	detectfakes "github.com/konstantinfoerster/card-service-go/internal/common/img/fakes"
+	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/server"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type fakeSearchService struct {
-	cards       []*domain.Card
-	collections map[string][]*domain.Card
-}
-
-func NewFakeSearchService() application.SearchService {
-	cards := make([]*domain.Card, 0)
-	cards = append(cards, &domain.Card{ID: 1, Name: "Dummy Card 1"})
-	cards = append(cards, &domain.Card{ID: 2, Name: "Dummy Card 2"})
-	cards = append(cards, &domain.Card{ID: 3, Name: "Dummy Card 3"})
-
-	collectedCards := make([]*domain.Card, 0)
-	collectedCards = append(collectedCards, &domain.Card{ID: 1, Name: "Dummy Card 1", Amount: 2})
-	collectedCards = append(collectedCards, &domain.Card{ID: 2, Name: "Dummy Card 2", Amount: 0})
-	collectedCards = append(collectedCards, &domain.Card{ID: 3, Name: "Dummy Card 3", Amount: 5})
-
-	collections := map[string][]*domain.Card{
-		validUser: collectedCards,
-	}
-
-	return &fakeSearchService{
-		cards:       cards,
-		collections: collections,
-	}
-}
-
-func (s *fakeSearchService) Search(name string, page domain.Page, collector domain.Collector) (domain.PagedResult, error) {
-	result := make([]*domain.Card, 0)
-
-	cards := s.cards
-	if collector.ID != "" {
-		cards = s.collections[collector.ID]
-	}
-
-	for _, c := range cards {
-		if strings.Contains(c.Name, name) {
-			result = append(result, c)
-		}
-	}
-
-	return domain.NewPagedResult(result, page), nil
-}
-
 func TestSearch(t *testing.T) {
-	srv := searchServer()
+	srv := searchServer(t)
 	cases := []struct {
 		name                string
 		header              func(req *http.Request)
@@ -71,32 +36,38 @@ func TestSearch(t *testing.T) {
 		assertContent       func(t *testing.T, resp *http.Response)
 	}{
 		{
-			name:                "json",
+			name:                "default page as json",
 			header:              func(req *http.Request) {},
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
-				body := commontest.FromJSON[adapter.PagedResult](t, resp)
+				expected := []adapter.Card{
+					{Item: adapter.Item{ID: 434}, Name: "Demonic Attorney"},
+					{Item: adapter.Item{ID: 706}, Name: "Demonic Hordes"},
+					{Item: adapter.Item{ID: 514}, Name: "Demonic Tutor"},
+				}
+				body := commontest.FromJSON[adapter.PagedResult[adapter.Card]](t, resp)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
-				assert.Len(t, body.Data, 3)
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 1}, Name: "Dummy Card 1"}, body.Data[0])
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 2}, Name: "Dummy Card 2"}, body.Data[1])
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 3}, Name: "Dummy Card 3"}, body.Data[2])
+				assert.ElementsMatch(t, expected, body.Data)
 			},
 		},
 		{
-			name:                "json paged",
+			name:                "second page as json",
 			header:              func(req *http.Request) {},
 			page:                "size=1&page=2",
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
-				body := commontest.FromJSON[adapter.PagedResult](t, resp)
-				assert.Equal(t, 2, body.Page)
+				expected := []adapter.Card{
+					{Item: adapter.Item{ID: 706}, Name: "Demonic Hordes"},
+				}
+				body := commontest.FromJSON[adapter.PagedResult[adapter.Card]](t, resp)
 				assert.True(t, body.HasMore)
+				assert.Equal(t, 2, body.Page)
+				assert.ElementsMatch(t, expected, body.Data)
 			},
 		},
 		{
-			name: "html",
+			name: "default page as html",
 			header: func(req *http.Request) {
 				req.Header.Set(fiber.HeaderAccept, fiber.MIMETextHTMLCharsetUTF8)
 			},
@@ -110,7 +81,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx first page",
+			name: "default page as htmx",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -123,7 +94,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx next page",
+			name: "second page as htmx",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -133,11 +104,11 @@ func TestSearch(t *testing.T) {
 				body := commontest.ToString(t, resp)
 				commontest.AssertContainsPartialHTML(t, body)
 				assert.NotContains(t, body, "data-testid=\"search-result-txt\"")
-				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-"), "expected 1 card  in %s", body)
 			},
 		},
 		{
-			name: "htmx with lazy loading marker",
+			name: "htmx has lazy loading marker",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -149,7 +120,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx without lazy loading marker",
+			name: "htmx has no lazy loading marker",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -165,7 +136,7 @@ func TestSearch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := commontest.NewRequest(
 				commontest.WithMethod(http.MethodGet),
-				commontest.WithURL("http://localhost/cards?name=Dummy+Card&"+tc.page),
+				commontest.WithURL("http://localhost/cards?name=Demonic&"+tc.page),
 			)
 			tc.header(req)
 
@@ -181,8 +152,8 @@ func TestSearch(t *testing.T) {
 }
 
 func TestSearchWithUser(t *testing.T) {
-	srv := searchServer()
-	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: validUser})
+	srv := searchServer(t)
+	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: validUser.ID})
 	cases := []struct {
 		name                string
 		header              func(req *http.Request)
@@ -190,21 +161,23 @@ func TestSearchWithUser(t *testing.T) {
 		assertContent       func(t *testing.T, resp *http.Response)
 	}{
 		{
-			name:                "json",
+			name:                "default page as json",
 			header:              func(req *http.Request) {},
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, resp *http.Response) {
-				body := commontest.FromJSON[adapter.PagedResult](t, resp)
+				expected := []adapter.Card{
+					{Item: adapter.Item{ID: 434}, Name: "Demonic Attorney"},
+					{Item: adapter.Item{ID: 706, Amount: 3}, Name: "Demonic Hordes"},
+					{Item: adapter.Item{ID: 514, Amount: 5}, Name: "Demonic Tutor"},
+				}
+				body := commontest.FromJSON[adapter.PagedResult[adapter.Card]](t, resp)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
-				assert.Len(t, body.Data, 3)
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 1, Amount: 2}, Name: "Dummy Card 1"}, body.Data[0])
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 2, Amount: 0}, Name: "Dummy Card 2"}, body.Data[1])
-				assert.Equal(t, &adapter.Card{Item: adapter.Item{ID: 3, Amount: 5}, Name: "Dummy Card 3"}, body.Data[2])
+				assert.ElementsMatch(t, expected, body.Data)
 			},
 		},
 		{
-			name: "html",
+			name: "default page as html",
 			header: func(req *http.Request) {
 				req.Header.Set(fiber.HeaderAccept, fiber.MIMETextHTMLCharsetUTF8)
 			},
@@ -220,7 +193,7 @@ func TestSearchWithUser(t *testing.T) {
 			},
 		},
 		{
-			name: "htmx first page",
+			name: "default page as htmx",
 			header: func(req *http.Request) {
 				req.Header.Set(commonhttp.HeaderHTMXRequest, "true")
 			},
@@ -240,7 +213,7 @@ func TestSearchWithUser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			req := commontest.NewRequest(
 				commontest.WithMethod(http.MethodGet),
-				commontest.WithURL("http://localhost/cards?name=Dummy+Card"),
+				commontest.WithURL("http://localhost/cards?name=Demonic"),
 				commontest.WithEncryptedCookie(t, http.Cookie{
 					Name:  "SESSION",
 					Value: token,
@@ -260,11 +233,11 @@ func TestSearchWithUser(t *testing.T) {
 }
 
 func TestSearchWithInvalidUser(t *testing.T) {
-	srv := searchServer()
+	srv := searchServer(t)
 	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: invalidUser})
 	req := commontest.NewRequest(
 		commontest.WithMethod(http.MethodGet),
-		commontest.WithURL("http://localhost/cards?name=Dummy+Card&size=5&page=1"),
+		commontest.WithURL("http://localhost/cards?name=Demonic&size=5&page=1"),
 		commontest.WithEncryptedCookie(t, http.Cookie{
 			Name:  "SESSION",
 			Value: token,
@@ -278,11 +251,63 @@ func TestSearchWithInvalidUser(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
 
-func searchServer() *server.Server {
+func currentDir() string {
+	_, cf, _, _ := runtime.Caller(0)
+
+	return path.Join(path.Dir(cf))
+}
+
+func TestDetect(t *testing.T) {
+	srv := searchServer(t)
+	fImg, err := os.Open(path.Join(currentDir(), "testdata", "cardImageModified.jpg"))
+	defer commonio.Close(fImg)
+	require.NoError(t, err)
+
+	req := commontest.NewRequest(
+		commontest.WithMethod(http.MethodPost),
+		commontest.WithURL("http://localhost/detect"),
+		commontest.WithMultipartFile(t, fImg, fImg.Name()),
+	)
+
+	resp, err := srv.Test(req)
+	defer commontest.Close(t, resp)
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	score := 4
+	expected := []adapter.Card{
+		{
+			Item:  adapter.Item{ID: 1},
+			Name:  "Ancestor's Chosen",
+			Image: "cardImage.jpg",
+			Score: &score,
+		},
+	}
+	body := commontest.FromJSON[adapter.PagedResult[adapter.Card]](t, resp)
+	assert.False(t, body.HasMore)
+	assert.Equal(t, 1, body.Page)
+	assert.ElementsMatch(t, expected, body.Data)
+}
+
+func searchServer(t *testing.T) *server.Server {
 	srv := defaultServer()
 
-	authSvc := NewFakeUserService()
-	searchSvc := NewFakeSearchService()
+	authSvc := oidcfakes.NewUserService(validUser)
+	repo, err := fakes.NewRepository(img.NewPHasher())
+	require.NoError(t, err)
+
+	collectSvc := application.NewCollectionService(repo, repo)
+
+	_, err = collectSvc.Collect(domain.Item{ID: 434, Amount: 0}, domain.Collector{ID: validUser.ID})
+	require.NoError(t, err)
+	_, err = collectSvc.Collect(domain.Item{ID: 514, Amount: 5}, domain.Collector{ID: validUser.ID})
+	require.NoError(t, err)
+	_, err = collectSvc.Collect(domain.Item{ID: 706, Amount: 3}, domain.Collector{ID: validUser.ID})
+	require.NoError(t, err)
+
+	hasher := img.NewPHasher()
+	detector := detectfakes.NewDetector()
+	searchSvc := application.NewSearchService(repo, detector, hasher)
 	srv.RegisterRoutes(func(r fiber.Router) {
 		adapter.SearchRoutes(r.Group("/"), config.Oidc{}, authSvc, searchSvc)
 	})

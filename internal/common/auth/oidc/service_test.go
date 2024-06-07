@@ -145,6 +145,7 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 
 	_, _, err := svc.Authenticate("test", "code-0")
 	require.Error(t, err)
+
 	var appErr common.AppError
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, common.ErrTypeUnknown, appErr.ErrorType)
@@ -181,7 +182,7 @@ func startProviderServer(t *testing.T, expectedBody string) *httptest.Server {
 
 		if r.Method == http.MethodPost && strings.HasSuffix(r.RequestURI, "/auth") {
 			_, err := w.Write(commontest.ToJSON(t, oidc.JSONWebToken{}))
-			require.NoError(t, err)
+			assert.NoError(t, err)
 
 			status = 200
 		}
@@ -192,7 +193,7 @@ func startProviderServer(t *testing.T, expectedBody string) *httptest.Server {
 
 		if expectedBody != "" {
 			body, err := io.ReadAll(r.Body)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, expectedBody, string(body))
 		}
 

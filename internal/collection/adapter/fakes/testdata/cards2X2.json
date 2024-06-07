@@ -1,0 +1,92 @@
+[
+  {
+    "id": 745,
+    "name": "Emrakul, the Aeons Torn",
+    "number": "1",
+    "rarity": "MYTHIC",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 1065,
+    "name": "Emiel the Blessed",
+    "number": "10",
+    "rarity": "MYTHIC",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 911,
+    "name": "Abbot of Keral Keep",
+    "number": "100",
+    "rarity": "RARE",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 1253,
+    "name": "Alesha, Who Smiles at Death",
+    "number": "101",
+    "rarity": "RARE",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 774,
+    "name": "Anger of the Gods",
+    "number": "102",
+    "rarity": "RARE",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 1097,
+    "name": "Backdraft Hellkite",
+    "number": "103",
+    "rarity": "RARE",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 912,
+    "name": "Bedlam Reveler",
+    "number": "104",
+    "rarity": "RARE",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 1098,
+    "name": "Chaos Warp",
+    "number": "105",
+    "rarity": "RARE",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 775,
+    "name": "Dark-Dweller Oracle",
+    "number": "106",
+    "rarity": "COMMON",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  },
+  {
+    "id": 1215,
+    "name": "Dockside Extortionist",
+    "number": "107",
+    "rarity": "MYTHIC",
+    "border": "BLACK",
+    "layout": "NORMAL",
+    "card_set_code": "2X2"
+  }
+]

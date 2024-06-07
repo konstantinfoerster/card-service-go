@@ -247,6 +247,10 @@ CREATE TABLE card_image
     card_id    INTEGER      NOT NULL CHECK (card_id >= 0),
     face_id    INTEGER,
     mime_type  VARCHAR(100) NOT NULL CHECK (mime_type <> ''),
+    phash1     BIT(64),
+    phash2     BIT(64),
+    phash3     BIT(64),
+    phash4     BIT(64),
     lang_lang  CHAR(3) REFERENCES lang (lang),
     UNIQUE (image_path)
 );

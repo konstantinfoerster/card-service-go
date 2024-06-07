@@ -41,7 +41,7 @@ func NewOauthMiddleware(svc UserService, options ...func(*MiddlewareConfig)) fib
 
 func FromConfig(cfg config.Oidc) func(*MiddlewareConfig) {
 	return func(c *MiddlewareConfig) {
-		c.Key = cfg.SessionCookieNameOrDefault()
+		c.Key = cfg.SessionCookieName
 	}
 }
 
