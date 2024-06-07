@@ -252,6 +252,7 @@ func (r FakeRepository) Remove(itemID int, collector domain.Collector) error {
 }
 
 func readFromJSON(path string) ([]domain.Card, error) {
+	// #nosec G304 only used in tests
 	cardsRaw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open %s, %w", path, err)

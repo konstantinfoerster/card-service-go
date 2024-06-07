@@ -14,7 +14,8 @@ ENV GOOS="linux"
 ENV GOARCH="amd64"
 ENV CGO_ENABLED="0"
 
-RUN go build -ldflags="-s -w" -o card-service cmd/main.go && chmod 0755 /app/card-service
+RUN go build -ldflags="-s -w" -o card-service cmd/main.go \
+      && chmod 0755 /app/card-service
 
 ##### TARGET #####
 
