@@ -53,7 +53,7 @@ func (d boxDetector) Detect(img io.Reader) (Images, error) {
 	candidates, err := findCandidates(orig, normalized)
 	if err != nil {
 		if errors.Is(err, ErrNoContours) {
-			return newImages(), nil
+			return NewImages(), nil
 		}
 
 		return nil, err
@@ -126,7 +126,7 @@ func findCandidates(orig gocv.Mat, normalized gocv.Mat) (Images, error) {
 	}
 	defer contours.Close()
 
-	images := newImages()
+	images := NewImages()
 	for i := 0; i < contours.Size(); i++ {
 		pv := contours.At(i)
 
