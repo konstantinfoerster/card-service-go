@@ -289,10 +289,45 @@ func TestDetect(t *testing.T) {
 	assert.ElementsMatch(t, expected, body.Data)
 }
 
+func TestDetectWithUser(t *testing.T) {
+	srv := searchServer(t)
+	fImg, err := os.Open(path.Join(currentDir(), "testdata", "cardImageModified.jpg"))
+	defer commonio.Close(fImg)
+	require.NoError(t, err)
+	token := commontest.Base64Encoded(t, &oidc.JSONWebToken{IDToken: detectorUser.ID})
+	req := commontest.NewRequest(
+		commontest.WithMethod(http.MethodPost),
+		commontest.WithURL("http://localhost/detect"),
+		commontest.WithEncryptedCookie(t, http.Cookie{
+			Name:  "SESSION",
+			Value: token,
+		}),
+		commontest.WithMultipartFile(t, fImg, fImg.Name()),
+	)
+
+	resp, err := srv.Test(req)
+	defer commontest.Close(t, resp)
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	score := 4
+	expected := []adapter.Card{
+		{
+			Item:  adapter.Item{ID: 1, Amount: 1},
+			Name:  "Ancestor's Chosen",
+			Image: "cardImage.jpg",
+			Score: &score,
+		},
+	}
+	body := commontest.FromJSON[adapter.PagedResult[adapter.Card]](t, resp)
+	assert.False(t, body.HasMore)
+	assert.Equal(t, 1, body.Page)
+	assert.ElementsMatch(t, expected, body.Data)
+}
 func searchServer(t *testing.T) *server.Server {
 	srv := defaultServer()
 
-	authSvc := oidcfakes.NewUserService(validUser)
+	authSvc := oidcfakes.NewUserService(validUser, detectorUser)
 	repo, err := fakes.NewRepository(img.NewPHasher())
 	require.NoError(t, err)
 
@@ -303,6 +338,8 @@ func searchServer(t *testing.T) *server.Server {
 	_, err = collectSvc.Collect(domain.Item{ID: 514, Amount: 5}, domain.Collector{ID: validUser.ID})
 	require.NoError(t, err)
 	_, err = collectSvc.Collect(domain.Item{ID: 706, Amount: 3}, domain.Collector{ID: validUser.ID})
+	require.NoError(t, err)
+	_, err = collectSvc.Collect(domain.Item{ID: 1, Amount: 1}, domain.Collector{ID: detectorUser.ID})
 	require.NoError(t, err)
 
 	hasher := img.NewPHasher()

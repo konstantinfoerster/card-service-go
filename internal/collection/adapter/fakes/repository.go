@@ -151,7 +151,7 @@ func (r FakeRepository) hash(c domain.Card) (domain.Hash, error) {
 	return r.hasher.Hash(img.Image{Image: dImg})
 }
 
-func (r FakeRepository) Top5MatchesByHash(ctx context.Context, hashes ...domain.Hash) (domain.Matches, error) {
+func (r FakeRepository) allMatchesByHash(_ context.Context, hashes ...domain.Hash) (domain.Matches, error) {
 	var result domain.Matches
 	for _, card := range r.cards {
 		if card.Image == "" {
@@ -179,12 +179,46 @@ func (r FakeRepository) Top5MatchesByHash(ctx context.Context, hashes ...domain.
 		})
 	}
 
+	slices.SortStableFunc(result, func(a domain.Match, b domain.Match) int {
+		return cmp.Compare(a.Score, b.Score)
+	})
+
+	return result, nil
+}
+
+func (r FakeRepository) Top5MatchesByHash(ctx context.Context, hashes ...domain.Hash) (domain.Matches, error) {
+	result, err := r.allMatchesByHash(ctx, hashes...)
+	if err != nil {
+		return nil, err
+	}
+
+	limit := 5
+	if len(result) > limit {
+		return result[:limit], nil
+	}
+
 	return result, nil
 }
 
 func (r FakeRepository) Top5MatchesByCollectorAndHash(
 	ctx context.Context, collector domain.Collector, hashes ...domain.Hash) (domain.Matches, error) {
-	return nil, nil
+	result, err := r.allMatchesByHash(ctx, hashes...)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range r.collected[collector.ID] {
+		for i := range result {
+			result[i].Amount = c.Amount
+		}
+	}
+
+	limit := 5
+	if len(result) > limit {
+		return result[:limit], nil
+	}
+
+	return result, nil
 }
 
 func (r FakeRepository) FindCollectedByName(

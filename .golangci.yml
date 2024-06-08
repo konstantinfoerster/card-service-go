@@ -28,7 +28,6 @@ linters:
     - errchkjson # checks types passed to the json encoding functions. Reports unsupported types.
     - errname # checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
     - errorlint # linter that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
-    - execinquery # warns about wrong usage of Query
     - exhaustive # checks exhaustiveness of enum switch statements
     - exportloopref # checks for pointers to enclosing loop variables
     - forbidigo # Forbids identifiers

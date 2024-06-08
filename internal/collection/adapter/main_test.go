@@ -9,6 +9,7 @@ import (
 )
 
 var validUser = auth.User{ID: "myUser", Username: "myUser"}
+var detectorUser = auth.User{ID: "detectorUser", Username: "detectorUser"}
 
 const invalidUser = "invalidUser"
 
