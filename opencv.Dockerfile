@@ -1,6 +1,7 @@
-##### BUILDER #####
+FROM ghcr.io/hybridgroup/opencv:4.10.0
 
-FROM golang:1.22-alpine3.19 as builder
+ARG RELEASE
+ENV IMG_VERSION="${RELEASE}"
 
 ## Task: copy source files
 COPY . /app
@@ -12,28 +13,15 @@ RUN go mod download && go mod verify
 ## Task: build project
 ENV GOOS="linux"
 ENV GOARCH="amd64"
-ENV CGO_ENABLED="0"
+ENV CGO_ENABLED="1"
 
-RUN go build -ldflags="-s -w" -o card-service cmd/main.go \
-      && chmod 0755 /app/card-service
-
-##### TARGET #####
-
-FROM alpine:3.19
-
-ARG RELEASE
-ENV IMG_VERSION="${RELEASE}"
-
-COPY --from=builder /app/card-service /usr/bin/
-
-# hadolint ignore=DL3018
-RUN set -eux; \
-    apk add --no-progress --quiet --no-cache --upgrade \
-        tzdata
+RUN go build -tags opencv -ldflags="-s -w" -o card-service cmd/main.go \
+      && chmod 0755 /app/card-service \
+      && cp /app/card-service /usr/bin/card-service
 
 USER nobody
 
-CMD ["/usr/bin/card-service", "--config", "/config/application.yaml"]
+CMD ["/usr/bin/card-service", "--config", "/config/application-service.yaml"]
 
 LABEL org.opencontainers.image.title="Card-Manager Service" \
       org.opencontainers.image.description="Application that helps you to manage your card collection" \

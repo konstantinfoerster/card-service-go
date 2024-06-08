@@ -1,10 +1,12 @@
 package adapter_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/konstantinfoerster/card-service-go/internal/collection/adapter"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/domain"
+	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
@@ -25,6 +27,7 @@ func TestIntegrationCardRepository(t *testing.T) {
 
 		t.Run("find by id", findByID)
 		t.Run("find by id with none existing id", findByNoneExistingID)
+
 		t.Run("find by name default page", findByName)
 		t.Run("find by name last page", findByNameLastPage)
 		t.Run("find by name double face card", findByNameDoubleFace)
@@ -34,6 +37,12 @@ func TestIntegrationCardRepository(t *testing.T) {
 		t.Run("find by name and collector", findByNameAndCollector)
 		t.Run("find by name and collector double face card", findByNameAndCollectorDoubleFace)
 		t.Run("find by name and collector with no image", findByNameAndCollectorNoImageURL)
+
+		t.Run("top 5 matches by hash", top5MatchesByHash)
+		t.Run("top 5 matches by hash no result", top5MatchesByHashNoResult)
+
+		t.Run("top 5 matches by collector and hash", top5MatchesByCollectorAndHash)
+		t.Run("top 5 matches by collector and hash no result", top5MatchesByCollectorAndHashNoResult)
 	})
 }
 
@@ -45,14 +54,13 @@ func findByID(t *testing.T) {
 }
 
 func findByNoneExistingID(t *testing.T) {
-	result, err := serchRepository.ByID(1000)
+	_, err := serchRepository.ByID(1000)
 
-	assert.Nil(t, result)
 	require.ErrorIs(t, err, domain.ErrCardNotFound)
 }
 
 func findByName(t *testing.T) {
-	result, err := serchRepository.FindByName("ummy Card", domain.NewPage(1, 3))
+	result, err := serchRepository.FindByName("ummy Card", common.NewPage(1, 3))
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Page)
@@ -67,7 +75,7 @@ func findByName(t *testing.T) {
 }
 
 func findByNameLastPage(t *testing.T) {
-	result, err := serchRepository.FindByName("Dummy Card", domain.NewPage(2, 3))
+	result, err := serchRepository.FindByName("Dummy Card", common.NewPage(2, 3))
 
 	require.NoError(t, err)
 	assert.False(t, result.HasMore)
@@ -106,7 +114,7 @@ func findByNameDoubleFace(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := serchRepository.FindByName(tc.searchTerm, domain.NewPage(1, 10))
+			result, err := serchRepository.FindByName(tc.searchTerm, common.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Len(t, result.Result, tc.resultSize)
@@ -115,7 +123,7 @@ func findByNameDoubleFace(t *testing.T) {
 }
 
 func findByNameNoImageURL(t *testing.T) {
-	result, err := serchRepository.FindByName("No Image Card", domain.NewPage(1, 5))
+	result, err := serchRepository.FindByName("No Image Card", common.NewPage(1, 5))
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 2)
@@ -148,7 +156,7 @@ func findByNameNoResult(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := serchRepository.FindByName(tc.searchTerm, domain.NewPage(1, 10))
+			result, err := serchRepository.FindByName(tc.searchTerm, common.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Equal(t, 1, result.Page)
@@ -160,7 +168,7 @@ func findByNameNoResult(t *testing.T) {
 
 func findByNameAndCollector(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	result, err := serchRepository.FindByNameAndCollector("ummy Card", domain.NewPage(1, 3), c)
+	result, err := serchRepository.FindByCollectorAndName(c, "ummy Card", common.NewPage(1, 3))
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 3)
@@ -211,7 +219,7 @@ func findByNameAndCollectorDoubleFace(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := domain.Collector{ID: "myUser"}
-			result, err := serchRepository.FindByNameAndCollector(tc.searchTerm, domain.NewPage(1, 10), c)
+			result, err := serchRepository.FindByCollectorAndName(c, tc.searchTerm, common.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Len(t, result.Result, tc.resultSize)
@@ -225,7 +233,7 @@ func findByNameAndCollectorDoubleFace(t *testing.T) {
 
 func findByNameAndCollectorNoImageURL(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	result, err := serchRepository.FindByNameAndCollector("No Image Card", domain.NewPage(1, 10), c)
+	result, err := serchRepository.FindByCollectorAndName(c, "No Image Card", common.NewPage(1, 10))
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 2)
@@ -233,6 +241,76 @@ func findByNameAndCollectorNoImageURL(t *testing.T) {
 	assert.Equal(t, "", result.Result[0].Image)
 	assert.Equal(t, 1, result.Result[1].Amount)
 	assert.Equal(t, "http://localhost/images/noFace.png", result.Result[1].Image)
+}
+
+func top5MatchesByHash(t *testing.T) {
+	ctx := context.Background()
+	unknownHash := domain.Hash{Value: []uint64{1, 2, 3, 4}}
+	hash := domain.Hash{
+		Value: []uint64{
+			9223372036854775807,
+			8828676655832293646,
+			8002350605550622951,
+			4369376647429299945,
+		},
+	}
+
+	result, err := serchRepository.Top5MatchesByHash(ctx, unknownHash, hash, unknownHash)
+
+	require.NoError(t, err)
+	require.Len(t, result, 3)
+	for _, r := range result {
+		assert.Less(t, r.Score, 60)
+		assert.Contains(t, r.Name, "with hash")
+		assert.Empty(t, r.Amount)
+	}
+}
+
+func top5MatchesByHashNoResult(t *testing.T) {
+	ctx := context.Background()
+	unknownHash := domain.Hash{Value: []uint64{1, 2, 3, 4}}
+
+	result, err := serchRepository.Top5MatchesByHash(ctx, unknownHash)
+
+	require.NoError(t, err)
+	require.Empty(t, result)
+}
+
+func top5MatchesByCollectorAndHash(t *testing.T) {
+	ctx := context.Background()
+	c := domain.Collector{ID: "myUser"}
+	unknownHash := domain.Hash{Value: []uint64{1, 2, 3, 4}}
+	hash := domain.Hash{
+		Value: []uint64{
+			9223372036854775807,
+			8828676655832293646,
+			8002350605550622951,
+			4369376647429299945,
+		},
+	}
+
+	result, err := serchRepository.Top5MatchesByCollectorAndHash(ctx, c, unknownHash, hash, unknownHash)
+
+	require.NoError(t, err)
+	require.Len(t, result, 3)
+	for _, r := range result {
+		assert.Less(t, r.Score, 60)
+		assert.Contains(t, r.Name, "with hash")
+	}
+	assert.NotEmpty(t, result[0].Amount)
+	assert.NotEmpty(t, result[1].Amount)
+	assert.Empty(t, result[2].Amount)
+}
+
+func top5MatchesByCollectorAndHashNoResult(t *testing.T) {
+	ctx := context.Background()
+	c := domain.Collector{ID: "myUser"}
+	unknownHash := domain.Hash{Value: []uint64{1, 2, 3, 4}}
+
+	result, err := serchRepository.Top5MatchesByCollectorAndHash(ctx, c, unknownHash)
+
+	require.NoError(t, err)
+	require.Empty(t, result)
 }
 
 func newCardRepository(t *testing.T, con *postgres.DBConnection) domain.SearchRepository {

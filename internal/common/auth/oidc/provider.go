@@ -140,7 +140,7 @@ func (p *provider) getToken(ctx context.Context, code string, redirectURI string
 	defer commonio.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		// TODO error struct
+		// TODO: error struct
 		content, cErr := io.ReadAll(resp.Body)
 		if cErr != nil {
 			return nil, common.NewUnknownError(cErr, "unable-to-read-code-exchange-error-response")

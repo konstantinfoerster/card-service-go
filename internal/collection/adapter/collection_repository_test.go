@@ -5,6 +5,7 @@ import (
 
 	"github.com/konstantinfoerster/card-service-go/internal/collection/adapter"
 	"github.com/konstantinfoerster/card-service-go/internal/collection/domain"
+	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func TestIntegrationCollectionRepository(t *testing.T) {
 
 func findCollectedByName(t *testing.T) {
 	c := domain.Collector{ID: "myUser"}
-	result, err := collectionRepo.FindCollectedByName("ummy Card", domain.NewPage(1, 10), c)
+	result, err := collectionRepo.FindCollectedByName("ummy Card", common.NewPage(1, 10), c)
 
 	require.NoError(t, err)
 	require.Len(t, result.Result, 2)
@@ -55,7 +56,7 @@ func addCards(t *testing.T) {
 	err = collectionRepo.Upsert(item, c)
 	require.NoError(t, err)
 
-	page, err := collectionRepo.FindCollectedByName("Uncollected Card 1", domain.NewPage(1, 10), c)
+	page, err := collectionRepo.FindCollectedByName("Uncollected Card 1", common.NewPage(1, 10), c)
 	require.NoError(t, err)
 
 	require.Len(t, page.Result, 1)
@@ -79,7 +80,7 @@ func removeCards(t *testing.T) {
 	err := collectionRepo.Remove(cardID, c)
 	require.NoError(t, err)
 
-	page, err := collectionRepo.FindCollectedByName("Remove Collected Card 1", domain.NewPage(1, 10), c)
+	page, err := collectionRepo.FindCollectedByName("Remove Collected Card 1", common.NewPage(1, 10), c)
 	require.NoError(t, err)
 
 	require.Empty(t, page.Result)

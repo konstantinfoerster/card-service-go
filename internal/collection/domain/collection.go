@@ -31,7 +31,7 @@ func NewItem(id int, amount int) (Item, error) {
 }
 
 type CollectionRepository interface {
-	FindCollectedByName(name string, page Page, collector Collector) (PagedResult, error)
+	FindCollectedByName(name string, page common.Page, collector Collector) (Cards, error)
 	Upsert(item Item, collector Collector) error
 	Remove(itemID int, collector Collector) error
 }

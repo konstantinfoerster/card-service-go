@@ -96,7 +96,7 @@ func exchangeCode(cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService)
 		}
 
 		expires := timeSvc.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
-		setCookie(c, cfg.SessionCookieNameOrDefault(), token64, expires)
+		setCookie(c, cfg.SessionCookieName, token64, expires)
 
 		if commonhttp.AcceptsHTML(c) {
 			log.Debug().Msgf("render finish_login site")
@@ -112,11 +112,11 @@ func logout(cfg config.Oidc, svc oidc.Service, timeSvc common.TimeService) fiber
 	return func(c *fiber.Ctx) error {
 		clearCookie(c, stateCookie, timeSvc.Now())
 
-		cookieValue := strings.TrimSpace(c.Cookies(cfg.SessionCookieNameOrDefault()))
+		cookieValue := strings.TrimSpace(c.Cookies(cfg.SessionCookieName))
 		if cookieValue == "" {
 			return c.SendStatus(http.StatusOK)
 		}
-		clearCookie(c, cfg.SessionCookieNameOrDefault(), timeSvc.Now())
+		clearCookie(c, cfg.SessionCookieName, timeSvc.Now())
 
 		token, err := oidc.DecodeToken(cookieValue)
 		if err != nil {

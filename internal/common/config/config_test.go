@@ -2,9 +2,11 @@ package config_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDatabaseConnectionURL(t *testing.T) {
@@ -44,24 +46,21 @@ func TestServerAddrPortOnly(t *testing.T) {
 	assert.Equal(t, ":3000", cfg.Addr())
 }
 
-func TestLoggingLevel(t *testing.T) {
-	cfg := config.Logging{
-		Level: "ERROR",
-	}
+func TestNewConfig_Defaults(t *testing.T) {
+	cfg, err := config.NewConfig("testdata/empty.yaml")
 
-	assert.Equal(t, "error", cfg.LevelOrDefault())
+	require.NoError(t, err)
+	assert.NotEmpty(t, cfg.Logging.Level)
+	assert.NotEmpty(t, cfg.Oidc.SessionCookieName)
+	assert.Greater(t, cfg.Oidc.StateCookieAge, time.Second)
 }
 
-func TestLoggingLevelDefaultWhenUnset(t *testing.T) {
-	cfg := config.Logging{}
+func TestNewConfig_OverwriteDefaults(t *testing.T) {
+	cfg, err := config.NewConfig("testdata/application.yaml")
 
-	assert.Equal(t, "info", cfg.LevelOrDefault())
-}
-
-func TestLoggingLevelDefaultWhenEmpty(t *testing.T) {
-	cfg := config.Logging{
-		Level: "  ",
-	}
-
-	assert.Equal(t, "info", cfg.LevelOrDefault())
+	require.NoError(t, err)
+	assert.Equal(t, "http://localhost:3000/test", cfg.Oidc.RedirectURI)
+	assert.Equal(t, "trace", cfg.Logging.Level)
+	assert.Equal(t, "SESSION_TEST", cfg.Oidc.SessionCookieName)
+	assert.Equal(t, time.Hour*2, cfg.Oidc.StateCookieAge)
 }

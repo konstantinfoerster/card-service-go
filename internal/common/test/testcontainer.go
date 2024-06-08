@@ -42,7 +42,7 @@ func (r *DatabaseRunner) Start() (*postgres.DBConnection, error) {
 	password := "tester"
 	database := "cardmanager"
 
-	// TODO read env variables from config
+	// TODO: read env variables from config
 	var initScriptDirPermissions int64 = 0755
 	req := testcontainers.ContainerRequest{
 		Image:        "postgres:16-alpine",

@@ -6,7 +6,7 @@ on:
 
 env:
   GO_VERSION: 1.22
-  GO_LINT_VERSION: v1.56
+  GO_LINT_VERSION: v1.59
 
 permissions:
   contents: read
@@ -79,7 +79,7 @@ jobs:
 
       - name: Go run all tests
         # -count=1 disable test caching
-        run: go test -race -covermode=atomic -coverprofile=coverage.out -count=1 ./...
+        run: go test -race -coverpkg=./... -covermode=atomic -coverprofile=coverage.out -count=1 ./...
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4

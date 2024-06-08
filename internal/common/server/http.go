@@ -33,16 +33,17 @@ func NewHTTPTestServer() *Server {
 }
 
 func NewHTTPServer(cfg *config.Server) *Server {
-	engine := html.New(cfg.TemplateDirOrDefault(), ".gohtml")
+	engine := html.New(cfg.TemplateDir, ".gohtml")
 	engine.AddFunc(
 		"isLastIndex", func(index, length int) bool {
 			return index+1 == length
 		},
 	)
 
+	// FIXME: make body size configurable
 	app := fiber.New(fiber.Config{
 		Views: engine,
-		// FIXME error handler does not handle text/html requests
+		// FIXME: error handler does not handle text/html requests
 		ErrorHandler: problemjson.RespondWithProblemJSON,
 	})
 
@@ -50,11 +51,12 @@ func NewHTTPServer(cfg *config.Server) *Server {
 	app.Use(encryptcookie.New(encryptcookie.Config{
 		Key: cfg.Cookie.EncryptionKey,
 	}))
-	// FIXME can be removed after switching to htmx
+	// FIXME: can be removed after switching to htmx
 	app.Use(cors.New(cors.Config{
 		AllowHeaders: "Origin,Content-Type,Accept,Content-Length,Accept-Language," +
 			"Accept-Encoding,Connection,Access-Control-Allow-Origin",
-		AllowOrigins:     "http://localhost:8000", // FIXME that should be configurable
+		// FIXME: that should be configurable
+		AllowOrigins:     "http://localhost:8000",
 		AllowCredentials: true,
 		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
 		MaxAge:           -1,

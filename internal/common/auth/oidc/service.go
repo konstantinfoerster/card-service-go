@@ -57,9 +57,9 @@ type JSONWebToken struct {
 	RefreshToken string `json:"refresh_token"`
 	IDToken      string `json:"id_token"`
 	Scope        string `json:"scope"`
-	ExpiresIn    int    `json:"expires_in"`
 	Type         string `json:"token_type"`
 	Provider     string `json:"provider"`
+	ExpiresIn    int    `json:"expires_in"`
 }
 
 func (t *JSONWebToken) Encode() (string, error) {
@@ -150,7 +150,7 @@ func (s *authFlowService) Logout(token *JSONWebToken) error {
 		return err
 	}
 
-	// FIXME with timeout?
+	// FIXME: with timeout?
 	ctx := context.Background()
 
 	return p.RevokeToken(ctx, token.AccessToken)

@@ -91,3 +91,65 @@ INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
 VALUES (11, 10, 'images/removeCollectedCard1.png', 'eng', 'png');
 INSERT INTO card_collection(card_id, user_id, amount)
 VALUES (10, 'myUser', 2);
+
+-- Card 11 with hash
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Card 11 with hash', '1', 'COMMON', 'WHITE', 'NORMAL', 'M15');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (11, 'Card 11 with hash', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type,
+phash1, phash2, phash3, phash4)
+VALUES (12, 11, 'images/card11Hash.png', 'eng', 'png',
+'1000000101010001001101101000000100111110110011101001110001010100', 
+'0111101010000101110000101010010001100011101010101110000100001110',
+'0110111100001110000011110111101000111011111110100001100011100111',
+'0011110010100011001001001110100100101111111010010001111011101001'
+);
+INSERT INTO card_collection(card_id, user_id, amount)
+VALUES (11, 'myUser', 3);
+
+-- Card 12 with hash
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Card 12 with hash', '2', 'COMMON', 'WHITE', 'NORMAL', 'M15');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (12, 'Card 12 with hash', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type,
+phash1, phash2, phash3, phash4)
+VALUES (13, 12, 'images/card12hash.png', 'eng', 'png',
+'1000000101010101001101101000000100111110110011101001110001010100',
+'0111101010000101110000101010010001100011101010101110000100001110',
+'0110111100101110000010110111101000111011111110100001100011100101',
+'0011110010100011001001011110100100101111111010010001111011100001'
+);
+INSERT INTO card_collection(card_id, user_id, amount)
+VALUES (12, 'myUser', 1);
+
+-- Card 13 with hash
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Card 13 with hash', '3', 'COMMON', 'WHITE', 'NORMAL', 'M15');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (13, 'Card 13 with hash', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type,
+phash1, phash2, phash3, phash4)
+VALUES (14, 13, 'images/card13hash.png', 'eng', 'png',
+'1000010101010001001101101000000100111110110010101001110001010100',
+'0111101010000101110000101010010001100011101011101100000100101110',
+'0110111100101110000011110111101000111011111110100001100011100111',
+'0011110010000011001001001110100100101111111010010001101011101001'
+);
+
+-- Card 14 with hash, that card has a score of 70
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Card 14 with hash', '4', 'COMMON', 'WHITE', 'NORMAL', 'M15');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (14, 'Card 14 with hash', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type,
+phash1, phash2, phash3, phash4)
+VALUES (15, 14, 'images/card14hash.png', 'eng', 'png',
+'1001010100010001001111100000000101111010111010101001000001111010',
+'0111101110000010111000011011001001100011101011101110001101001100',
+'0110111000001110110001100011100000001110101110110011110010110011',
+'1001110011100011100111001010001100011011101011100001101101001100'
+);
+INSERT INTO card_collection(card_id, user_id, amount)
+VALUES (14, 'myUser', 1);

@@ -13,7 +13,7 @@
     {{embed}}
 </main>
 {{- template "partials/footer" . -}}
-<script src="public/js/htmx-1.9.10.min.js"></script>
+<script src="public/js/htmx-1.9.12.min.js"></script>
 <script>
   (function () {
     const primaryHeader = document.querySelector('.primary-header');
@@ -36,15 +36,16 @@
 
     const profileToggle = document.querySelector('#btn-profile')
     const profileMenu = document.querySelector('.profile-menu')
-    profileToggle.addEventListener('click', () => {
-      profileMenu.toggleAttribute('data-visible');
-      if (profileMenu.hasAttribute('data-visible')) {
-        profileToggle.setAttribute('aria-expanded', 'true');
-      } else {
-        profileToggle.setAttribute('aria-expanded', 'false');
-      }
-    })
-
+    if (profileToggle) {
+        profileToggle.addEventListener('click', () => {
+          profileMenu.toggleAttribute('data-visible');
+          if (profileMenu.hasAttribute('data-visible')) {
+            profileToggle.setAttribute('aria-expanded', 'true');
+          } else {
+            profileToggle.setAttribute('aria-expanded', 'false');
+          }
+        })
+    }
   })();
 </script>
 </body>
