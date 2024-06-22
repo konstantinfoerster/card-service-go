@@ -12,18 +12,16 @@ import (
 
 type Service interface {
 	cards.Searcher
-	Collect(ctx context.Context, item Item) (Item, error)
+	Collect(ctx context.Context, item Item, collector cards.Collector) (Item, error)
 }
 
 type collectionService struct {
 	collectionRepo Repository
-	cardRepo       cards.Repository
 }
 
-func NewService(collectionRepo Repository, cardRepo cards.Repository) Service {
+func NewService(collectionRepo Repository) Service {
 	return &collectionService{
 		collectionRepo: collectionRepo,
-		cardRepo:       cardRepo,
 	}
 }
 
@@ -36,7 +34,7 @@ func (s *collectionService) Search(ctx context.Context, name string, collector c
 	return r, nil
 }
 
-func (s *collectionService) Collect(ctx context.Context, item Item) (Item, error) {
+func (s *collectionService) Collect(ctx context.Context, item Item, collector cards.Collector) (Item, error) {
 	_, err := s.collectionRepo.ByID(ctx, item.ID)
 	if err != nil {
 		if errors.Is(err, cards.ErrCardNotFound) {
@@ -49,14 +47,14 @@ func (s *collectionService) Collect(ctx context.Context, item Item) (Item, error
 	}
 
 	if item.Amount == 0 {
-		if err := s.collectionRepo.Remove(ctx, item); err != nil {
+		if err := s.collectionRepo.Remove(ctx, item, collector); err != nil {
 			return Item{}, aerrors.NewUnknownError(err, "unable-to-remove-item")
 		}
 
 		return item, nil
 	}
 
-	if err := s.collectionRepo.Upsert(ctx, item); err != nil {
+	if err := s.collectionRepo.Upsert(ctx, item, collector); err != nil {
 		return Item{}, aerrors.NewUnknownError(err, "unable-to-upsert-item")
 	}
 

@@ -27,6 +27,10 @@ func NewCards(cards []Card, p common.Page) Cards {
 	}
 }
 
+func NewCollector(id string) Collector {
+	return Collector{ID: id}
+}
+
 // Collector user who interacts with his collection.
 type Collector struct {
 	ID string

@@ -17,8 +17,8 @@ import (
 type Repository interface {
 	ByID(ctx context.Context, id int) (cards.Card, error)
 	FindCollectedByName(ctx context.Context, name string, collector cards.Collector, page common.Page) (cards.Cards, error)
-	Upsert(ctx context.Context, item Item) error
-	Remove(ctx context.Context, item Item) error
+	Upsert(ctx context.Context, item Item, collector cards.Collector) error
+	Remove(ctx context.Context, item Item, collector cards.Collector) error
 }
 
 type postgresRepository struct {
@@ -125,7 +125,7 @@ func (r *postgresRepository) FindCollectedByName(
 	return cards.NewCards(result, page), nil
 }
 
-func (r *postgresRepository) Upsert(ctx context.Context, item Item) error {
+func (r *postgresRepository) Upsert(ctx context.Context, item Item, collector cards.Collector) error {
 	query := `
 		INSERT INTO
 			card_collection (card_id, amount, user_id)
@@ -135,14 +135,14 @@ func (r *postgresRepository) Upsert(ctx context.Context, item Item) error {
 			(card_id, user_id)
 		DO UPDATE SET
 			amount = excluded.amount`
-	if _, err := r.db.Conn.Exec(ctx, query, item.ID, item.Amount, item.Owner); err != nil {
+	if _, err := r.db.Conn.Exec(ctx, query, item.ID, item.Amount, collector.ID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *postgresRepository) Remove(ctx context.Context, item Item) error {
+func (r *postgresRepository) Remove(ctx context.Context, item Item, collector cards.Collector) error {
 	query := `
 		DELETE FROM
 			card_collection
@@ -150,7 +150,7 @@ func (r *postgresRepository) Remove(ctx context.Context, item Item) error {
 			card_id = $1
 		AND
 			user_id = $2`
-	if _, err := r.db.Conn.Exec(ctx, query, item.ID, item.Owner); err != nil {
+	if _, err := r.db.Conn.Exec(ctx, query, item.ID, collector.ID); err != nil {
 		return err
 	}
 

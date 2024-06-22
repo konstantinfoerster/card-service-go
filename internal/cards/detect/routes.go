@@ -38,7 +38,7 @@ func detect(svc Service) fiber.Handler {
 			return err
 		}
 
-		pagedResult := newMatchesResult(result)
+		pagedResult := newMatchesResponse(result)
 		if web.AcceptsHTML(c) || web.IsHTMX(c) {
 			data := fiber.Map{
 				"Page": pagedResult,
@@ -51,7 +51,7 @@ func detect(svc Service) fiber.Handler {
 	}
 }
 
-func newMatchesResult(matches Matches) *web.PagedResponse[cards.CardDTO] {
+func newMatchesResponse(matches Matches) *web.PagedResponse[cards.CardDTO] {
 	data := make([]cards.CardDTO, len(matches))
 	for i, m := range matches {
 		s := m.Score

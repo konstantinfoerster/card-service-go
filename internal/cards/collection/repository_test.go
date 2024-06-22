@@ -15,6 +15,8 @@ import (
 
 var repository collection.Repository
 
+var collector = cards.NewCollector("myUser")
+
 func TestIntegrationCollectionRepository(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -54,8 +56,7 @@ func findByNoneExistingID(t *testing.T) {
 
 func findCollectedByName(t *testing.T) {
 	ctx := context.Background()
-	c := cards.Collector{ID: "myUser"}
-	result, err := repository.FindCollectedByName(ctx, "ummy Card", c, common.NewPage(1, 10))
+	result, err := repository.FindCollectedByName(ctx, "ummy Card", collector, common.NewPage(1, 10))
 
 	require.NoError(t, err)
 	require.Len(t, result.Result, 2)
@@ -69,14 +70,13 @@ func findCollectedByName(t *testing.T) {
 
 func addCards(t *testing.T) {
 	ctx := context.Background()
-	c := cards.Collector{ID: "myUser"}
-	item, err := collection.NewItem(9, 2, c.ID)
+	item, err := collection.NewItem(9, 2)
 	require.NoError(t, err)
 
-	err = repository.Upsert(ctx, item)
+	err = repository.Upsert(ctx, item, collector)
 	require.NoError(t, err)
 
-	page, err := repository.FindCollectedByName(ctx, "Uncollected Card 1", c, common.NewPage(1, 10))
+	page, err := repository.FindCollectedByName(ctx, "Uncollected Card 1", collector, common.NewPage(1, 10))
 	require.NoError(t, err)
 
 	require.Len(t, page.Result, 1)
@@ -86,23 +86,22 @@ func addCards(t *testing.T) {
 
 func addNoneExistingCardNoError(t *testing.T) {
 	ctx := context.Background()
-	noneExistingItem, _ := collection.NewItem(1000, 1, "myUser")
+	noneExistingItem, _ := collection.NewItem(1000, 1)
 
-	err := repository.Upsert(ctx, noneExistingItem)
+	err := repository.Upsert(ctx, noneExistingItem, collector)
 
 	require.NoError(t, err)
 }
 
 func removeCards(t *testing.T) {
 	ctx := context.Background()
-	c := cards.Collector{ID: "myUser"}
-	item, err := collection.RemoveItem(10, c.ID)
+	item, err := collection.RemoveItem(10)
 	require.NoError(t, err)
 
-	err = repository.Remove(ctx, item)
+	err = repository.Remove(ctx, item, collector)
 	require.NoError(t, err)
 
-	page, err := repository.FindCollectedByName(ctx, "Remove Collected Card 1", c, common.NewPage(1, 10))
+	page, err := repository.FindCollectedByName(ctx, "Remove Collected Card 1", collector, common.NewPage(1, 10))
 	require.NoError(t, err)
 
 	require.Empty(t, page.Result)
@@ -110,9 +109,9 @@ func removeCards(t *testing.T) {
 
 func removeUncollectedCardNoError(t *testing.T) {
 	ctx := context.Background()
-	noneExistingItem, _ := collection.RemoveItem(2000, "myUser")
+	noneExistingItem, _ := collection.RemoveItem(2000)
 
-	err := repository.Remove(ctx, noneExistingItem)
+	err := repository.Remove(ctx, noneExistingItem, collector)
 
 	require.NoError(t, err)
 }

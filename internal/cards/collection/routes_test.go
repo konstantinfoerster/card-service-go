@@ -321,14 +321,15 @@ func testServer(t *testing.T) *web.Server {
 	authSvc := oidcfakes.NewUserService(validUser)
 	repo, err := fakes.NewRepository(nil)
 	require.NoError(t, err)
-	collectSvc := collection.NewService(repo, repo)
+	collectSvc := collection.NewService(repo)
 
 	ctx := context.Background()
-	_, err = collectSvc.Collect(ctx, collection.Item{ID: 434, Amount: 1, Owner: validUser.ID})
+	collector := cards.NewCollector(validUser.ID)
+	_, err = collectSvc.Collect(ctx, collection.Item{ID: 434, Amount: 1}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, collection.Item{ID: 514, Amount: 5, Owner: validUser.ID})
+	_, err = collectSvc.Collect(ctx, collection.Item{ID: 514, Amount: 5}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, collection.Item{ID: 706, Amount: 3, Owner: validUser.ID})
+	_, err = collectSvc.Collect(ctx, collection.Item{ID: 706, Amount: 3}, collector)
 	require.NoError(t, err)
 
 	srv.RegisterRoutes(func(r fiber.Router) {

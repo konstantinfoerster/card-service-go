@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/collection"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/fakes"
 	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
@@ -14,10 +15,10 @@ import (
 func TestCollectItem(t *testing.T) {
 	svc := newCollectionService(t)
 	ctx := context.Background()
-	item, err := collection.NewItem(1, 2, "myUser")
+	item, err := collection.NewItem(1, 2)
 	require.NoError(t, err)
 
-	collect, err := svc.Collect(ctx, item)
+	collect, err := svc.Collect(ctx, item, cards.NewCollector("myUser"))
 
 	require.NoError(t, err)
 	assert.Equal(t, item.ID, collect.ID)
@@ -27,10 +28,10 @@ func TestCollectItem(t *testing.T) {
 func TestCollectNoneExistingItem(t *testing.T) {
 	ctx := context.Background()
 	svc := newCollectionService(t)
-	noneExistingItem, err := collection.NewItem(1000, 1, "myUser")
+	noneExistingItem, err := collection.NewItem(1000, 1)
 	require.NoError(t, err)
 
-	collect, err := svc.Collect(ctx, noneExistingItem)
+	collect, err := svc.Collect(ctx, noneExistingItem, cards.NewCollector("myUser"))
 
 	assert.Equal(t, collection.Item{}, collect)
 	var appErr aerrors.AppError
@@ -42,5 +43,5 @@ func newCollectionService(t *testing.T) collection.Service {
 	repo, err := fakes.NewRepository(nil)
 	require.NoError(t, err)
 
-	return collection.NewService(repo, repo)
+	return collection.NewService(repo)
 }

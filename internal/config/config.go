@@ -59,7 +59,7 @@ type Images struct {
 	Host string `yaml:"host"`
 }
 
-func NewConfig(path string) (Config, error) {
+func NewConfig(path string) (*Config, error) {
 	p := filepath.Clean(path)
 
 	s, err := os.Stat(p)
@@ -72,7 +72,7 @@ func NewConfig(path string) (Config, error) {
 
 	data, err := os.ReadFile(p)
 	if err != nil {
-		return Config{}, fmt.Errorf("can't read config file: %w", err)
+		return nil, fmt.Errorf("can't read config file: %w", err)
 	}
 
 	defaultConfig := Config{
@@ -90,14 +90,14 @@ func NewConfig(path string) (Config, error) {
 
 	err = yaml.Unmarshal(data, &defaultConfig)
 	if err != nil {
-		return Config{}, fmt.Errorf("config unmarshal failed with: %w", err)
+		return nil, fmt.Errorf("config unmarshal failed with: %w", err)
 	}
 
 	// TODO: validate config content
 
-	if strings.HasSuffix(defaultConfig.Images.Host, "") {
-		defaultConfig.Images.Host += "/"
-	}
+    if strings.HasSuffix(defaultConfig.Images.Host, "") {
+        defaultConfig.Images.Host += "/"
+    }
 
-	return defaultConfig, nil
+	return &defaultConfig, nil
 }

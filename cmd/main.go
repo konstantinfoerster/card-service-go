@@ -92,7 +92,7 @@ func run(cfg *config.Config) error {
 	searchService := cards.NewService(searchRepo)
 
 	collectionRep := collection.NewRepository(dbCon, cfg.Images)
-	collectService := collection.NewService(collectionRep, searchRepo)
+	collectService := collection.NewService(collectionRep)
 
 	detectRep := detect.NewRepository(dbCon, cfg.Images)
 	detectService := detect.NewDetectService(detectRep, detector, hasher)

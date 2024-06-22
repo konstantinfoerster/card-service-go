@@ -66,12 +66,12 @@ func collect(svc Service) fiber.Handler {
 			return aerrors.NewInvalidInputMsg("invalid-body", "failed to parse body")
 		}
 
-		it, err := NewItem(body.ID, body.Amount, user.ID)
+		it, err := NewItem(body.ID, body.Amount)
 		if err != nil {
 			return err
 		}
 
-        item, err := svc.Collect(c.Context(), it)
+        item, err := svc.Collect(c.Context(), it, cards.AsCollector(user))
 		if err != nil {
 			return err
 		}

@@ -108,10 +108,12 @@ func testServer(t *testing.T) *web.Server {
 	authSvc := oidcfakes.NewUserService(validUser, detectorUser)
 	repo, err := fakes.NewRepository(detect.NewPHasher())
 	require.NoError(t, err)
-	collectSvc := collection.NewService(repo, repo)
+	collectSvc := collection.NewService(repo)
 
 	ctx := context.Background()
-	_, err = collectSvc.Collect(ctx, collection.Item{ID: 1, Amount: 1, Owner: detectorUser.ID})
+	item, err := collection.NewItem(1, 1)
+	require.NoError(t, err)
+	_, err = collectSvc.Collect(ctx, item, cards.NewCollector(detectorUser.ID))
 	require.NoError(t, err)
 
 	hasher := detect.NewPHasher()

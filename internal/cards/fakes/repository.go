@@ -246,15 +246,17 @@ func (r FakeRepository) FindCollectedByName(
 	return cards.NewCards(result, page), nil
 }
 
-func (r FakeRepository) Upsert(_ context.Context, item collection.Item) error {
-	if _, ok := r.collected[item.Owner]; !ok {
-		r.collected[item.Owner] = make([]cards.Card, 0)
+func (r FakeRepository) Upsert(_ context.Context, item collection.Item, collector cards.Collector) error {
+	cID := collector.ID
+
+	if _, ok := r.collected[cID]; !ok {
+		r.collected[cID] = make([]cards.Card, 0)
 	}
 
-	for i, c := range r.collected[item.Owner] {
+	for i, c := range r.collected[cID] {
 		if c.ID == item.ID {
 			c.Amount = item.Amount
-			r.collected[item.Owner][i] = c
+			r.collected[cID][i] = c
 
 			return nil
 		}
@@ -264,7 +266,7 @@ func (r FakeRepository) Upsert(_ context.Context, item collection.Item) error {
 	for _, c := range r.cards {
 		if c.ID == item.ID {
 			c.Amount = item.Amount
-			r.collected[item.Owner] = append(r.collected[item.Owner], c)
+			r.collected[cID] = append(r.collected[cID], c)
 
 			return nil
 		}
@@ -273,9 +275,11 @@ func (r FakeRepository) Upsert(_ context.Context, item collection.Item) error {
 	return nil
 }
 
-func (r FakeRepository) Remove(_ context.Context, item collection.Item) error {
+func (r FakeRepository) Remove(_ context.Context, item collection.Item, collector cards.Collector) error {
+	cID := collector.ID
+
 	toDelete := -1
-	for i, c := range r.collected[item.Owner] {
+	for i, c := range r.collected[cID] {
 		if c.ID == item.ID {
 			toDelete = i
 
@@ -284,7 +288,7 @@ func (r FakeRepository) Remove(_ context.Context, item collection.Item) error {
 	}
 
 	if toDelete != -1 {
-		r.collected[item.Owner] = slices.Delete(r.collected[item.Owner], toDelete, toDelete+1)
+		r.collected[cID] = slices.Delete(r.collected[cID], toDelete, toDelete+1)
 	}
 
 	return nil

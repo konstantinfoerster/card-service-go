@@ -264,23 +264,25 @@ func searchServer(t *testing.T) *web.Server {
 	authSvc := oidcfakes.NewUserService(validUser, detectorUser)
 	repo, err := fakes.NewRepository(detect.NewPHasher())
 	require.NoError(t, err)
-	collectSvc := collection.NewService(repo, repo)
+	collectSvc := collection.NewService(repo)
 
 	ctx := context.Background()
 
-	item, err := collection.NewItem(514, 5, validUser.ID)
+	vCollector := cards.NewCollector(validUser.ID)
+	item, err := collection.NewItem(514, 5)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, item)
+	_, err = collectSvc.Collect(ctx, item, vCollector)
 	require.NoError(t, err)
 
-	item, err = collection.NewItem(706, 3, validUser.ID)
+	item, err = collection.NewItem(706, 3)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, item)
+	_, err = collectSvc.Collect(ctx, item, vCollector)
 	require.NoError(t, err)
-	
-	item, err = collection.NewItem(1, 1, detectorUser.ID)
+
+	dCollector := cards.NewCollector(detectorUser.ID)
+	item, err = collection.NewItem(1, 1)
 	require.NoError(t, err)
-    _, err = collectSvc.Collect(ctx, item)
+	_, err = collectSvc.Collect(ctx, item, dCollector)
 	require.NoError(t, err)
 
 	searchSvc := cards.NewService(repo)

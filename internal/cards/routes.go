@@ -14,10 +14,9 @@ func Routes(r fiber.Router, cfg config.Oidc, authSvc oidc.UserService, searchSvc
 
 	r.Get("/cards", relaxedAuthMiddleware, search(searchSvc))
 
-
-    // /cards
-    // /mycards
-    // /detect
+	// /cards
+	// /mycards
+	// /detect
 }
 
 func search(svc Searcher) fiber.Handler {
@@ -119,7 +118,5 @@ func AsCollector(user *auth.User) Collector {
 		return Collector{}
 	}
 
-	return Collector{
-		ID: user.ID,
-	}
+	return NewCollector(user.ID)
 }
