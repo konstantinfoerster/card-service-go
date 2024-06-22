@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
-	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type MiddlewareConfig struct {
@@ -20,10 +19,10 @@ func NewOauthMiddleware(svc UserService, options ...func(*MiddlewareConfig)) fib
 	c := MiddlewareConfig{
 		Extractor: func(ctx *fiber.Ctx, cookie string) (*auth.User, error) {
 			if cookie == "" {
-				return nil, common.NewAuthorizationError(fmt.Errorf("no running session found"), "no-session")
+				return nil, aerrors.NewAuthorizationError(fmt.Errorf("no running session found"), "no-session")
 			}
 
-			jwtToken, err := commonhttp.DecodeBase64[JSONWebToken](cookie)
+			jwtToken, err := DecodeBase64[JSONWebToken](cookie)
 			if err != nil {
 				return nil, err
 			}
@@ -45,7 +44,7 @@ func FromConfig(cfg config.Oidc) func(*MiddlewareConfig) {
 	}
 }
 
-func AllowEmptyCookie() func(*MiddlewareConfig) {
+func AllowUnauthorized() func(*MiddlewareConfig) {
 	return func(c *MiddlewareConfig) {
 		c.AllowEmptyCookie = true
 	}
@@ -73,7 +72,7 @@ func newTokenExtractHandler(config ...MiddlewareConfig) fiber.Handler {
 				return c.Next()
 			}
 
-			return common.NewAuthorizationError(fmt.Errorf("unauthorized"), "unauthorized")
+			return aerrors.NewAuthorizationError(fmt.Errorf("unauthorized"), "unauthorized")
 		}
 
 		value, err := cfg.Extractor(c, cookieValue)
@@ -85,9 +84,9 @@ func newTokenExtractHandler(config ...MiddlewareConfig) fiber.Handler {
 		}
 
 		if err != nil {
-			return common.NewAuthorizationError(err, "unauthorized")
+			return aerrors.NewAuthorizationError(err, "unauthorized")
 		}
 
-		return common.NewAuthorizationError(fmt.Errorf("invalid or expired session"), "unauthorized")
+		return aerrors.NewAuthorizationError(fmt.Errorf("invalid or expired session"), "unauthorized")
 	}
 }

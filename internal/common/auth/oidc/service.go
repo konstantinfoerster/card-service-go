@@ -6,10 +6,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
-	commonhttp "github.com/konstantinfoerster/card-service-go/internal/common/http"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 func NewRedirectURL(p Provider, redirectURI string) (*RedirectURL, error) {
@@ -35,7 +34,7 @@ func NewState(provider string) *State {
 
 // DecodeState decode given base64 url encoded State.
 func DecodeState(value string) (*State, error) {
-	return commonhttp.DecodeBase64[State](value)
+	return DecodeBase64[State](value)
 }
 
 type State struct {
@@ -44,12 +43,12 @@ type State struct {
 }
 
 func (s *State) Encode() (string, error) {
-	return commonhttp.EncodeBase64(s)
+	return EncodeBase64(s)
 }
 
 // DecodeToken decode given base64 url encoded JSONWebToken.
 func DecodeToken(value string) (*JSONWebToken, error) {
-	return commonhttp.DecodeBase64[JSONWebToken](value)
+	return DecodeBase64[JSONWebToken](value)
 }
 
 type JSONWebToken struct {
@@ -63,7 +62,7 @@ type JSONWebToken struct {
 }
 
 func (t *JSONWebToken) Encode() (string, error) {
-	return commonhttp.EncodeBase64(t)
+	return EncodeBase64(t)
 }
 
 type claims struct {
@@ -160,7 +159,7 @@ func (s *authFlowService) getProvider(key string) (Provider, error) {
 	if strings.TrimSpace(key) == "" {
 		err := fmt.Errorf("provider mut not be empty")
 
-		return nil, common.NewInvalidInputError(err, "login-provider-empty", err.Error())
+		return nil, aerrors.NewInvalidInputError(err, "login-provider-empty", err.Error())
 	}
 
 	p, ok := s.provider[strings.ToLower(key)]
@@ -170,5 +169,5 @@ func (s *authFlowService) getProvider(key string) (Provider, error) {
 
 	err := fmt.Errorf("provider '%s' not supported", key)
 
-	return nil, common.NewInvalidInputError(err, "login-provider-not-supported", err.Error())
+	return nil, aerrors.NewInvalidInputError(err, "login-provider-not-supported", err.Error())
 }

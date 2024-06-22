@@ -1,4 +1,4 @@
-package commontest
+package test
 
 import (
 	"encoding/json"

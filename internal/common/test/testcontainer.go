@@ -1,4 +1,4 @@
-package commontest
+package test
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/rs/zerolog/log"
@@ -97,7 +96,7 @@ func (r *DatabaseRunner) Start() (*postgres.DBConnection, error) {
 		return nil, err
 	}
 
-	return postgres.Connect(ctx, config.Database{
+	return postgres.Connect(ctx, postgres.Database{
 		Username: username,
 		Password: password,
 		Host:     ip,

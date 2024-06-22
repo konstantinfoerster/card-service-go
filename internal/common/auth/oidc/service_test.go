@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
-	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
+	"github.com/konstantinfoerster/card-service-go/internal/common/test"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,22 +27,22 @@ func TestUnsupportedProvider(t *testing.T) {
 	cases := []struct {
 		name     string
 		provider string
-		errType  common.ErrorType
+		errType  aerrors.ErrorType
 	}{
 		{
 			name:     "Unknown provider",
 			provider: "unknown",
-			errType:  common.ErrTypeInvalidInput,
+			errType:  aerrors.ErrTypeInvalidInput,
 		},
 		{
 			name:     "empty provider",
 			provider: "",
-			errType:  common.ErrTypeInvalidInput,
+			errType:  aerrors.ErrTypeInvalidInput,
 		},
 		{
 			name:     "space only provider",
 			provider: "  ",
-			errType:  common.ErrTypeInvalidInput,
+			errType:  aerrors.ErrTypeInvalidInput,
 		},
 	}
 
@@ -52,7 +52,7 @@ func TestUnsupportedProvider(t *testing.T) {
 
 			_, _, err := svc.Authenticate(tc.provider, "")
 
-			var appErr common.AppError
+			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
@@ -62,7 +62,7 @@ func TestUnsupportedProvider(t *testing.T) {
 
 			_, err := svc.GetAuthURL(tc.provider)
 
-			var appErr common.AppError
+			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
@@ -72,7 +72,7 @@ func TestUnsupportedProvider(t *testing.T) {
 
 			_, err := svc.GetAuthenticatedUser(tc.provider, nil)
 
-			var appErr common.AppError
+			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
@@ -82,7 +82,7 @@ func TestUnsupportedProvider(t *testing.T) {
 
 			err := svc.Logout(&oidc.JSONWebToken{Provider: tc.provider})
 
-			var appErr common.AppError
+			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
@@ -146,9 +146,9 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 	_, _, err := svc.Authenticate("test", "code-0")
 	require.Error(t, err)
 
-	var appErr common.AppError
+	var appErr aerrors.AppError
 	require.ErrorAs(t, err, &appErr)
-	assert.Equal(t, common.ErrTypeUnknown, appErr.ErrorType)
+	assert.Equal(t, aerrors.ErrTypeUnknown, appErr.ErrorType)
 }
 
 func TestGetAuthenticatedUser(t *testing.T) {
@@ -181,7 +181,7 @@ func startProviderServer(t *testing.T, expectedBody string) *httptest.Server {
 		status := 500
 
 		if r.Method == http.MethodPost && strings.HasSuffix(r.RequestURI, "/auth") {
-			_, err := w.Write(commontest.ToJSON(t, oidc.JSONWebToken{}))
+			_, err := w.Write(test.ToJSON(t, oidc.JSONWebToken{}))
 			assert.NoError(t, err)
 
 			status = 200

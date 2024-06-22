@@ -9,9 +9,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
-	"github.com/konstantinfoerster/card-service-go/internal/common/problemjson"
-	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
+	"github.com/konstantinfoerster/card-service-go/internal/common/test"
+	"github.com/konstantinfoerster/card-service-go/internal/common/web"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,12 +50,12 @@ func TestOauthMiddleware(t *testing.T) {
 
 		return c.SendString("OK")
 	})
-	req := commontest.NewRequest(
-		commontest.WithMethod(http.MethodGet),
-		commontest.WithURL("/test"),
-		commontest.WithCookie(&http.Cookie{
+	req := test.NewRequest(
+		test.WithMethod(http.MethodGet),
+		test.WithURL("/test"),
+		test.WithCookie(&http.Cookie{
 			Name:  "SESSION",
-			Value: commontest.Base64Encoded(t, &oidc.JSONWebToken{}),
+			Value: test.Base64Encoded(t, oidc.JSONWebToken{}),
 		}),
 	)
 
@@ -83,12 +83,12 @@ func TestOauthMiddlewareUseConfiguredCookie(t *testing.T) {
 
 		return c.SendString("OK")
 	})
-	req := commontest.NewRequest(
-		commontest.WithMethod(http.MethodGet),
-		commontest.WithURL("/test"),
-		commontest.WithCookie(&http.Cookie{
+	req := test.NewRequest(
+		test.WithMethod(http.MethodGet),
+		test.WithURL("/test"),
+		test.WithCookie(&http.Cookie{
 			Name:  cfg.SessionCookieName,
-			Value: commontest.Base64Encoded(t, &oidc.JSONWebToken{}),
+			Value: test.Base64Encoded(t, oidc.JSONWebToken{}),
 		}),
 	)
 
@@ -114,7 +114,7 @@ func TestOauthMiddlewareError(t *testing.T) {
 			name: "service error",
 			cookie: &http.Cookie{
 				Name:  cfg.SessionCookieName,
-				Value: commontest.Base64Encoded(t, &oidc.JSONWebToken{}),
+				Value: test.Base64Encoded(t, oidc.JSONWebToken{}),
 			},
 			svc: &mockUserService{
 				FakeGetAuthenticatedUser: func() (*auth.User, error) {
@@ -155,7 +155,7 @@ func TestOauthMiddlewareError(t *testing.T) {
 			name: "nil user from service without error",
 			cookie: &http.Cookie{
 				Name:  cfg.SessionCookieName,
-				Value: commontest.Base64Encoded(t, &oidc.JSONWebToken{}),
+				Value: test.Base64Encoded(t, oidc.JSONWebToken{}),
 			},
 			svc: &mockUserService{
 				FakeGetAuthenticatedUser: func() (*auth.User, error) {
@@ -168,7 +168,7 @@ func TestOauthMiddlewareError(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			app := fiber.New(fiber.Config{
-				ErrorHandler: problemjson.RespondWithProblemJSON,
+				ErrorHandler: web.RespondWithProblemJSON,
 			})
 			app.Use(oidc.NewOauthMiddleware(tc.svc, oidc.FromConfig(cfg)))
 			app.Get("/test", func(c *fiber.Ctx) error {
@@ -177,10 +177,10 @@ func TestOauthMiddlewareError(t *testing.T) {
 				return nil
 			})
 
-			req := commontest.NewRequest(
-				commontest.WithMethod(http.MethodGet),
-				commontest.WithURL("/test"),
-				commontest.WithCookie(tc.cookie),
+			req := test.NewRequest(
+				test.WithMethod(http.MethodGet),
+				test.WithURL("/test"),
+				test.WithCookie(tc.cookie),
 			)
 
 			resp, err := app.Test(req)

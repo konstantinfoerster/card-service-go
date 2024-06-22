@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
 )
 
 type DBConnection struct {
@@ -17,7 +16,7 @@ type DBConnection struct {
 	pgxCon *pgxpool.Pool
 }
 
-func Connect(ctx context.Context, config config.Database) (*DBConnection, error) {
+func Connect(ctx context.Context, config Database) (*DBConnection, error) {
 	c, err := pgxpool.ParseConfig(config.ConnectionURL())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config from URL %w", err)

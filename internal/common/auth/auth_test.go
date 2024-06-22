@@ -6,7 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth"
-	commontest "github.com/konstantinfoerster/card-service-go/internal/common/test"
+	"github.com/konstantinfoerster/card-service-go/internal/common/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,9 +23,9 @@ func TestUserFromCtx(t *testing.T) {
 
 		return nil
 	})
-	req := commontest.NewRequest(
-		commontest.WithMethod(http.MethodGet),
-		commontest.WithURL("/test"),
+	req := test.NewRequest(
+		test.WithMethod(http.MethodGet),
+		test.WithURL("/test"),
 	)
 
 	_, err := app.Test(req)
@@ -70,9 +70,9 @@ func TestUserFromCtxInvalidInput(t *testing.T) {
 
 				return nil
 			})
-			req := commontest.NewRequest(
-				commontest.WithMethod(http.MethodGet),
-				commontest.WithURL("/test"),
+			req := test.NewRequest(
+				test.WithMethod(http.MethodGet),
+				test.WithURL("/test"),
 			)
 
 			_, err := app.Test(req)

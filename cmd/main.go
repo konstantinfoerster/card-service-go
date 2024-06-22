@@ -13,16 +13,17 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	collectionadapter "github.com/konstantinfoerster/card-service-go/internal/collection/adapter"
-	collection "github.com/konstantinfoerster/card-service-go/internal/collection/application"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/collection"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/detect"
 	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
-	"github.com/konstantinfoerster/card-service-go/internal/common/img"
+	"github.com/konstantinfoerster/card-service-go/internal/common/clock"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/common/server"
-	loginadapter "github.com/konstantinfoerster/card-service-go/internal/login/adapter"
+	"github.com/konstantinfoerster/card-service-go/internal/common/web"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/dashboard"
+	"github.com/konstantinfoerster/card-service-go/internal/login"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
@@ -82,27 +83,31 @@ func run(cfg *config.Config) error {
 		return fmt.Errorf("failed to load oidc provider, %w", err)
 	}
 
-	timeService := common.NewTimeService()
+	timeService := clock.NewTimeService()
 	authService := oidc.New(cfg.Oidc, oidcProvider)
-	detector := img.NewDetector()
-	hasher := img.NewPHasher()
+	detector := detect.NewDetector()
+	hasher := detect.NewPHasher()
 
-	searchRepo := collectionadapter.NewSearchRepository(dbCon, cfg.Images)
-	searchService := collection.NewSearchService(searchRepo, detector, hasher)
+	searchRepo := cards.NewRepository(dbCon, cfg.Images)
+	searchService := cards.NewService(searchRepo)
 
-	collectionRep := collectionadapter.NewCollectionRepository(dbCon, cfg.Images)
-	collectService := collection.NewCollectionService(collectionRep, searchRepo)
+	collectionRep := collection.NewRepository(dbCon, cfg.Images)
+	collectService := collection.NewService(collectionRep, searchRepo)
 
-	srv := server.NewHTTPServer(&cfg.Server).RegisterRoutes(func(r fiber.Router) {
+	detectRep := detect.NewRepository(dbCon, cfg.Images)
+	detectService := detect.NewDetectService(detectRep, detector, hasher)
+
+	srv := web.NewHTTPServer(&cfg.Server).RegisterRoutes(func(r fiber.Router) {
 		r.Static("/public", "./public")
 
-		collectionadapter.DashboardRoutes(r, cfg.Oidc, authService)
-		collectionadapter.SearchRoutes(r, cfg.Oidc, authService, searchService)
-		collectionadapter.CollectRoutes(r, cfg.Oidc, authService, collectService)
+		dashboard.Routes(r, cfg.Oidc, authService)
+		cards.Routes(r, cfg.Oidc, authService, searchService)
+		collection.Routes(r, cfg.Oidc, authService, collectService)
+		detect.Routes(r, cfg.Oidc, authService, detectService)
 
 		apiV1 := r.Group("/api").Group("/v1")
 
-		loginadapter.Routes(apiV1, cfg.Oidc, authService, timeService)
+		login.Routes(apiV1, cfg.Oidc, authService, timeService)
 	})
 
 	return srv.Run()

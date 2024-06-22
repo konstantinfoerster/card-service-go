@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
 )
 
 var (
-	ErrNoUserInContext = common.NewAuthorizationError(fmt.Errorf("no user in context"), "no-user-found")
+	// ErrNoUserInContext = errors.NewAuthorizationError(fmt.Errorf("no user in context"), "no-user-found")
+	ErrNoUserInContext = fmt.Errorf("no user in context")
 )
 
 const UserContextKey = "userid"

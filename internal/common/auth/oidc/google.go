@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
 	"google.golang.org/api/idtoken"
 	"google.golang.org/api/option"
 )
@@ -28,7 +28,7 @@ func googleProvider(client *http.Client) (*provider, error) {
 		validate: func(ctx context.Context, token *JSONWebToken, clientID string) (*claims, error) {
 			payload, err := validator.Validate(ctx, token.IDToken, clientID)
 			if err != nil {
-				return nil, common.NewUnknownError(fmt.Errorf("id token invalid %w", err), "invalid-token")
+				return nil, aerrors.NewUnknownError(fmt.Errorf("id token invalid %w", err), "invalid-token")
 			}
 			email := payload.Claims["email"]
 			sub := payload.Claims["sub"]

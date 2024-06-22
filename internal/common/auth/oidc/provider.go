@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
+	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 )
 
@@ -135,7 +135,7 @@ func (p *provider) getToken(ctx context.Context, code string, redirectURI string
 		"grant_type":    {"authorization_code"},
 	})
 	if err != nil {
-		return nil, common.NewUnknownError(err, "unable-to-execute-code-exchange-request")
+		return nil, aerrors.NewUnknownError(err, "unable-to-execute-code-exchange-request")
 	}
 	defer commonio.Close(resp.Body)
 
@@ -143,10 +143,10 @@ func (p *provider) getToken(ctx context.Context, code string, redirectURI string
 		// TODO: error struct
 		content, cErr := io.ReadAll(resp.Body)
 		if cErr != nil {
-			return nil, common.NewUnknownError(cErr, "unable-to-read-code-exchange-error-response")
+			return nil, aerrors.NewUnknownError(cErr, "unable-to-read-code-exchange-error-response")
 		}
 
-		return nil, common.NewUnknownError(fmt.Errorf("code exchange endpoint error response %s", content),
+		return nil, aerrors.NewUnknownError(fmt.Errorf("code exchange endpoint error response %s", content),
 			"code-exchange-endpoint-respond-with-error")
 	}
 
@@ -154,7 +154,7 @@ func (p *provider) getToken(ctx context.Context, code string, redirectURI string
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&jwtToken)
 	if err != nil {
-		return nil, common.NewUnknownError(err, "unable-to-decode-code-exchange-response")
+		return nil, aerrors.NewUnknownError(err, "unable-to-decode-code-exchange-response")
 	}
 
 	jwtToken.Provider = p.name
@@ -182,7 +182,7 @@ func (p *provider) RevokeToken(ctx context.Context, token string) error {
 		"token": {token},
 	})
 	if err != nil {
-		return common.NewUnknownError(err, "unable-to-execute-token-revoke-request")
+		return aerrors.NewUnknownError(err, "unable-to-execute-token-revoke-request")
 	}
 	defer commonio.Close(resp.Body)
 
@@ -192,10 +192,10 @@ func (p *provider) RevokeToken(ctx context.Context, token string) error {
 
 	content, cErr := io.ReadAll(resp.Body)
 	if cErr != nil {
-		return common.NewUnknownError(cErr, "unable-to-read-token-revoke-error-response")
+		return aerrors.NewUnknownError(cErr, "unable-to-read-token-revoke-error-response")
 	}
 
-	return common.NewUnknownError(fmt.Errorf("token revoke endpoint return an error %s", content),
+	return aerrors.NewUnknownError(fmt.Errorf("token revoke endpoint return an error %s", content),
 		"revoke-token-endpoint-respond-with-error")
 }
 
