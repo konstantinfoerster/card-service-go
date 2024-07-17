@@ -6,24 +6,23 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/api/web"
+	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
+	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/cards/collection"
-	"github.com/konstantinfoerster/card-service-go/internal/cards/detect"
-	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/common/clock"
+	"github.com/konstantinfoerster/card-service-go/internal/common/detect"
 	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/common/web"
+	commonpg "github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/dashboard"
-	"github.com/konstantinfoerster/card-service-go/internal/login"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
@@ -69,45 +68,44 @@ func main() {
 
 func run(cfg *config.Config) error {
 	ctx := context.Background()
-	dbCon, err := postgres.Connect(ctx, cfg.Database)
+	dbCon, err := commonpg.Connect(ctx, cfg.Database)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database %w", err)
 	}
 	defer commonio.Close(dbCon)
 
-	client := &http.Client{
-		Timeout: time.Second * time.Duration(5),
-	}
-	oidcProvider, err := oidc.FromConfiguration(cfg.Oidc, client)
+	oidcProvider, err := auth.FromConfiguration(cfg.Oidc)
 	if err != nil {
 		return fmt.Errorf("failed to load oidc provider, %w", err)
 	}
 
-	timeService := clock.NewTimeService()
-	authService := oidc.New(cfg.Oidc, oidcProvider)
+	timeSvc := clock.NewTimeService()
+	authSvc := auth.New(cfg.Oidc, oidcProvider...)
 	detector := detect.NewDetector()
 	hasher := detect.NewPHasher()
 
-	searchRepo := cards.NewRepository(dbCon, cfg.Images)
-	searchService := cards.NewService(searchRepo)
+	searchRepo := postgres.NewCardRepository(dbCon, cfg.Images)
+	searchSvc := cards.NewCardService(searchRepo)
 
-	collectionRep := collection.NewRepository(dbCon, cfg.Images)
-	collectService := collection.NewService(collectionRep)
+	collectionRep := postgres.NewCollectionRepository(dbCon, cfg.Images)
+	collectSvc := cards.NewCollectionService(collectionRep)
 
-	detectRep := detect.NewRepository(dbCon, cfg.Images)
-	detectService := detect.NewDetectService(detectRep, detector, hasher)
+	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
+	detectSvc := cards.NewDetectService(detectRep, detector, hasher)
 
-	srv := web.NewHTTPServer(&cfg.Server).RegisterRoutes(func(r fiber.Router) {
+	authMiddleware := web.NewAuthMiddleware(cfg.Oidc, authSvc)
+
+	srv := web.NewHTTPServer(cfg.Server).RegisterRoutes(func(r fiber.Router) {
 		r.Static("/public", "./public")
 
-		dashboard.Routes(r, cfg.Oidc, authService)
-		cards.Routes(r, cfg.Oidc, authService, searchService)
-		collection.Routes(r, cfg.Oidc, authService, collectService)
-		detect.Routes(r, cfg.Oidc, authService, detectService)
+		cardsapi.DashboardRoutes(r, authMiddleware)
+		cardsapi.SearchRoutes(r, authMiddleware, searchSvc)
+		cardsapi.CollectionRoutes(r, authMiddleware, collectSvc)
+		cardsapi.DetectRoutes(r, authMiddleware, detectSvc)
 
 		apiV1 := r.Group("/api").Group("/v1")
 
-		login.Routes(apiV1, cfg.Oidc, authService, timeService)
+		loginapi.Routes(apiV1, authMiddleware, cfg.Oidc, authSvc, timeSvc)
 	})
 
 	return srv.Run()

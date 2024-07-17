@@ -14,17 +14,17 @@ func TestNewPage(t *testing.T) {
 		expectPage common.Page
 	}{
 		{
-			name:       "Page 0 fallbacks to default",
+			name:       "page 0 fallbacks to default",
 			page:       common.NewPage(0, 10),
 			expectPage: common.NewPage(1, 10),
 		},
 		{
-			name:       "Size 0 fallbacks to default",
+			name:       "page size 0 fallbacks to default",
 			page:       common.NewPage(1, 0),
 			expectPage: common.NewPage(1, 10),
 		},
 		{
-			name:       "To large size fallbacks to limit",
+			name:       "page size fallbacks to limit if exceed",
 			page:       common.NewPage(1, 1000),
 			expectPage: common.NewPage(1, 100),
 		},

@@ -16,6 +16,21 @@ func (p Page) Offset() int {
 	return (p.Page() - 1) * p.Size()
 }
 
+func GetPage[T any](data []T, page Page) []T {
+	offset := page.Offset()
+	if len(data) < offset {
+		return []T{}
+	}
+
+	limit := page.Size()
+	maxIdx := offset + limit
+	if len(data) >= maxIdx {
+		return data[offset:maxIdx]
+	}
+
+	return data[offset:]
+}
+
 func NewPage(page, size int) Page {
 	firstPage := 1
 	// TODO: make size configurable
@@ -59,3 +74,4 @@ func NewPagedResult[T any](data []T, page Page) PagedResult[T] {
 		Page:    page.Page(),
 	}
 }
+
