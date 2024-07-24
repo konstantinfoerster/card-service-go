@@ -2,23 +2,33 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/konstantinfoerster/card-service-go/internal/api/web"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Database postgres.Database `yaml:"database"`
-	Logging  Logging           `yaml:"logging"`
-	Images   Images            `yaml:"images"`
-	Server   web.ServerConfig  `yaml:"server"`
-	Oidc     auth.OidcConfig   `yaml:"oidc"`
+	Database Database `yaml:"database"`
+	Logging  Logging  `yaml:"logging"`
+	Images   Images   `yaml:"images"`
+	Server   Server   `yaml:"server"`
+	Oidc     Oidc     `yaml:"oidc"`
+}
+
+type Database struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Database string `yaml:"database"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
+func (d Database) ConnectionURL() string {
+	return fmt.Sprintf("postgres://%s:%s@%s/%s", d.Username, d.Password, net.JoinHostPort(d.Host, d.Port), d.Database)
 }
 
 type Logging struct {
@@ -27,6 +37,39 @@ type Logging struct {
 
 type Images struct {
 	Host string `yaml:"host"`
+}
+
+type Server struct {
+	Host        string `yaml:"host"`
+	Cookie      Cookie `yaml:"cookie"`
+	TemplateDir string `yaml:"template_path"`
+	Port        int    `yaml:"port"`
+}
+
+func (s Server) Addr() string {
+	return fmt.Sprintf("%s:%d", s.Host, s.Port)
+}
+
+type Cookie struct {
+	// EncryptionKey a 32 character string
+	EncryptionKey string `yaml:"encryption_key"`
+}
+
+type Oidc struct {
+	Provider          map[string]Provider `yaml:"provider"`
+	RedirectURI       string              `yaml:"redirect_uri"`
+	SessionCookieName string              `yaml:"session_cookie_name"`
+	StateCookieAge    time.Duration       `yaml:"state_cookie_age"`
+	ClientTimeout     time.Duration       `yaml:"client_timeout"`
+}
+
+type Provider struct {
+	AuthURL   string `yaml:"auth_url"`
+	TokenURL  string `yaml:"token_url"`
+	RevokeURL string `yaml:"revoke_url"`
+	ClientID  string `yaml:"client_id"`
+	Secret    string `yaml:"secret"`
+	Scope     string `yaml:"scope"`
 }
 
 func NewConfig(path string) (*Config, error) {
@@ -45,17 +88,18 @@ func NewConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("can't read config file: %w", err)
 	}
 
+	defaultTimeoutSec := 5
 	defaultConfig := Config{
 		Logging: Logging{
 			Level: "info",
 		},
-		Server: web.ServerConfig{
+		Server: Server{
 			TemplateDir: "./views",
 		},
-		Oidc: auth.OidcConfig{
+		Oidc: Oidc{
 			SessionCookieName: "SESSION",
 			StateCookieAge:    time.Minute,
-			ClientTimeout:     5 * time.Second,
+			ClientTimeout:     time.Duration(defaultTimeoutSec) * time.Second,
 		},
 	}
 

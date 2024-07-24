@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
 
 const DefaultLang = "eng"
@@ -20,18 +19,18 @@ type Card struct {
 }
 
 type Cards struct {
-	common.PagedResult[Card]
+	PagedResult[Card]
 }
 
-func Empty(p common.Page) Cards {
+func Empty(p Page) Cards {
 	return Cards{
-		common.NewEmptyResult[Card](p),
+		NewEmptyResult[Card](p),
 	}
 }
 
-func NewCards(cards []Card, p common.Page) Cards {
+func NewCards(cards []Card, p Page) Cards {
 	return Cards{
-		common.NewPagedResult(cards, p),
+		NewPagedResult(cards, p),
 	}
 }
 
@@ -45,12 +44,12 @@ type Collector struct {
 }
 
 type CardRepository interface {
-	FindByName(ctx context.Context, name string, page common.Page) (Cards, error)
-	FindByNameWithAmount(ctx context.Context, name string, collector Collector, page common.Page) (Cards, error)
+	FindByName(ctx context.Context, name string, page Page) (Cards, error)
+	FindByNameWithAmount(ctx context.Context, name string, collector Collector, page Page) (Cards, error)
 }
 
 type CardService interface {
-	Search(ctx context.Context, name string, collector Collector, page common.Page) (Cards, error)
+	Search(ctx context.Context, name string, collector Collector, page Page) (Cards, error)
 }
 
 type searchService struct {
@@ -63,7 +62,7 @@ func NewCardService(repo CardRepository) CardService {
 	}
 }
 
-func (s *searchService) Search(ctx context.Context, name string, collector Collector, page common.Page) (Cards, error) {
+func (s *searchService) Search(ctx context.Context, name string, collector Collector, page Page) (Cards, error) {
 	if collector.ID == "" {
 		r, err := s.repo.FindByName(ctx, name, page)
 		if err != nil {

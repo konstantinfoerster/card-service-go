@@ -11,6 +11,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,7 +142,6 @@ func TestSearch(t *testing.T) {
 
 func TestSearchWithUser(t *testing.T) {
 	srv, provider := searchServer(t)
-	token := provider.Token(validClaim).Encode()
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -198,10 +198,11 @@ func TestSearchWithUser(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/cards?name=Demonic"),
-				test.WithEncryptedCookie(t, "SESSION", token),
+				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
 			)
 
@@ -218,11 +219,14 @@ func TestSearchWithUser(t *testing.T) {
 
 func TestSearchWithInvalidUser(t *testing.T) {
 	srv, provider := searchServer(t)
-	token := provider.Token(invalidClaim).Encode()
+	token := &auth.JWT{
+		Provider:    provider.GetName(),
+		AccessToken: "invalidToken",
+	}
 	req := test.NewRequest(
 		test.WithMethod(web.MethodGet),
 		test.WithURL("http://localhost/cards?name=Demonic&size=5&page=1"),
-		test.WithEncryptedCookie(t, "SESSION", token),
+		test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 	)
 
 	resp, err := srv.Test(req)
@@ -238,20 +242,20 @@ func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 
-	item1, err := cards.NewItem(514, 5)
+	item1, err := cards.NewCollectable(514, 5)
 	require.NoError(t, err)
-	item2, err := cards.NewItem(706, 3)
+	item2, err := cards.NewCollectable(706, 3)
 	require.NoError(t, err)
-	item3, err := cards.NewItem(1, 1)
+	item3, err := cards.NewCollectable(1, 1)
 	require.NoError(t, err)
-	collected := map[string][]cards.Item{
+	collected := map[string][]cards.Collectable{
 		validClaim.ID: {item1, item2, item3},
 	}
 
 	repo, err := memory.NewCardRepository(seed, collected)
 	require.NoError(t, err)
 
-	oCfg := auth.OidcConfig{}
+	oCfg := config.Oidc{}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
 	authSvc := auth.New(oCfg, provider)
 	searchSvc := cards.NewCardService(repo)

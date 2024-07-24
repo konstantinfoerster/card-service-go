@@ -1,30 +1,28 @@
-##### BUILDER #####
-
 FROM golang:1.22-alpine3.20 as builder
 
-## Task: copy source files
-COPY . /app
 WORKDIR /app
 
-## Task: fetch project deps
+# download go modules
+COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
-## Task: build project
+# copy source files
+COPY . /app
+
+# build project
 ENV GOOS="linux"
 ENV GOARCH="amd64"
 ENV CGO_ENABLED="0"
 
-RUN go build -ldflags="-s -w" -o card-service cmd/main.go \
-      && chmod 0755 /app/card-service
+RUN go build -ldflags="-s -w" -o service cmd/main.go \
+      && chmod 0755 /app/service
 
-##### TARGET #####
-
-FROM alpine:3.12
+FROM alpine:3.20 as dev
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"
 
-COPY --from=builder /app/card-service /usr/bin/
+COPY --from=builder /app/service /usr/bin/
 
 # hadolint ignore=DL3018
 RUN set -eux; \
@@ -33,7 +31,7 @@ RUN set -eux; \
 
 USER nobody
 
-CMD ["/usr/bin/card-service", "--config", "/config/application.yaml"]
+CMD ["/usr/bin/service", "--config", "/config/application.yaml"]
 
 LABEL org.opencontainers.image.title="Card-Manager Service" \
       org.opencontainers.image.description="Application that helps you to manage your card collection" \

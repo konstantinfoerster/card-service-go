@@ -7,32 +7,30 @@ import (
 	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/common/clock"
-	"github.com/konstantinfoerster/card-service-go/internal/common/detect"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/image"
 )
 
 type DetectRepository interface {
-	Top5MatchesByHash(ctx context.Context, hashes ...detect.Hash) (cards.Matches, error)
-	Top5MatchesByCollectorAndHash(ctx context.Context, collector cards.Collector, hashes ...detect.Hash) (cards.Matches, error)
+	Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (cards.Matches, error)
+	Top5MatchesByCollectorAndHash(ctx context.Context, c cards.Collector, hashes ...image.Hash) (cards.Matches, error)
 }
 
 type postgresDetectRepository struct {
-	db  *postgres.DBConnection
+	db  *DBConnection
 	cfg config.Images
 }
 
-func NewDetectRepository(connection *postgres.DBConnection, cfg config.Images) DetectRepository {
+func NewDetectRepository(connection *DBConnection, cfg config.Images) DetectRepository {
 	return &postgresDetectRepository{
 		db:  connection,
 		cfg: cfg,
 	}
 }
 
-func (r *postgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...detect.Hash) (cards.Matches, error) {
-	defer clock.TimeTracker(time.Now(), "Top5MatchesByHash")
-
+func (r *postgresDetectRepository) Top5MatchesByHash(ctx context.Context,
+	hashes ...image.Hash) (cards.Matches, error) {
+	defer cards.TimeTracker(time.Now(), "Top5MatchesByHash")
 	if len(hashes) == 0 {
 		return cards.Matches{}, nil
 	}
@@ -100,15 +98,15 @@ func (r *postgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes
 }
 
 func (r *postgresDetectRepository) Top5MatchesByCollectorAndHash(ctx context.Context,
-	collector cards.Collector, hashes ...detect.Hash) (cards.Matches, error) {
-	defer clock.TimeTracker(time.Now(), "Top5MatchesByHashAndCollector")
+	c cards.Collector, hashes ...image.Hash) (cards.Matches, error) {
+	defer cards.TimeTracker(time.Now(), "Top5MatchesByHashAndCollector")
 
 	if len(hashes) == 0 {
 		return cards.Matches{}, nil
 	}
 
 	limit := 5
-	params := []any{limit, r.cfg.Host, cards.DefaultLang, collector.ID}
+	params := []any{limit, r.cfg.Host, cards.DefaultLang, c.ID}
 	var sb strings.Builder
 	sb.WriteString("LEAST(")
 	for i, hash := range hashes {

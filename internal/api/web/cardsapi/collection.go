@@ -2,9 +2,9 @@ package cardsapi
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
 )
 
 func CollectionRoutes(r fiber.Router, auth web.AuthMiddleware, cSvc cards.CollectionService) {
@@ -61,7 +61,7 @@ func collect(svc cards.CollectionService) fiber.Handler {
 			return aerrors.NewInvalidInputMsg("invalid-body", "failed to parse body")
 		}
 
-		it, err := cards.NewItem(body.ID, body.Amount)
+		it, err := cards.NewCollectable(body.ID, body.Amount)
 		if err != nil {
 			return err
 		}

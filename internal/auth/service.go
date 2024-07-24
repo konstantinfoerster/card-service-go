@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 func NewRedirectURL(p Provider, redirectURI string) (*RedirectURL, error) {
-	state, err := p.GenerateState().MustEncode()
+	state, err := p.GenerateState().Encode()
 	if err != nil {
 		return nil, err
 	}
@@ -26,11 +27,11 @@ type RedirectURL struct {
 }
 
 // DecodeToken decode given base64 url encoded JSONWebToken.
-func DecodeToken(value string) (*JSONWebToken, error) {
-	return DecodeBase64[JSONWebToken](value)
+func DecodeToken(value string) (*JWT, error) {
+	return DecodeBase64[JWT](value)
 }
 
-type JSONWebToken struct {
+type JWT struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	IDToken      string `json:"id_token"`
@@ -40,16 +41,7 @@ type JSONWebToken struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
-func (t *JSONWebToken) Encode() string {
-	btoken, err := EncodeBase64(t)
-	if err != nil {
-		panic(err)
-	}
-
-	return btoken
-}
-
-func (t *JSONWebToken) MustEncode() (string, error) {
+func (t *JWT) Encode() (string, error) {
 	return EncodeBase64(t)
 }
 
@@ -63,13 +55,13 @@ func NewClaims(id, email string) *Claims {
 }
 
 type Service interface {
-	AuthInfo(ctx context.Context, provider string, token *JSONWebToken) (*Claims, error)
+	AuthInfo(ctx context.Context, provider string, token *JWT) (*Claims, error)
 	AuthURL(provider string) (*RedirectURL, error)
-	Authenticate(ctx context.Context, provider string, code string) (*Claims, *JSONWebToken, error)
-	Logout(ctx context.Context, token *JSONWebToken) error
+	Authenticate(ctx context.Context, provider string, code string) (*Claims, *JWT, error)
+	Logout(ctx context.Context, token *JWT) error
 }
 
-func New(cfg OidcConfig, provider ...Provider) Service {
+func New(cfg config.Oidc, provider ...Provider) Service {
 	pp := make(map[string]Provider)
 	for _, p := range provider {
 		if p == nil {
@@ -87,7 +79,7 @@ func New(cfg OidcConfig, provider ...Provider) Service {
 
 type authFlowService struct {
 	provider map[string]Provider
-	cfg      OidcConfig
+	cfg      config.Oidc
 }
 
 func (s *authFlowService) AuthURL(provider string) (*RedirectURL, error) {
@@ -99,7 +91,8 @@ func (s *authFlowService) AuthURL(provider string) (*RedirectURL, error) {
 	return NewRedirectURL(p, s.cfg.RedirectURI)
 }
 
-func (s *authFlowService) Authenticate(ctx context.Context, provider string, authCode string) (*Claims, *JSONWebToken, error) {
+func (s *authFlowService) Authenticate(
+	ctx context.Context, provider string, authCode string) (*Claims, *JWT, error) {
 	p, err := s.getProvider(provider)
 	if err != nil {
 		return nil, nil, err
@@ -113,7 +106,7 @@ func (s *authFlowService) Authenticate(ctx context.Context, provider string, aut
 	return claims, jwtToken, nil
 }
 
-func (s *authFlowService) AuthInfo(ctx context.Context, provider string, token *JSONWebToken) (*Claims, error) {
+func (s *authFlowService) AuthInfo(ctx context.Context, provider string, token *JWT) (*Claims, error) {
 	p, err := s.getProvider(provider)
 	if err != nil {
 		return nil, err
@@ -127,7 +120,7 @@ func (s *authFlowService) AuthInfo(ctx context.Context, provider string, token *
 	return claims, nil
 }
 
-func (s *authFlowService) Logout(ctx context.Context, token *JSONWebToken) error {
+func (s *authFlowService) Logout(ctx context.Context, token *JWT) error {
 	p, err := s.getProvider(token.Provider)
 	if err != nil {
 		return err

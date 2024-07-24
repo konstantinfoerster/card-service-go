@@ -6,14 +6,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
 )
 
-func newPage(c *fiber.Ctx) common.Page {
+func newPage(c *fiber.Ctx) cards.Page {
 	size, _ := strconv.Atoi(c.Query("size", ""))
 	page, _ := strconv.Atoi(c.Query("page", "0"))
 
-	return common.NewPage(page, size)
+	return cards.NewPage(page, size)
 }
 
 type PagedResponse[T any] struct {

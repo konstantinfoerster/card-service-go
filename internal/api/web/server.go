@@ -12,11 +12,12 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type Server struct {
 	app *fiber.App
-	Cfg ServerConfig
+	Cfg config.Server
 }
 
 func currentDir() string {
@@ -26,8 +27,8 @@ func currentDir() string {
 }
 
 func NewHTTPTestServer() *Server {
-	cfg := ServerConfig{
-		Cookie: Cookie{
+	cfg := config.Server{
+		Cookie: config.Cookie{
 			EncryptionKey: "01234567890123456789012345678901",
 		},
 		TemplateDir: path.Join(currentDir(), "../../../views"),
@@ -36,7 +37,7 @@ func NewHTTPTestServer() *Server {
 	return NewHTTPServer(cfg)
 }
 
-func NewHTTPServer(cfg ServerConfig) *Server {
+func NewHTTPServer(cfg config.Server) *Server {
 	engine := html.New(cfg.TemplateDir, ".gohtml")
 	engine.AddFunc(
 		"isLastIndex", func(index, length int) bool {

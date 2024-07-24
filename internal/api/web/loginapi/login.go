@@ -7,24 +7,24 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
-	"github.com/konstantinfoerster/card-service-go/internal/common/clock"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 )
 
 const stateCookie = "TOKEN_STATE"
 
 // Routes All login and user related routes.
-func Routes(app fiber.Router, auth web.AuthMiddleware, cfg auth.OidcConfig, svc auth.Service, timeSvc clock.TimeService) {
-	app.Get("/login/callback", exchangeCode(cfg, svc, timeSvc))
-	app.Get("/login/:provider", login(cfg, svc, timeSvc))
-	app.Get("/logout", logout(cfg, svc, timeSvc))
+func Routes(app fiber.Router, auth web.AuthMiddleware, cfg config.Oidc, svc auth.Service, tSvc auth.TimeService) {
+	app.Get("/login/callback", exchangeCode(cfg, svc, tSvc))
+	app.Get("/login/:provider", login(cfg, svc, tSvc))
+	app.Get("/logout", logout(cfg, svc, tSvc))
 	app.Get("/user", auth.Required(), getCurrentUser())
 }
 
-func login(cfg auth.OidcConfig, svc auth.Service, timeSvc clock.TimeService) fiber.Handler {
+func login(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -45,7 +45,7 @@ func login(cfg auth.OidcConfig, svc auth.Service, timeSvc clock.TimeService) fib
 	}
 }
 
-func exchangeCode(cfg auth.OidcConfig, svc auth.Service, timeSvc clock.TimeService) fiber.Handler {
+func exchangeCode(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		cookieValue := strings.TrimSpace(c.Cookies(stateCookie))
 		if cookieValue == "" {
@@ -87,7 +87,7 @@ func exchangeCode(cfg auth.OidcConfig, svc auth.Service, timeSvc clock.TimeServi
 			return err
 		}
 
-		token64, err := token.MustEncode()
+		token64, err := token.Encode()
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func exchangeCode(cfg auth.OidcConfig, svc auth.Service, timeSvc clock.TimeServi
 	}
 }
 
-func logout(cfg auth.OidcConfig, svc auth.Service, timeSvc clock.TimeService) fiber.Handler {
+func logout(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		clearCookie(c, stateCookie, timeSvc.Now())
 

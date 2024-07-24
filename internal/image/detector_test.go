@@ -1,14 +1,14 @@
-package detect_test
+package image_test
 
 import (
 	"testing"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common/detect"
+	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewImages(t *testing.T) {
-	actual := detect.NewImages()
+	actual := image.NewImages()
 
 	assert.NotNil(t, actual)
 }

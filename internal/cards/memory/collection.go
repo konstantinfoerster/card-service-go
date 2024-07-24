@@ -4,23 +4,21 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	_ "image/jpeg"
 	"slices"
 	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
 )
 
 type inMemCollectionRepository struct {
-	collected map[string][]cards.Item
+	collected map[string][]cards.Collectable
 	cards     []cards.Card
 }
 
 func NewCollectionRepository(data []cards.Card) (cards.CollectionRepository, error) {
 	return &inMemCollectionRepository{
 		cards:     data,
-		collected: make(map[string][]cards.Item),
+		collected: make(map[string][]cards.Collectable),
 	}, nil
 }
 
@@ -35,7 +33,7 @@ func (r inMemCollectionRepository) ByID(_ context.Context, id int) (cards.Card, 
 }
 
 func (r inMemCollectionRepository) FindCollectedByName(
-	_ context.Context, name string, collector cards.Collector, page common.Page) (cards.Cards, error) {
+	_ context.Context, name string, collector cards.Collector, page cards.Page) (cards.Cards, error) {
 	var matches []cards.Card
 	for _, c := range r.cards {
 		if !strings.Contains(strings.ToLower(c.Name), strings.ToLower(name)) {
@@ -57,16 +55,16 @@ func (r inMemCollectionRepository) FindCollectedByName(
 		return cmp.Compare(a.Name, b.Name)
 	})
 
-	matches = common.GetPage(matches, page)
+	matches = cards.GetPage(matches, page)
 
 	return cards.NewCards(matches, page), nil
 }
 
-func (r inMemCollectionRepository) Upsert(_ context.Context, item cards.Item, collector cards.Collector) error {
+func (r inMemCollectionRepository) Upsert(_ context.Context, item cards.Collectable, collector cards.Collector) error {
 	cID := collector.ID
 
 	if _, ok := r.collected[cID]; !ok {
-		r.collected[cID] = make([]cards.Item, 0)
+		r.collected[cID] = make([]cards.Collectable, 0)
 	}
 
 	for i, c := range r.collected[cID] {
@@ -89,7 +87,7 @@ func (r inMemCollectionRepository) Upsert(_ context.Context, item cards.Item, co
 	return nil
 }
 
-func (r inMemCollectionRepository) Remove(_ context.Context, item cards.Item, collector cards.Collector) error {
+func (r inMemCollectionRepository) Remove(_ context.Context, item cards.Collectable, collector cards.Collector) error {
 	cID := collector.ID
 
 	toDelete := -1

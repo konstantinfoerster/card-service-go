@@ -1,8 +1,10 @@
-package detect
+package image
 
 import (
 	"image"
 	"io"
+
+	_ "image/jpeg"
 
 	"github.com/anthonynsimon/bild/transform"
 )
@@ -14,6 +16,15 @@ const (
 	Degree90
 	Degree180
 )
+
+func NewImage(in io.Reader) (Image, error) {
+	dImg, _, err := image.Decode(in)
+	if err != nil {
+		return Image{}, err
+	}
+
+	return Image{dImg}, nil
+}
 
 type Image struct {
 	image.Image

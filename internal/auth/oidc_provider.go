@@ -10,10 +10,11 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
+	"github.com/konstantinfoerster/card-service-go/internal/aio"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
-func TestProvider(cfg ProviderConfig, client *http.Client) Provider {
+func TestProvider(cfg config.Provider, client *http.Client) Provider {
 	return &provider{
 		name:      "test",
 		authURL:   cfg.AuthURL,
@@ -23,13 +24,13 @@ func TestProvider(cfg ProviderConfig, client *http.Client) Provider {
 		clientID:  cfg.ClientID,
 		secret:    cfg.Secret,
 		scope:     cfg.Scope,
-		validate: func(ctx context.Context, token *JSONWebToken, clientID string) (*Claims, error) {
+		validate: func(ctx context.Context, token *JWT, clientID string) (*Claims, error) {
 			return NewClaims("1", "test@localhost"), nil
 		},
 	}
 }
 
-func FromConfiguration(cfg OidcConfig) ([]Provider, error) {
+func FromConfiguration(cfg config.Oidc) ([]Provider, error) {
 	client := &http.Client{
 		Timeout: cfg.ClientTimeout,
 	}
@@ -61,7 +62,7 @@ func FromConfiguration(cfg OidcConfig) ([]Provider, error) {
 	return pp, nil
 }
 
-func apply(p *provider, cfg ProviderConfig) error {
+func apply(p *provider, cfg config.Provider) error {
 	if cfg.AuthURL != "" {
 		p.authURL = cfg.AuthURL
 	}
@@ -91,15 +92,15 @@ func apply(p *provider, cfg ProviderConfig) error {
 type Provider interface {
 	GetName() string
 	GetAuthURL(state string, redirectURL string) string
-	ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*Claims, *JSONWebToken, error)
-	ValidateToken(ctx context.Context, token *JSONWebToken) (*Claims, error)
+	ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*Claims, *JWT, error)
+	ValidateToken(ctx context.Context, token *JWT) (*Claims, error)
 	RevokeToken(ctx context.Context, token string) error
 	GenerateState() State
 }
 
 type provider struct {
 	client    *http.Client
-	validate  func(ctx context.Context, token *JSONWebToken, clientID string) (*Claims, error)
+	validate  func(ctx context.Context, token *JWT, clientID string) (*Claims, error)
 	name      string
 	authURL   string
 	tokenURL  string
@@ -119,11 +120,11 @@ func (p *provider) GetAuthURL(state string, redirectURI string) string {
 		url.QueryEscape(p.scope))
 }
 
-func (p *provider) ValidateToken(ctx context.Context, token *JSONWebToken) (*Claims, error) {
+func (p *provider) ValidateToken(ctx context.Context, token *JWT) (*Claims, error) {
 	return p.validate(ctx, token, p.clientID)
 }
 
-func (p *provider) getToken(ctx context.Context, code string, redirectURI string) (*JSONWebToken, error) {
+func (p *provider) getToken(ctx context.Context, code string, redirectURI string) (*JWT, error) {
 	resp, err := p.postRequest(ctx, p.tokenURL, url.Values{ //nolint:bodyclose
 		"code":          {code},
 		"client_id":     {p.clientID},
@@ -134,7 +135,7 @@ func (p *provider) getToken(ctx context.Context, code string, redirectURI string
 	if err != nil {
 		return nil, fmt.Errorf("code exchange request failed with %w", err)
 	}
-	defer commonio.Close(resp.Body)
+	defer aio.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		// TODO: error struct
@@ -146,7 +147,7 @@ func (p *provider) getToken(ctx context.Context, code string, redirectURI string
 		return nil, fmt.Errorf("code exchange failed with response %s", content)
 	}
 
-	var jwtToken JSONWebToken
+	var jwtToken JWT
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&jwtToken)
 	if err != nil {
@@ -159,7 +160,7 @@ func (p *provider) getToken(ctx context.Context, code string, redirectURI string
 }
 
 func (p *provider) ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*Claims,
-	*JSONWebToken, error) {
+	*JWT, error) {
 	jwtToken, err := p.getToken(ctx, authCode, redirectURI)
 	if err != nil {
 		return nil, nil, err
@@ -180,7 +181,7 @@ func (p *provider) RevokeToken(ctx context.Context, token string) error {
 	if err != nil {
 		return fmt.Errorf("token revoke request failed with %w", err)
 	}
-	defer commonio.Close(resp.Body)
+	defer aio.Close(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		content, cErr := io.ReadAll(resp.Body)
@@ -218,14 +219,6 @@ type State struct {
 	Provider string `json:"provider"`
 }
 
-func (s State) MustEncode() (string, error) {
+func (s State) Encode() (string, error) {
 	return EncodeBase64(s)
-}
-func (s State) Encode() string {
-    e, err := EncodeBase64(s)
-    if err != nil {
-        panic(err)
-    }
-
-    return e
 }

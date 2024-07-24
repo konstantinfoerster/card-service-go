@@ -1,4 +1,4 @@
-package common
+package cards
 
 type Page struct {
 	p, s int
@@ -74,4 +74,3 @@ func NewPagedResult[T any](data []T, page Page) PagedResult[T] {
 		Page:    page.Page(),
 	}
 }
-

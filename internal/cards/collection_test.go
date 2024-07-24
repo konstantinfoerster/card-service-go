@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,7 +15,7 @@ import (
 func TestCollectItem(t *testing.T) {
 	ctx := context.Background()
 	svc := newCollectionService(t)
-	item, err := cards.NewItem(1, 2)
+	item, err := cards.NewCollectable(1, 2)
 	require.NoError(t, err)
 
 	collect, err := svc.Collect(ctx, item, cards.NewCollector("myUser"))
@@ -28,12 +28,12 @@ func TestCollectItem(t *testing.T) {
 func TestCollectNoneExistingItem(t *testing.T) {
 	ctx := context.Background()
 	svc := newCollectionService(t)
-	noneExistingItem, err := cards.NewItem(1000, 1)
+	noneExistingItem, err := cards.NewCollectable(1000, 1)
 	require.NoError(t, err)
 
 	collect, err := svc.Collect(ctx, noneExistingItem, cards.NewCollector("myUser"))
 
-	assert.Equal(t, cards.Item{}, collect)
+	assert.Equal(t, cards.Collectable{}, collect)
 	var appErr aerrors.AppError
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, aerrors.ErrTypeInvalidInput, appErr.ErrorType)

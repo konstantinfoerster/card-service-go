@@ -12,17 +12,16 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/common/clock"
-	"github.com/konstantinfoerster/card-service-go/internal/common/detect"
-	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
-	commonpg "github.com/konstantinfoerster/card-service-go/internal/common/postgres"
+	cardspg "github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
@@ -68,21 +67,21 @@ func main() {
 
 func run(cfg *config.Config) error {
 	ctx := context.Background()
-	dbCon, err := commonpg.Connect(ctx, cfg.Database)
+	dbCon, err := cardspg.Connect(ctx, cfg.Database)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database %w", err)
 	}
-	defer commonio.Close(dbCon)
+	defer aio.Close(dbCon)
 
 	oidcProvider, err := auth.FromConfiguration(cfg.Oidc)
 	if err != nil {
 		return fmt.Errorf("failed to load oidc provider, %w", err)
 	}
 
-	timeSvc := clock.NewTimeService()
+	timeSvc := auth.NewTimeService()
 	authSvc := auth.New(cfg.Oidc, oidcProvider...)
-	detector := detect.NewDetector()
-	hasher := detect.NewPHasher()
+	detector := image.NewDetector()
+	hasher := image.NewPHasher()
 
 	searchRepo := postgres.NewCardRepository(dbCon, cfg.Images)
 	searchSvc := cards.NewCardService(searchRepo)

@@ -12,6 +12,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -123,11 +124,11 @@ func TestSearchCollected(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := provider.Token(validClaim).Encode()
+			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/mycards?name=Demonic&"+tc.page),
-				test.WithEncryptedCookie(t, "SESSION", token),
+				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
 			)
 
@@ -194,11 +195,11 @@ func TestCollectItemAdd(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := provider.Token(validClaim).Encode()
+			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithEncryptedCookie(t, "SESSION", token),
+				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
 				test.WithJSONBody(t, cardsapi.Item{ID: 1, Amount: tc.amount}),
 			)
@@ -242,12 +243,12 @@ func TestCollectItemRemove(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := provider.Token(validClaim).Encode()
+			token := provider.Token("myuser")
 			// collect item
 			reqAdd := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithEncryptedCookie(t, "SESSION", token),
+				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithJSONBody(t, cardsapi.Item{ID: 1, Amount: 1}),
 			)
 			respAdd, _ := srv.Test(reqAdd)
@@ -256,7 +257,7 @@ func TestCollectItemRemove(t *testing.T) {
 			reqRemove := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithEncryptedCookie(t, "SESSION", token),
+				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
 				test.WithJSONBody(t, cardsapi.Item{ID: 1, Amount: 0}),
 			)
@@ -272,13 +273,11 @@ func TestCollectItemRemove(t *testing.T) {
 	}
 }
 
-func TestCollectItemWithInvalidToken(t *testing.T) {
-	srv, provider := testServer(t)
-	token := provider.Token(invalidClaim).Encode()
+func TestCollectItemNoSession(t *testing.T) {
+	srv, _ := testServer(t)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodPost),
 		test.WithURL("http://localhost/mycards"),
-		test.WithEncryptedCookie(t, "SESSION", token),
 		test.WithJSONBody(t, cardsapi.Item{ID: 1}),
 	)
 
@@ -299,14 +298,14 @@ func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 
 	collector := cards.NewCollector(validClaim.ID)
 	ctx := context.Background()
-	_, err = collectSvc.Collect(ctx, cards.Item{ID: 434, Amount: 1}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: 434, Amount: 1}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, cards.Item{ID: 514, Amount: 5}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: 514, Amount: 5}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, cards.Item{ID: 706, Amount: 3}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: 706, Amount: 3}, collector)
 	require.NoError(t, err)
 
-	oCfg := auth.OidcConfig{}
+	oCfg := config.Oidc{}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
 	authSvc := auth.New(oCfg, provider)
 	srv := web.NewHTTPTestServer()

@@ -2,10 +2,10 @@ package cardsapi
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
-	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
 )
 
 func DetectRoutes(r fiber.Router, auth web.AuthMiddleware, detectSvc cards.DetectService) {
@@ -26,7 +26,7 @@ func Detect(svc cards.DetectService) fiber.Handler {
 		if err != nil {
 			return aerrors.NewInvalidInputError(err, "invalid-file", "failed to open file")
 		}
-		defer commonio.Close(file)
+		defer aio.Close(file)
 
 		result, err := svc.Detect(c.Context(), asCollector(user), file)
 		if err != nil {

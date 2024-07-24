@@ -1,9 +1,7 @@
-package clock
+package auth
 
 import (
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 type TimeService interface {
@@ -33,9 +31,4 @@ type fakeClockService struct {
 
 func (s *fakeClockService) Now() time.Time {
 	return s.time
-}
-
-func TimeTracker(start time.Time, name string) {
-	elapsed := time.Since(start)
-	log.Info().Msgf("%s took %s", name, elapsed)
 }

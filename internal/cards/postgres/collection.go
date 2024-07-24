@@ -7,25 +7,23 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/pkg/errors"
 )
 
 type CollectionRepository interface {
 	ByID(ctx context.Context, id int) (cards.Card, error)
-	FindCollectedByName(ctx context.Context, name string, collector cards.Collector, page common.Page) (cards.Cards, error)
-	Upsert(ctx context.Context, item cards.Item, collector cards.Collector) error
-	Remove(ctx context.Context, item cards.Item, collector cards.Collector) error
+	FindCollectedByName(ctx context.Context, name string, c cards.Collector, page cards.Page) (cards.Cards, error)
+	Upsert(ctx context.Context, item cards.Collectable, c cards.Collector) error
+	Remove(ctx context.Context, item cards.Collectable, c cards.Collector) error
 }
 
 type postgresCollectionRepository struct {
-	db  *postgres.DBConnection
+	db  *DBConnection
 	cfg config.Images
 }
 
-func NewCollectionRepository(connection *postgres.DBConnection, cfg config.Images) CollectionRepository {
+func NewCollectionRepository(connection *DBConnection, cfg config.Images) CollectionRepository {
 	return &postgresCollectionRepository{
 		db:  connection,
 		cfg: cfg,
@@ -70,7 +68,7 @@ func (r *postgresCollectionRepository) ByID(ctx context.Context, id int) (cards.
 // A matching card face will be separate entry e.g. if front and back side of a card match, two entries will
 // be returned.
 func (r *postgresCollectionRepository) FindCollectedByName(
-	ctx context.Context, name string, collector cards.Collector, page common.Page) (cards.Cards, error) {
+	ctx context.Context, name string, c cards.Collector, page cards.Page) (cards.Cards, error) {
 	orEmptyName := ""
 	if strings.TrimSpace(name) == "" {
 		orEmptyName = "OR 1 = 1"
@@ -103,7 +101,7 @@ func (r *postgresCollectionRepository) FindCollectedByName(
 		LIMIT $2
 		OFFSET $3`, orEmptyName)
 	rows, err := r.db.Conn.Query(ctx, query, name, page.Size(), page.Offset(), r.cfg.Host,
-		cards.DefaultLang, collector.ID)
+		cards.DefaultLang, c.ID)
 	if err != nil {
 		return cards.Empty(page), fmt.Errorf("failed to execute paged card face select %w", err)
 	}
@@ -124,7 +122,7 @@ func (r *postgresCollectionRepository) FindCollectedByName(
 	return cards.NewCards(result, page), nil
 }
 
-func (r *postgresCollectionRepository) Upsert(ctx context.Context, item cards.Item, collector cards.Collector) error {
+func (r *postgresCollectionRepository) Upsert(ctx context.Context, item cards.Collectable, c cards.Collector) error {
 	query := `
 		INSERT INTO
 			card_collection (card_id, amount, user_id)
@@ -134,14 +132,14 @@ func (r *postgresCollectionRepository) Upsert(ctx context.Context, item cards.It
 			(card_id, user_id)
 		DO UPDATE SET
 			amount = excluded.amount`
-	if _, err := r.db.Conn.Exec(ctx, query, item.ID, item.Amount, collector.ID); err != nil {
+	if _, err := r.db.Conn.Exec(ctx, query, item.ID, item.Amount, c.ID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (r *postgresCollectionRepository) Remove(ctx context.Context, item cards.Item, collector cards.Collector) error {
+func (r *postgresCollectionRepository) Remove(ctx context.Context, item cards.Collectable, c cards.Collector) error {
 	query := `
 		DELETE FROM
 			card_collection
@@ -149,7 +147,7 @@ func (r *postgresCollectionRepository) Remove(ctx context.Context, item cards.It
 			card_id = $1
 		AND
 			user_id = $2`
-	if _, err := r.db.Conn.Exec(ctx, query, item.ID, collector.ID); err != nil {
+	if _, err := r.db.Conn.Exec(ctx, query, item.ID, c.ID); err != nil {
 		return err
 	}
 

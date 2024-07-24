@@ -6,18 +6,16 @@ import (
 	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/pkg/errors"
 )
 
 type postgresCardRepository struct {
-	db  *postgres.DBConnection
+	db  *DBConnection
 	cfg config.Images
 }
 
-func NewCardRepository(connection *postgres.DBConnection, cfg config.Images) cards.CardRepository {
+func NewCardRepository(connection *DBConnection, cfg config.Images) cards.CardRepository {
 	return &postgresCardRepository{
 		db:  connection,
 		cfg: cfg,
@@ -26,7 +24,7 @@ func NewCardRepository(connection *postgres.DBConnection, cfg config.Images) car
 
 // FindByName finds all cards that contain the given name. A matching card face will be separate entry e.g.
 // if front and back side of a card match, two entries will be returned.
-func (r *postgresCardRepository) FindByName(ctx context.Context, name string, page common.Page) (cards.Cards, error) {
+func (r *postgresCardRepository) FindByName(ctx context.Context, name string, page cards.Page) (cards.Cards, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return cards.Empty(page), nil
@@ -77,7 +75,7 @@ func (r *postgresCardRepository) FindByName(ctx context.Context, name string, pa
 // given collector. A matching card face will be separate entry e.g. if front and back side of a card match,
 // two entries will be returned.
 func (r *postgresCardRepository) FindByNameWithAmount(
-	ctx context.Context, name string, collector cards.Collector, page common.Page) (cards.Cards, error) {
+	ctx context.Context, name string, collector cards.Collector, page cards.Page) (cards.Cards, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return cards.Empty(page), nil

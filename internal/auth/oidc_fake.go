@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type ProviderOption func(*FakeProvider)
@@ -52,7 +54,7 @@ func WithStateID(stateID string) ProviderOption {
 	}
 }
 
-func WithProviderCfg(cfg ProviderConfig) ProviderOption {
+func WithProviderCfg(cfg config.Provider) ProviderOption {
 	return func(p *FakeProvider) {
 		p.clientID = cfg.ClientID
 		p.scope = cfg.Scope
@@ -82,35 +84,31 @@ func (p *FakeProvider) GetAuthURL(state string, redirectURI string) string {
 		url.QueryEscape(p.scope))
 }
 
-func (p *FakeProvider) ValidateToken(ctx context.Context, token *JSONWebToken) (*Claims, error) {
+func (p *FakeProvider) ValidateToken(ctx context.Context, token *JWT) (*Claims, error) {
 	for _, c := range p.claims {
-		if generateAccessToken(c) == token.AccessToken {
+		if generateAccessToken(c.ID) == token.AccessToken {
 			return c, nil
 		}
 	}
 
-	for _, c := range p.claims {
-		fmt.Printf("invalid token %s != %s\n", generateAccessToken(c), token.AccessToken)
-	}
 	return nil, fmt.Errorf("invalid token")
 }
 
 func (p *FakeProvider) ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*Claims,
-	*JSONWebToken, error) {
+	*JWT, error) {
 	if slices.Contains(p.validRedirectURI, redirectURI) {
 		return nil, nil, fmt.Errorf("invalid redirectURI")
 	}
 
 	for _, c := range p.claims {
 		if c.ID == authCode {
-			accessToken := generateAccessToken(c)
+			accessToken := generateAccessToken(c.ID)
 			p.loggedIn = append(p.loggedIn, accessToken)
-			return c, &JSONWebToken{
-				IDToken:      generateIDToken(c),
-				AccessToken:  accessToken,
-				RefreshToken: generateRefreshToken(c),
-				Provider:     p.name,
-				ExpiresIn:    p.tokenExpires,
+
+			return c, &JWT{
+				AccessToken: accessToken,
+				Provider:    p.name,
+				ExpiresIn:   p.tokenExpires,
 			}, nil
 		}
 	}
@@ -118,16 +116,8 @@ func (p *FakeProvider) ExchangeCode(ctx context.Context, authCode string, redire
 	return nil, nil, fmt.Errorf("invalid authCode")
 }
 
-func generateIDToken(c *Claims) string {
-	return c.ID + "-idtoken"
-}
-
-func generateAccessToken(c *Claims) string {
-	return c.ID + "-accesstoken"
-}
-
-func generateRefreshToken(c *Claims) string {
-	return c.ID + "-refreshtoken"
+func generateAccessToken(id string) string {
+	return id + "-accesstoken"
 }
 
 func (p *FakeProvider) RevokeToken(ctx context.Context, token string) error {
@@ -138,10 +128,9 @@ func (p *FakeProvider) RevokeToken(ctx context.Context, token string) error {
 		}
 	}
 
-    if toDelete == -1 {
-        return fmt.Errorf("token %s for revoke not found", token)
-
-    }
+	if toDelete == -1 {
+		return fmt.Errorf("token %s for revoke not found", token)
+	}
 
 	dd := p.loggedIn
 	dd[toDelete] = dd[len(dd)-1]
@@ -154,12 +143,11 @@ func (p *FakeProvider) GenerateState() State {
 	return State{ID: p.stateID, Provider: p.GetName()}
 }
 
-func (p *FakeProvider) Token(claims *Claims) *JSONWebToken {
-	return &JSONWebToken{
-		Provider:     p.name,
-		ExpiresIn:    p.tokenExpires,
-		AccessToken:  generateAccessToken(claims),
-		IDToken:      generateIDToken(claims),
-		RefreshToken: generateRefreshToken(claims),
+// Token Returns a valid token for the given user ID.
+func (p *FakeProvider) Token(userID string) *JWT {
+	return &JWT{
+		Provider:    p.name,
+		ExpiresIn:   p.tokenExpires,
+		AccessToken: generateAccessToken(userID),
 	}
 }

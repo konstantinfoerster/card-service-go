@@ -4,15 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/konstantinfoerster/card-service-go/internal/api/web"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDatabaseConnectionURL(t *testing.T) {
-	cfg := postgres.Database{
+	cfg := config.Database{
 		Host:     "localhost",
 		Port:     "5432",
 		Database: "test",
@@ -24,7 +22,7 @@ func TestDatabaseConnectionURL(t *testing.T) {
 }
 
 func TestServerAddr(t *testing.T) {
-	cfg := web.ServerConfig{
+	cfg := config.Server{
 		Host: "localhost",
 		Port: 3000,
 	}
@@ -33,7 +31,7 @@ func TestServerAddr(t *testing.T) {
 }
 
 func TestServerAddrHostOnly(t *testing.T) {
-	cfg := web.ServerConfig{
+	cfg := config.Server{
 		Host: "localhost",
 	}
 
@@ -41,7 +39,7 @@ func TestServerAddrHostOnly(t *testing.T) {
 }
 
 func TestServerAddrPortOnly(t *testing.T) {
-	cfg := web.ServerConfig{
+	cfg := config.Server{
 		Port: 3000,
 	}
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 var (
@@ -31,7 +32,7 @@ func UserFromCtx(ctx *fiber.Ctx) (*User, error) {
 	return nil, ErrNoUserInContext
 }
 
-func NewAuthMiddleware(cfg auth.OidcConfig, svc auth.Service) AuthMiddleware {
+func NewAuthMiddleware(cfg config.Oidc, svc auth.Service) AuthMiddleware {
 	authFn := func(ctx *fiber.Ctx, claims *auth.Claims) {
 		u := NewUser(claims.ID, claims.Email)
 		ctx.Locals(UserContextKey, u)
@@ -47,7 +48,7 @@ func NewAuthMiddleware(cfg auth.OidcConfig, svc auth.Service) AuthMiddleware {
 type AuthMiddleware struct {
 	svc    auth.Service
 	authFn func(ctx *fiber.Ctx, claims *auth.Claims)
-	cfg    auth.OidcConfig
+	cfg    config.Oidc
 }
 
 func (r AuthMiddleware) Relaxed() func(*fiber.Ctx) error {

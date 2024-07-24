@@ -1,8 +1,7 @@
-package detect
+package image
 
 import (
 	"fmt"
-	"image"
 
 	"github.com/corona10/goimagehash"
 )
@@ -23,7 +22,7 @@ func (h Hash) AsBase2() []string {
 
 type Hasher interface {
 	// Hash builds a hash based on the given image
-	Hash(img image.Image) (Hash, error)
+	Hash(img Image) (Hash, error)
 	// Distance builds the distance between the given hashes
 	Distance(hash1 Hash, hash2 Hash) (int, error)
 }
@@ -35,7 +34,7 @@ func NewPHasher() Hasher {
 type phasher struct {
 }
 
-func (p phasher) Hash(img image.Image) (Hash, error) {
+func (p phasher) Hash(img Image) (Hash, error) {
 	width := 16
 	height := 16
 	ph, err := goimagehash.ExtPerceptionHash(img, width, height)

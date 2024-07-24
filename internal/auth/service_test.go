@@ -10,8 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ func TestUnsupportedProvider(t *testing.T) {
 	for _, tc := range cases {
 		t.Run("Authenticate - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(auth.OidcConfig{})
+			svc := auth.New(config.Oidc{})
 
 			_, _, err := svc.Authenticate(ctx, tc.provider, "")
 
@@ -55,7 +56,7 @@ func TestUnsupportedProvider(t *testing.T) {
 		})
 
 		t.Run("AuthURL - "+tc.name, func(t *testing.T) {
-			svc := auth.New(auth.OidcConfig{})
+			svc := auth.New(config.Oidc{})
 
 			_, err := svc.AuthURL(tc.provider)
 
@@ -66,7 +67,7 @@ func TestUnsupportedProvider(t *testing.T) {
 
 		t.Run("AuthInfo - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(auth.OidcConfig{})
+			svc := auth.New(config.Oidc{})
 
 			_, err := svc.AuthInfo(ctx, tc.provider, nil)
 
@@ -77,9 +78,9 @@ func TestUnsupportedProvider(t *testing.T) {
 
 		t.Run("Logout - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(auth.OidcConfig{})
+			svc := auth.New(config.Oidc{})
 
-			err := svc.Logout(ctx, &auth.JSONWebToken{Provider: tc.provider})
+			err := svc.Logout(ctx, &auth.JWT{Provider: tc.provider})
 
 			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
@@ -89,10 +90,10 @@ func TestUnsupportedProvider(t *testing.T) {
 }
 
 func TestAuthURL(t *testing.T) {
-	cfg := auth.OidcConfig{
+	cfg := config.Oidc{
 		RedirectURI: "http://localhost",
 	}
-	pCfg := auth.ProviderConfig{
+	pCfg := config.Provider{
 		AuthURL:  "http://localhost/oauth2/auth",
 		ClientID: "client id 0",
 		Scope:    "openid email",
@@ -118,10 +119,10 @@ func TestAuthenticate(t *testing.T) {
 	}
 	srv := startProviderServer(t, expectedBody.Encode())
 	defer srv.Close()
-	cfg := auth.OidcConfig{
+	cfg := config.Oidc{
 		RedirectURI: "http://localhost",
 	}
-	pCfg := auth.ProviderConfig{
+	pCfg := config.Provider{
 		TokenURL: fmt.Sprintf("%s/oauth2/auth", srv.URL),
 		ClientID: "client id 0",
 		Secret:   "secure",
@@ -139,10 +140,10 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 	ctx := context.Background()
 	srv := startProviderServer(t, "")
 	defer srv.Close()
-	pCfg := auth.ProviderConfig{
+	pCfg := config.Provider{
 		TokenURL: fmt.Sprintf("%s/oauth2/autherror", srv.URL),
 	}
-	svc := auth.New(auth.OidcConfig{}, auth.TestProvider(pCfg, client))
+	svc := auth.New(config.Oidc{}, auth.TestProvider(pCfg, client))
 
 	_, _, err := svc.Authenticate(ctx, "test", "code-0")
 	require.Error(t, err)
@@ -154,9 +155,9 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 
 func TestAuthInfo(t *testing.T) {
 	ctx := context.Background()
-	svc := auth.New(auth.OidcConfig{}, auth.TestProvider(auth.ProviderConfig{}, client))
+	svc := auth.New(config.Oidc{}, auth.TestProvider(config.Provider{}, client))
 
-	user, err := svc.AuthInfo(ctx, "test", &auth.JSONWebToken{})
+	user, err := svc.AuthInfo(ctx, "test", &auth.JWT{})
 
 	require.NoError(t, err)
 	assert.Equal(t, auth.NewClaims("1", "test@localhost"), user)
@@ -169,12 +170,12 @@ func TestLogout(t *testing.T) {
 	}
 	srv := startProviderServer(t, expectedBody.Encode())
 	defer srv.Close()
-	pCfg := auth.ProviderConfig{
+	pCfg := config.Provider{
 		RevokeURL: fmt.Sprintf("%s/oauth2/revoke", srv.URL),
 	}
-	svc := auth.New(auth.OidcConfig{}, auth.TestProvider(pCfg, client))
+	svc := auth.New(config.Oidc{}, auth.TestProvider(pCfg, client))
 
-	err := svc.Logout(ctx, &auth.JSONWebToken{AccessToken: "token-0", Provider: "test"})
+	err := svc.Logout(ctx, &auth.JWT{AccessToken: "token-0", Provider: "test"})
 
 	require.NoError(t, err)
 }
@@ -184,7 +185,7 @@ func startProviderServer(t *testing.T, expectedBody string) *httptest.Server {
 		status := 500
 
 		if r.Method == http.MethodPost && strings.HasSuffix(r.RequestURI, "/auth") {
-			_, err := w.Write(test.ToJSON(t, auth.JSONWebToken{}))
+			_, err := w.Write(test.ToJSON(t, auth.JWT{}))
 			assert.NoError(t, err)
 
 			status = 200

@@ -2,6 +2,8 @@ package test
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -133,6 +135,12 @@ func WithCookie(name, value string) func(*httpRequest) {
 	}
 }
 
+func WithSessionCookie(value string) func(*httpRequest) {
+	return func(req *httpRequest) {
+		req.cookies = append(req.cookies, &http.Cookie{Name: "SESSION", Value: value})
+	}
+}
+
 func WithEncryptedCookie(t *testing.T, name, value string) func(*httpRequest) {
 	return func(req *httpRequest) {
 		v, err := encryptcookie.EncryptCookie(value, CookieEncryptionKey)
@@ -140,6 +148,15 @@ func WithEncryptedCookie(t *testing.T, name, value string) func(*httpRequest) {
 
 		WithCookie(name, v)(req)
 	}
+}
+
+func Base64Encoded(t *testing.T, value any) string {
+	rawValue, err := json.Marshal(&value)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return base64.URLEncoding.EncodeToString(rawValue)
 }
 
 func Close(t *testing.T, resp *http.Response) {

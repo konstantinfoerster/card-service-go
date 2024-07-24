@@ -9,13 +9,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 )
 
-// var detectorUser = auth.User{ID: "detectorUser", Username: "detectorUser"}
-// var detectCollector = cards.NewCollector(detectorUser.ID)
-// var validUser = auth.User{ID: "myUser", Username: "myUser"}
-// var collector = cards.NewCollector(validUser.ID)
-
-var validClaim = auth.NewClaims("valid-id", "validator")
-var invalidClaim = auth.NewClaims("invalid-id", "invalidator")
+var validClaim = auth.NewClaims("myuser", "myUser")
 
 func TestMain(m *testing.M) {
 	exitVal := m.Run()

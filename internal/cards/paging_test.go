@@ -1,32 +1,32 @@
-package common_test
+package cards_test
 
 import (
 	"testing"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common"
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewPage(t *testing.T) {
 	cases := []struct {
 		name       string
-		page       common.Page
-		expectPage common.Page
+		page       cards.Page
+		expectPage cards.Page
 	}{
 		{
 			name:       "page 0 fallbacks to default",
-			page:       common.NewPage(0, 10),
-			expectPage: common.NewPage(1, 10),
+			page:       cards.NewPage(0, 10),
+			expectPage: cards.NewPage(1, 10),
 		},
 		{
 			name:       "page size 0 fallbacks to default",
-			page:       common.NewPage(1, 0),
-			expectPage: common.NewPage(1, 10),
+			page:       cards.NewPage(1, 0),
+			expectPage: cards.NewPage(1, 10),
 		},
 		{
 			name:       "page size fallbacks to limit if exceed",
-			page:       common.NewPage(1, 1000),
-			expectPage: common.NewPage(1, 100),
+			page:       cards.NewPage(1, 1000),
+			expectPage: cards.NewPage(1, 100),
 		},
 	}
 

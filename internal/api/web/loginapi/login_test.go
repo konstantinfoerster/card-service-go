@@ -13,22 +13,22 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/common/clock"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var staticTimeSvc = clock.NewFakeTimeService(time.Now())
+var staticTimeSvc = auth.NewFakeTimeService(time.Now())
 
 var cookieEncryptionKey = ""
 
 func TestLogin(t *testing.T) {
-	validClaim := auth.NewClaims("myUser", "myUser")
+	user := auth.NewClaims("myuser", "myUser")
 	provider := auth.NewFakeProvider(
-		auth.WithClaims(validClaim),
+		auth.WithClaims(user),
 		auth.WithStateID("state-0"),
-		auth.WithProviderCfg(auth.ProviderConfig{
+		auth.WithProviderCfg(config.Provider{
 			ClientID: "my-client-id",
 			Scope:    "oidc email",
 			AuthURL:  "http://localhost/auth",
@@ -39,7 +39,7 @@ func TestLogin(t *testing.T) {
 		test.WithMethod(web.MethodGet),
 		test.WithURL("http://localhost/login/testProvider"),
 	)
-	expectedState := provider.GenerateState().Encode()
+	expectedState := test.Base64Encoded(t, provider.GenerateState())
 	expectedCookie := &http.Cookie{
 		Name:     "TOKEN_STATE",
 		Value:    expectedState,
@@ -81,16 +81,15 @@ func TestLoginUnknownProvider(t *testing.T) {
 
 func TestExchangeCode(t *testing.T) {
 	sessionExpires := staticTimeSvc.Now().Unix()
-	validClaim := auth.NewClaims("myUser", "myUser")
+	user := auth.NewClaims("myuser", "myUser")
 	provider := auth.NewFakeProvider(
-		auth.WithClaims(validClaim),
+		auth.WithClaims(user),
 		auth.WithExpire(sessionExpires),
 	)
 	srv := loginServer(staticTimeSvc, provider)
-	token := provider.Token(validClaim).Encode()
 	expectedSessionCookie := &http.Cookie{
 		Name:     "SESSION",
-		Value:    token,
+		Value:    test.Base64Encoded(t, provider.Token("myuser")),
 		Expires:  expiresIn(time.Duration(sessionExpires) * time.Second),
 		SameSite: http.SameSiteStrictMode,
 		HttpOnly: true,
@@ -131,10 +130,10 @@ func TestExchangeCode(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			rawState := provider.GenerateState().Encode()
+			rawState := test.Base64Encoded(t, provider.GenerateState())
 			req := test.NewRequest(
 				test.WithMethod(http.MethodGet),
-				test.WithURL(fmt.Sprintf("http://localhost/login/callback?code=myUser&state=%s", rawState)),
+				test.WithURL(fmt.Sprintf("http://localhost/login/callback?code=%s&state=%s", user.ID, rawState)),
 				test.WithCookie("TOKEN_STATE", encryptCookieValue(t, rawState)),
 			)
 			if tc.acceptHeader != "" {
@@ -157,7 +156,6 @@ func TestExchangeCode(t *testing.T) {
 }
 
 func TestExchangeInvalidInput(t *testing.T) {
-	validClaim := auth.NewClaims("myUser", "myUser")
 	cases := []struct {
 		name        string
 		queryParams string
@@ -166,21 +164,21 @@ func TestExchangeInvalidInput(t *testing.T) {
 	}{
 		{
 			name:        "No state cookie",
-			queryParams: fmt.Sprintf("?code=myUser&state=%s", auth.State{ID: "state-0"}.Encode()),
+			queryParams: fmt.Sprintf("?code=myUser&state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
 			provider:    nil,
 			statusCode:  http.StatusBadRequest,
 		},
 		{
 			name:        "No auth code",
-			queryParams: fmt.Sprintf("?state=%s", auth.State{ID: "state-0"}.Encode()),
+			queryParams: fmt.Sprintf("?state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
 			provider:    nil,
 			statusCode:  http.StatusBadRequest,
 		},
 		{
 			name:        "No auth state",
-			queryParams: "?code=myUser",
+			queryParams: "?code=myuser",
 			provider: auth.NewFakeProvider(
-				auth.WithClaims(validClaim),
+				auth.WithClaims(auth.NewClaims("myuser", "myUser")),
 			),
 			statusCode: http.StatusBadRequest,
 		},
@@ -191,8 +189,8 @@ func TestExchangeInvalidInput(t *testing.T) {
 		},
 		{
 			name: "State mismatch",
-			queryParams: fmt.Sprintf("?code=myUser&state=%s",
-				auth.State{ID: "state-1", Provider: "testProvider"}.Encode(),
+			queryParams: fmt.Sprintf("?code=myuser&state=%s",
+				test.Base64Encoded(t, auth.State{ID: "state-1", Provider: "testProvider"}),
 			),
 			provider:   auth.NewFakeProvider(),
 			statusCode: http.StatusBadRequest,
@@ -200,7 +198,7 @@ func TestExchangeInvalidInput(t *testing.T) {
 		{
 			name: "Failed authentication",
 			queryParams: fmt.Sprintf("?code=myAuthCode&state=%s",
-				auth.State{ID: "state-0", Provider: "testProvider"}.Encode(),
+				test.Base64Encoded(t, auth.State{ID: "state-0", Provider: "testProvider"}),
 			),
 			provider:   auth.NewFakeProvider(),
 			statusCode: http.StatusInternalServerError,
@@ -215,10 +213,10 @@ func TestExchangeInvalidInput(t *testing.T) {
 				test.WithURL("http://localhost/login/callback"+tc.queryParams),
 			)
 			if tc.provider != nil {
-				state := tc.provider.GenerateState()
+				state := test.Base64Encoded(t, tc.provider.GenerateState())
 				req.AddCookie(&http.Cookie{
 					Name:  "TOKEN_STATE",
-					Value: encryptCookieValue(t, state.Encode()),
+					Value: encryptCookieValue(t, state),
 				})
 			}
 
@@ -232,14 +230,14 @@ func TestExchangeInvalidInput(t *testing.T) {
 }
 
 func TestGetCurrentUser(t *testing.T) {
-	validClaim := auth.NewClaims("myUser", "myUser")
-	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
+	user := auth.NewClaims("myuser", "myUser")
+	provider := auth.NewFakeProvider(auth.WithClaims(user))
 	srv := loginServer(staticTimeSvc, provider)
-	token := provider.Token(validClaim).Encode()
+	token := provider.Token("myuser")
 	req := test.NewRequest(
 		test.WithMethod(http.MethodGet),
 		test.WithURL("http://localhost/user"),
-		test.WithCookie("SESSION", encryptCookieValue(t, token)),
+		test.WithCookie("SESSION", encryptCookieValue(t, test.Base64Encoded(t, token))),
 	)
 
 	resp, err := srv.Test(req)
@@ -284,25 +282,25 @@ func TestLogout(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			validClaim := auth.NewClaims("myUser", "myUser")
-			provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
+			user := auth.NewClaims("myuser", "myUser")
+			provider := auth.NewFakeProvider(auth.WithClaims(user))
 
 			srv := loginServer(staticTimeSvc, provider)
-			token := provider.Token(validClaim).Encode()
-			rawState := provider.GenerateState().Encode()
+			rawState := test.Base64Encoded(t, provider.GenerateState())
 			reqLogin := test.NewRequest(
 				test.WithMethod(http.MethodGet),
-				test.WithURL(fmt.Sprintf("http://localhost/login/callback?code=myUser&state=%s", rawState)),
+				test.WithURL(fmt.Sprintf("http://localhost/login/callback?code=%s&state=%s", user.ID, rawState)),
 				test.WithCookie("TOKEN_STATE", encryptCookieValue(t, rawState)),
 			)
 			respLogin, err := srv.Test(reqLogin)
 			require.NoError(t, err)
 			defer test.Close(t, respLogin)
 
+			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(http.MethodGet),
 				test.WithURL("http://localhost/logout"),
-				test.WithCookie("SESSION", encryptCookieValue(t, token)),
+				test.WithCookie("SESSION", encryptCookieValue(t, test.Base64Encoded(t, token))),
 				test.WithAccept(tc.acceptHeader),
 			)
 			expectedSessionCookie := &http.Cookie{
@@ -354,8 +352,9 @@ func TestLogoutError(t *testing.T) {
 		{
 			name: "Failed logout",
 			sessionCookieValueFn: func(t *testing.T) string {
-				invalidToken := &auth.JSONWebToken{Provider: "unknownProvider"}
-				return invalidToken.Encode()
+				invalidToken := &auth.JWT{Provider: "unknownProvider"}
+
+				return test.Base64Encoded(t, invalidToken)
 			},
 			statusCode: http.StatusBadRequest,
 		},
@@ -363,8 +362,8 @@ func TestLogoutError(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			validClaim := auth.NewClaims("myUser", "myUser")
-			provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
+			user := auth.NewClaims("myuser", "myUser")
+			provider := auth.NewFakeProvider(auth.WithClaims(user))
 			srv := loginServer(staticTimeSvc, provider)
 			req := httptest.NewRequest(http.MethodGet, "http://localhost/logout", nil)
 			value := tc.sessionCookieValueFn(t)
@@ -423,8 +422,8 @@ func expiresIn(d time.Duration) time.Time {
 	return staticTimeSvc.Now().Add(d).Truncate(time.Second).UTC()
 }
 
-func loginServer(timeSvc clock.TimeService, provider auth.Provider) *web.Server {
-	oCfg := auth.OidcConfig{
+func loginServer(timeSvc auth.TimeService, provider auth.Provider) *web.Server {
+	oCfg := config.Oidc{
 		StateCookieAge:    5 * time.Second,
 		SessionCookieName: "SESSION",
 		RedirectURI:       "http://localhost/home",

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
 
 func DecodeBase64[T any](value string) (*T, error) {

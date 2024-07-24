@@ -1,40 +1,72 @@
-package test
+package postgres_test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
-	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
+	"github.com/konstantinfoerster/card-service-go/internal/aio"
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func NewRunner() *DatabaseRunner {
-	return &DatabaseRunner{}
-}
+var connection *postgres.DBConnection
+var collector = cards.NewCollector("myUser")
 
-type DatabaseRunner struct {
-	conn      *postgres.DBConnection
-	container testcontainers.Container
-}
+func TestMain(m *testing.M) {
+	flag.Parse()
 
-func (r *DatabaseRunner) Start() (*postgres.DBConnection, error) {
 	ctx := context.Background()
+	dbRunner := newRunner()
+	if !testing.Short() {
+		if err := dbRunner.Start(ctx); err != nil {
+			panic(err)
+		}
 
+		var err error
+		connection, err = postgres.Connect(ctx, dbRunner.Config())
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	code := m.Run()
+
+	if err := dbRunner.Stop(ctx); err != nil {
+		panic(err)
+	}
+
+	os.Exit(code)
+}
+
+func newRunner() *databaseRunner {
+	return &databaseRunner{}
+}
+
+type databaseRunner struct {
+	container testcontainers.Container
+	cfg       config.Database
+	running   bool
+}
+
+func (r *databaseRunner) Start(ctx context.Context) error {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
-		return nil, fmt.Errorf("failed to get caller")
+		return fmt.Errorf("failed to get caller")
 	}
 
 	dbDir, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(file), "testdata", "db"))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	username := "tester"
@@ -79,39 +111,42 @@ func (r *DatabaseRunner) Start() (*postgres.DBConnection, error) {
 		Started:          true,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err = r.enableDebugIfRequired(ctx); err != nil {
-		return nil, err
+		return err
 	}
 
 	ip, err := r.container.Host(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	mappedPort, err := r.container.MappedPort(ctx, "5432")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return postgres.Connect(ctx, postgres.Database{
+	r.running = true
+	r.cfg = config.Database{
 		Username: username,
 		Password: password,
 		Host:     ip,
 		Port:     mappedPort.Port(),
 		Database: database,
-	})
+	}
+
+	return nil
 }
 
-func (r *DatabaseRunner) enableDebugIfRequired(ctx context.Context) error {
+func (r *databaseRunner) enableDebugIfRequired(ctx context.Context) error {
 	if e := log.Debug(); e.Enabled() {
 		logs, err := r.container.Logs(ctx)
 		if err != nil {
 			return err
 		}
-		defer commonio.Close(logs)
+		defer aio.Close(logs)
 
 		b, err := io.ReadAll(logs)
 		if err != nil {
@@ -124,31 +159,14 @@ func (r *DatabaseRunner) enableDebugIfRequired(ctx context.Context) error {
 	return nil
 }
 
-func (r *DatabaseRunner) Stop() error {
-	ctx := context.Background()
+func (r *databaseRunner) Stop(ctx context.Context) error {
+	if !r.running {
+		return nil
+	}
 
 	return r.container.Terminate(ctx)
 }
 
-func (r *DatabaseRunner) Run(t *testing.T, runTests func(t *testing.T)) {
-	t.Helper()
-
-	con, err := r.Start()
-	defer func(runner *DatabaseRunner) {
-		cErr := runner.Stop()
-		if cErr != nil {
-			t.Fatalf("failed to stop container %v", err)
-		}
-	}(r)
-	if err != nil {
-		t.Fatalf("failed to start container %v", err)
-	}
-
-	r.conn = con
-
-	runTests(t)
-}
-
-func (r *DatabaseRunner) Connection() *postgres.DBConnection {
-	return r.conn
+func (r *databaseRunner) Config() config.Database {
+	return r.cfg
 }

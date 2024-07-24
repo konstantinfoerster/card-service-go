@@ -1,6 +1,6 @@
 //go:build opencv
 
-package detect
+package image
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	_ "image/jpeg"
 	"io"
 	"math"
 	"sort"

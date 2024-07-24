@@ -6,42 +6,20 @@ import (
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var cardRepo cards.CardRepository
-
-func TestIntegrationCardRepository(t *testing.T) {
+func TestFindByName(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
 
-	cfg := config.Images{
-		Host: "http://localhost/",
-	}
-	runner := test.NewRunner()
-	runner.Run(t, func(t *testing.T) {
-		cardRepo = postgres.NewCardRepository(runner.Connection(), cfg)
-
-		t.Run("find by name default page", findByName)
-		t.Run("find by name last page", findByNameLastPage)
-		t.Run("find by name double face card", findByNameDoubleFace)
-		t.Run("find by empty or unknown term", findByNameNoResult)
-		t.Run("find by card with no image", findByNameNoImageURL)
-
-		t.Run("find by name and collector", findByNameAndCollector)
-		t.Run("find by name and collector double face card", findByNameAndCollectorDoubleFace)
-		t.Run("find by name and collector with no image", findByNameAndCollectorNoImageURL)
-	})
-}
-
-func findByName(t *testing.T) {
 	ctx := context.Background()
-	result, err := cardRepo.FindByName(ctx, "ummy Card", common.NewPage(1, 3))
+	result, err := cardRepo.FindByName(ctx, "ummy Card", cards.NewPage(1, 3))
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Page)
@@ -55,9 +33,15 @@ func findByName(t *testing.T) {
 	assert.Equal(t, "http://localhost/images/dummyCard3.png", result.Result[2].Image)
 }
 
-func findByNameLastPage(t *testing.T) {
+func TestFindByNameLastPage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
 	ctx := context.Background()
-	result, err := cardRepo.FindByName(ctx, "Dummy Card", common.NewPage(2, 3))
+	result, err := cardRepo.FindByName(ctx, "Dummy Card", cards.NewPage(2, 3))
 
 	require.NoError(t, err)
 	assert.False(t, result.HasMore)
@@ -66,7 +50,13 @@ func findByNameLastPage(t *testing.T) {
 	assert.Equal(t, "http://localhost/images/dummyCard4.png", result.Result[0].Image)
 }
 
-func findByNameDoubleFace(t *testing.T) {
+func TestFindByNameDoubleFace(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
 	cases := []struct {
 		name       string
 		searchTerm string
@@ -97,7 +87,7 @@ func findByNameDoubleFace(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			result, err := cardRepo.FindByName(ctx, tc.searchTerm, common.NewPage(1, 10))
+			result, err := cardRepo.FindByName(ctx, tc.searchTerm, cards.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Len(t, result.Result, tc.resultSize)
@@ -105,9 +95,15 @@ func findByNameDoubleFace(t *testing.T) {
 	}
 }
 
-func findByNameNoImageURL(t *testing.T) {
+func TestFindByNameNoImageURL(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
 	ctx := context.Background()
-	result, err := cardRepo.FindByName(ctx, "No Image Card", common.NewPage(1, 5))
+	result, err := cardRepo.FindByName(ctx, "No Image Card", cards.NewPage(1, 5))
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 2)
@@ -115,7 +111,13 @@ func findByNameNoImageURL(t *testing.T) {
 	assert.Equal(t, "http://localhost/images/noFace.png", result.Result[1].Image)
 }
 
-func findByNameNoResult(t *testing.T) {
+func TestFindByNameNoResult(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
 	cases := []struct {
 		name       string
 		searchTerm string
@@ -141,7 +143,7 @@ func findByNameNoResult(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			result, err := cardRepo.FindByName(ctx, tc.searchTerm, common.NewPage(1, 10))
+			result, err := cardRepo.FindByName(ctx, tc.searchTerm, cards.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Equal(t, 1, result.Page)
@@ -151,10 +153,15 @@ func findByNameNoResult(t *testing.T) {
 	}
 }
 
-func findByNameAndCollector(t *testing.T) {
+func TestFindByNameAndCollector(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
 	ctx := context.Background()
-	c := cards.Collector{ID: "myUser"}
-	result, err := cardRepo.FindByNameWithAmount(ctx, "ummy Card", c, common.NewPage(1, 3))
+	result, err := cardRepo.FindByNameWithAmount(ctx, "ummy Card", collector, cards.NewPage(1, 3))
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 3)
@@ -169,7 +176,13 @@ func findByNameAndCollector(t *testing.T) {
 	assert.Empty(t, result.Result[2].Amount)
 }
 
-func findByNameAndCollectorDoubleFace(t *testing.T) {
+func TestFindByNameAndCollectorDoubleFace(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
 	cases := []struct {
 		name       string
 		searchTerm string
@@ -205,8 +218,7 @@ func findByNameAndCollectorDoubleFace(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			c := cards.Collector{ID: "myUser"}
-			result, err := cardRepo.FindByNameWithAmount(ctx, tc.searchTerm, c, common.NewPage(1, 10))
+			result, err := cardRepo.FindByNameWithAmount(ctx, tc.searchTerm, collector, cards.NewPage(1, 10))
 
 			require.NoError(t, err)
 			assert.Len(t, result.Result, tc.resultSize)
@@ -218,10 +230,15 @@ func findByNameAndCollectorDoubleFace(t *testing.T) {
 	}
 }
 
-func findByNameAndCollectorNoImageURL(t *testing.T) {
+func TestFindByNameAndCollectorNoImageURL(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
 	ctx := context.Background()
-	c := cards.Collector{ID: "myUser"}
-	result, err := cardRepo.FindByNameWithAmount(ctx, "No Image Card", c, common.NewPage(1, 10))
+	result, err := cardRepo.FindByNameWithAmount(ctx, "No Image Card", collector, cards.NewPage(1, 10))
 
 	require.NoError(t, err)
 	assert.Len(t, result.Result, 2)

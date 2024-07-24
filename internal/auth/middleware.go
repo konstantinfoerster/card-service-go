@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 var ErrNoClaimsInContext = fmt.Errorf("no claims in context")
@@ -38,7 +39,7 @@ func NewOAuthMiddleware(svc Service, opts ...func(*MiddlewareConfig)) fiber.Hand
 				return nil, aerrors.NewAuthorizationError(fmt.Errorf("no running session found"), "no-session")
 			}
 
-			jwtToken, err := DecodeBase64[JSONWebToken](cookie)
+			jwtToken, err := DecodeBase64[JWT](cookie)
 			if err != nil {
 				return nil, err
 			}
@@ -47,6 +48,7 @@ func NewOAuthMiddleware(svc Service, opts ...func(*MiddlewareConfig)) fiber.Hand
 			if err != nil {
 				return nil, err
 			}
+
 			return claims, nil
 		},
 		Authorized: func(ctx *fiber.Ctx, claims *Claims) {
@@ -61,7 +63,7 @@ func NewOAuthMiddleware(svc Service, opts ...func(*MiddlewareConfig)) fiber.Hand
 	return newTokenExtractHandler(c)
 }
 
-func WithConfig(cfg OidcConfig) func(*MiddlewareConfig) {
+func WithConfig(cfg config.Oidc) func(*MiddlewareConfig) {
 	return func(c *MiddlewareConfig) {
 		c.Key = cfg.SessionCookieName
 	}

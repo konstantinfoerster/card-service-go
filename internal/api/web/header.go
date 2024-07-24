@@ -18,12 +18,12 @@ const StatusInternalServerError = http.StatusInternalServerError
 
 const HeaderHTMXRequest = "HX-Request"
 
-// IsHTMX true if the request is a HTMX request, false otherwise
+// IsHTMX true if the request is a HTMX request, false otherwise.
 func IsHTMX(c *fiber.Ctx) bool {
 	return strings.ToLower(c.Get(HeaderHTMXRequest)) == "true"
 }
 
-// AcceptsHTML true if the request expectects HTML as response, false otherwise
+// AcceptsHTML true if the request expectects HTML as response, false otherwise.
 func AcceptsHTML(c *fiber.Ctx) bool {
 	return strings.Contains(c.Get(fiber.HeaderAccept), fiber.MIMETextHTML)
 }

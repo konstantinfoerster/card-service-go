@@ -7,17 +7,18 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/common/aerrors"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestOAuthMiddleware(t *testing.T) {
-	expectedClaims := auth.NewClaims("1", "test@localhost")
+	expectedClaims := auth.NewClaims("test-1", "test@localhost")
 	provider := auth.NewFakeProvider(auth.WithClaims(expectedClaims))
-	svc := auth.New(auth.OidcConfig{}, provider)
+	svc := auth.New(config.Oidc{}, provider)
 	app := fiber.New()
 	app.Use(auth.NewOAuthMiddleware(svc))
 	app.Get("/test", func(c *fiber.Ctx) error {
@@ -31,7 +32,7 @@ func TestOAuthMiddleware(t *testing.T) {
 	req := test.NewRequest(
 		test.WithMethod(http.MethodGet),
 		test.WithURL("/test"),
-		test.WithCookie("SESSION", provider.Token(expectedClaims).Encode()),
+		test.WithCookie("SESSION", test.Base64Encoded(t, provider.Token("test-1"))),
 	)
 
 	resp, err := app.Test(req)
@@ -41,8 +42,8 @@ func TestOAuthMiddleware(t *testing.T) {
 }
 
 func TestOAuthMiddlewareWithCustomCookieName(t *testing.T) {
-	validClaims := auth.NewClaims("1", "test@localhost")
-	oCfg := auth.OidcConfig{SessionCookieName: "MY_SESSION"}
+	validClaims := auth.NewClaims("test-1", "test@localhost")
+	oCfg := config.Oidc{SessionCookieName: "MY_SESSION"}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaims))
 	svc := auth.New(oCfg, provider)
 	app := fiber.New()
@@ -58,7 +59,7 @@ func TestOAuthMiddlewareWithCustomCookieName(t *testing.T) {
 	req := test.NewRequest(
 		test.WithMethod(http.MethodGet),
 		test.WithURL("/test"),
-		test.WithCookie(oCfg.SessionCookieName, provider.Token(validClaims).Encode()),
+		test.WithCookie("MY_SESSION", test.Base64Encoded(t, provider.Token("test-1"))),
 	)
 
 	resp, err := app.Test(req)
@@ -68,7 +69,7 @@ func TestOAuthMiddlewareWithCustomCookieName(t *testing.T) {
 }
 
 func TestOAuthMiddlewareError(t *testing.T) {
-	cfg := auth.OidcConfig{SessionCookieName: "SESSION"}
+	cfg := config.Oidc{SessionCookieName: "SESSION"}
 	provider := auth.NewFakeProvider()
 	svc := auth.New(cfg, provider)
 	cases := []struct {
@@ -78,8 +79,11 @@ func TestOAuthMiddlewareError(t *testing.T) {
 		{
 			name: "invalid access token",
 			cookie: &http.Cookie{
-				Name:  cfg.SessionCookieName,
-				Value: provider.Token(auth.NewClaims("invalid", "")).Encode(),
+				Name: cfg.SessionCookieName,
+				Value: test.Base64Encoded(t, &auth.JWT{
+					Provider:    provider.GetName(),
+					AccessToken: "invalidToken",
+				}),
 			},
 		},
 		{

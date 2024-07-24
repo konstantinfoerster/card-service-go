@@ -4,41 +4,21 @@ import (
 	"context"
 	"testing"
 
-	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/common/detect"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/test"
+	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var detectRepo cards.DetectRepository
-
-func TestIntegrationardRepository(t *testing.T) {
+func TestTop5MatchesByHash(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
 
-	cfg := config.Images{
-		Host: "http://localhost/",
-	}
-	runner := test.NewRunner()
-	runner.Run(t, func(t *testing.T) {
-		detectRepo = postgres.NewDetectRepository(runner.Connection(), cfg)
-
-		t.Run("top 5 matches by hash", top5MatchesByHash)
-		t.Run("top 5 matches by hash no result", top5MatchesByHashNoResult)
-
-		t.Run("top 5 matches by collector and hash", top5MatchesByCollectorAndHash)
-		t.Run("top 5 matches by collector and hash no result", top5MatchesByCollectorAndHashNoResult)
-	})
-}
-
-func top5MatchesByHash(t *testing.T) {
-	ctx := context.Background()
-	unknownHash := detect.Hash{Value: []uint64{1, 2, 3, 4}}
-	hash := detect.Hash{
+	detectRepo := postgres.NewDetectRepository(connection, config.Images{})
+	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
+	hash := image.Hash{
 		Value: []uint64{
 			9223372036854775807,
 			8828676655832293646,
@@ -47,6 +27,7 @@ func top5MatchesByHash(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	result, err := detectRepo.Top5MatchesByHash(ctx, unknownHash, hash, unknownHash)
 
 	require.NoError(t, err)
@@ -58,21 +39,29 @@ func top5MatchesByHash(t *testing.T) {
 	}
 }
 
-func top5MatchesByHashNoResult(t *testing.T) {
-	ctx := context.Background()
-	unknownHash := detect.Hash{Value: []uint64{1, 2, 3, 4}}
+func Top5MatchesByHashNoResult(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{}
+	detectRepo := postgres.NewDetectRepository(connection, cfg)
+	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
 
+	ctx := context.Background()
 	result, err := detectRepo.Top5MatchesByHash(ctx, unknownHash)
 
 	require.NoError(t, err)
 	require.Empty(t, result)
 }
 
-func top5MatchesByCollectorAndHash(t *testing.T) {
-	ctx := context.Background()
-	c := cards.Collector{ID: "myUser"}
-	unknownHash := detect.Hash{Value: []uint64{1, 2, 3, 4}}
-	hash := detect.Hash{
+func Top5MatchesByCollectorAndHash(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{}
+	detectRepo := postgres.NewDetectRepository(connection, cfg)
+	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
+	hash := image.Hash{
 		Value: []uint64{
 			9223372036854775807,
 			8828676655832293646,
@@ -81,7 +70,8 @@ func top5MatchesByCollectorAndHash(t *testing.T) {
 		},
 	}
 
-	result, err := detectRepo.Top5MatchesByCollectorAndHash(ctx, c, unknownHash, hash, unknownHash)
+	ctx := context.Background()
+	result, err := detectRepo.Top5MatchesByCollectorAndHash(ctx, collector, unknownHash, hash, unknownHash)
 
 	require.NoError(t, err)
 	require.Len(t, result, 3)
@@ -94,12 +84,16 @@ func top5MatchesByCollectorAndHash(t *testing.T) {
 	assert.Empty(t, result[2].Amount)
 }
 
-func top5MatchesByCollectorAndHashNoResult(t *testing.T) {
-	ctx := context.Background()
-	c := cards.Collector{ID: "myUser"}
-	unknownHash := detect.Hash{Value: []uint64{1, 2, 3, 4}}
+func Top5MatchesByCollectorAndHashNoResult(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := config.Images{}
+	detectRepo := postgres.NewDetectRepository(connection, cfg)
+	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
 
-	result, err := detectRepo.Top5MatchesByCollectorAndHash(ctx, c, unknownHash)
+	ctx := context.Background()
+	result, err := detectRepo.Top5MatchesByCollectorAndHash(ctx, collector, unknownHash)
 
 	require.NoError(t, err)
 	require.Empty(t, result)

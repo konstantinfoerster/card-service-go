@@ -1,4 +1,4 @@
-package commonio
+package aio
 
 import (
 	"io"
