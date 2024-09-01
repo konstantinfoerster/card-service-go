@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -22,11 +21,13 @@ func Connect(ctx context.Context, config config.Database) (*DBConnection, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config from URL %w", err)
 	}
+
 	c.MaxConnLifetime = time.Second * time.Duration(5)
 	c.MaxConnIdleTime = time.Millisecond * time.Duration(500)
 	c.HealthCheckPeriod = time.Millisecond * time.Duration(500)
-	var maxConnBuffer int32 = 5 // + 5 just in case
-	c.MaxConns = int32(runtime.NumCPU()) + maxConnBuffer
+	if config.MaxConns > 0 {
+		c.MaxConns = config.MaxConns
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, c)
 	if err != nil {

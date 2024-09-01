@@ -155,7 +155,7 @@ func requiredQuery(c *fiber.Ctx, name string) (string, error) {
 
 func required(value, name string) (string, error) {
 	if strings.TrimSpace(value) == "" {
-		sErr := fmt.Errorf(name + " must not be empty")
+		sErr := fmt.Errorf("%s must not be empty", name)
 
 		return "", aerrors.NewInvalidInputError(sErr, "required-parameter", sErr.Error())
 	}

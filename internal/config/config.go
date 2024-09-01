@@ -25,6 +25,7 @@ type Database struct {
 	Database string `yaml:"database"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+	MaxConns int32  `yaml:"max_conns"`
 }
 
 func (d Database) ConnectionURL() string {

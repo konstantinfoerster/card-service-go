@@ -55,7 +55,7 @@ func (r *postgresCollectionRepository) ByID(ctx context.Context, id int) (cards.
 	var entry dbCard
 	if err := row.Scan(&entry.CardID, &entry.Name, &entry.Image); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return cards.Card{}, fmt.Errorf("card with id %d not found,  %w", id, cards.ErrCardNotFound)
+			return cards.Card{}, fmt.Errorf("card with id %d not found, %w", id, cards.ErrCardNotFound)
 		}
 
 		return cards.Card{}, fmt.Errorf("failed to execute card scan after select %w", err)
