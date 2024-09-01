@@ -29,7 +29,7 @@ linters:
     - errname # checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
     - errorlint # linter that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
     - exhaustive # checks exhaustiveness of enum switch statements
-    - exportloopref # checks for pointers to enclosing loop variables
+    # - exportloopref # checks for pointers to enclosing loop variables # deprecated with go 1.22
     - forbidigo # Forbids identifiers
     - funlen # detects long functions
     - gocheckcompilerdirectives # Checks that go compiler directive comments (//go:) are valid

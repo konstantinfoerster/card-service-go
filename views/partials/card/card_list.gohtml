@@ -15,7 +15,7 @@
           </div>
           {{- if and ($.Page.HasMore) (isLastIndex $index $length) -}}
             <div class="card-image-wrapper hidden-card"
-                 hx-get="/api/v1/cards?name={{ $.Query.Name}}&page={{ $.Page.NextPage }}"
+                 hx-get="/api/v1/cards?name={{ $.SearchTerm}}&page={{ $.Page.NextPage }}"
                  hx-trigger="revealed"
                  hx-swap="outerHTML"
             ></div>

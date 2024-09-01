@@ -6,23 +6,22 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	collectionadapter "github.com/konstantinfoerster/card-service-go/internal/collection/adapter"
-	collection "github.com/konstantinfoerster/card-service-go/internal/collection/application"
-	"github.com/konstantinfoerster/card-service-go/internal/common"
-	"github.com/konstantinfoerster/card-service-go/internal/common/auth/oidc"
-	"github.com/konstantinfoerster/card-service-go/internal/common/config"
-	"github.com/konstantinfoerster/card-service-go/internal/common/img"
-	commonio "github.com/konstantinfoerster/card-service-go/internal/common/io"
-	"github.com/konstantinfoerster/card-service-go/internal/common/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/common/server"
-	loginadapter "github.com/konstantinfoerster/card-service-go/internal/login/adapter"
+	"github.com/konstantinfoerster/card-service-go/internal/aio"
+	"github.com/konstantinfoerster/card-service-go/internal/api/web"
+	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
+	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
+	cardspg "github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
+	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
@@ -68,41 +67,44 @@ func main() {
 
 func run(cfg *config.Config) error {
 	ctx := context.Background()
-	dbCon, err := postgres.Connect(ctx, cfg.Database)
+	dbCon, err := cardspg.Connect(ctx, cfg.Database)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database %w", err)
 	}
-	defer commonio.Close(dbCon)
+	defer aio.Close(dbCon)
 
-	client := &http.Client{
-		Timeout: time.Second * time.Duration(5),
-	}
-	oidcProvider, err := oidc.FromConfiguration(cfg.Oidc, client)
+	oidcProvider, err := auth.FromConfiguration(cfg.Oidc)
 	if err != nil {
 		return fmt.Errorf("failed to load oidc provider, %w", err)
 	}
 
-	timeService := common.NewTimeService()
-	authService := oidc.New(cfg.Oidc, oidcProvider)
-	detector := img.NewDetector()
-	hasher := img.NewPHasher()
+	timeSvc := auth.NewTimeService()
+	authSvc := auth.New(cfg.Oidc, oidcProvider...)
+	detector := image.NewDetector()
+	hasher := image.NewPHasher()
 
-	searchRepo := collectionadapter.NewSearchRepository(dbCon, cfg.Images)
-	searchService := collection.NewSearchService(searchRepo, detector, hasher)
+	searchRepo := postgres.NewCardRepository(dbCon, cfg.Images)
+	searchSvc := cards.NewCardService(searchRepo)
 
-	collectionRep := collectionadapter.NewCollectionRepository(dbCon, cfg.Images)
-	collectService := collection.NewCollectionService(collectionRep, searchRepo)
+	collectionRep := postgres.NewCollectionRepository(dbCon, cfg.Images)
+	collectSvc := cards.NewCollectionService(collectionRep)
 
-	srv := server.NewHTTPServer(&cfg.Server).RegisterRoutes(func(r fiber.Router) {
+	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
+	detectSvc := cards.NewDetectService(detectRep, detector, hasher)
+
+	authMiddleware := web.NewAuthMiddleware(cfg.Oidc, authSvc)
+
+	srv := web.NewHTTPServer(cfg.Server).RegisterRoutes(func(r fiber.Router) {
 		r.Static("/public", "./public")
 
-		collectionadapter.DashboardRoutes(r, cfg.Oidc, authService)
-		collectionadapter.SearchRoutes(r, cfg.Oidc, authService, searchService)
-		collectionadapter.CollectRoutes(r, cfg.Oidc, authService, collectService)
+		cardsapi.DashboardRoutes(r, authMiddleware)
+		cardsapi.SearchRoutes(r, authMiddleware, searchSvc)
+		cardsapi.CollectionRoutes(r, authMiddleware, collectSvc)
+		cardsapi.DetectRoutes(r, authMiddleware, detectSvc)
 
 		apiV1 := r.Group("/api").Group("/v1")
 
-		loginadapter.Routes(apiV1, cfg.Oidc, authService, timeService)
+		loginapi.Routes(apiV1, authMiddleware, cfg.Oidc, authSvc, timeSvc)
 	})
 
 	return srv.Run()

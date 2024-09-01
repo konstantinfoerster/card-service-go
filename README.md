@@ -42,7 +42,7 @@ For mor information check: https://github.com/golang/go/wiki/Modules#how-to-upgr
 
 The linter [Hadolint](https://github.com/hadolint/hadolint) can be used to apply best practice on your Dockerfile.
 
-Just run `docker run --pull always --rm -i hadolint/hadolint < Dockerfile` to check your Dockerfile.
+Just run `docker run --pull always --rm -i hadolint/hadolint < build/Dockerfile` to check your Dockerfile.
 
 ### Golang linting
 
