@@ -42,7 +42,7 @@ func TestCollectNoneExistingItem(t *testing.T) {
 func newCollectionService(t *testing.T) cards.CollectionService {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
-	repo, err := memory.NewCollectionRepository(seed)
+	repo, err := memory.NewCardRepository(seed, nil)
 	require.NoError(t, err)
 
 	return cards.NewCollectionService(repo)

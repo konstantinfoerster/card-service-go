@@ -16,8 +16,7 @@ type Match struct {
 type Matches []Match
 
 type DetectRepository interface {
-	Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (Matches, error)
-	Top5MatchesByCollectorAndHash(ctx context.Context, collector Collector, hashes ...image.Hash) (Matches, error)
+	Top5MatchesByHash(ctx context.Context, c Collector, hashes ...image.Hash) (Matches, error)
 }
 
 type DetectService interface {
@@ -38,7 +37,7 @@ func NewDetectService(repo DetectRepository, detector image.Detector, hasher ima
 	}
 }
 
-func (s *detectService) Detect(ctx context.Context, collector Collector, in io.Reader) (Matches, error) {
+func (s *detectService) Detect(ctx context.Context, c Collector, in io.Reader) (Matches, error) {
 	result, err := s.detector.Detect(in)
 	if err != nil {
 		return nil, aerrors.NewUnknownError(err, "detection-failed")
@@ -59,16 +58,7 @@ func (s *detectService) Detect(ctx context.Context, collector Collector, in io.R
 		hashes = append(hashes, rhash)
 	}
 
-	if collector.ID == "" {
-		r, err := s.repo.Top5MatchesByHash(ctx, hashes...)
-		if err != nil {
-			return nil, aerrors.NewUnknownError(err, "unable-to-execute-hash-search")
-		}
-
-		return r, nil
-	}
-
-	r, err := s.repo.Top5MatchesByCollectorAndHash(ctx, collector, hashes...)
+	r, err := s.repo.Top5MatchesByHash(ctx, c, hashes...)
 	if err != nil {
 		return nil, aerrors.NewUnknownError(err, "unable-to-execute-hash-search")
 	}

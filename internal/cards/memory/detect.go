@@ -32,7 +32,7 @@ func NewDetectRepository(
 }
 
 func (r InMemDetectRepository) hash(c cards.Card) (image.Hash, error) {
-	fImg, err := os.Open(path.Join(r.cfg.Host, c.Image))
+	fImg, err := os.Open(path.Join(r.cfg.Host, c.Image.URL))
 	if err != nil {
 		return image.Hash{}, err
 	}
@@ -46,30 +46,18 @@ func (r InMemDetectRepository) hash(c cards.Card) (image.Hash, error) {
 	return r.hasher.Hash(img)
 }
 
-func (r InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (cards.Matches, error) {
+func (r InMemDetectRepository) Top5MatchesByHash(
+	ctx context.Context, c cards.Collector, hashes ...image.Hash) (cards.Matches, error) {
 	result, err := r.allMatchesByHash(ctx, hashes...)
 	if err != nil {
 		return nil, err
 	}
 
-	limit := 5
-	if len(result) > limit {
-		return result[:limit], nil
-	}
-
-	return result, nil
-}
-
-func (r InMemDetectRepository) Top5MatchesByCollectorAndHash(
-	ctx context.Context, collector cards.Collector, hashes ...image.Hash) (cards.Matches, error) {
-	result, err := r.allMatchesByHash(ctx, hashes...)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range r.collected[collector.ID] {
-		for i := range result {
-			result[i].Amount = c.Amount
+	if c.ID != "" {
+		for _, c := range r.collected[c.ID] {
+			for i := range result {
+				result[i].Amount = c.Amount
+			}
 		}
 	}
 
@@ -84,7 +72,7 @@ func (r InMemDetectRepository) Top5MatchesByCollectorAndHash(
 func (r InMemDetectRepository) allMatchesByHash(_ context.Context, hashes ...image.Hash) (cards.Matches, error) {
 	var result cards.Matches
 	for _, card := range r.cards {
-		if card.Image == "" {
+		if card.Image.URL == "" {
 			continue
 		}
 

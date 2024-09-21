@@ -205,6 +205,8 @@ CREATE TABLE card_face
     card_id             INTEGER REFERENCES card (id) ON DELETE CASCADE
 );
 
+CREATE INDEX idx_card_face_name_card_id on card_face(card_id, name);
+
 CREATE TABLE card_translation
 (
     id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

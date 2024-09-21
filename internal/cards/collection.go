@@ -2,7 +2,6 @@ package cards
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
@@ -33,30 +32,24 @@ func RemoveItem(id int) (Collectable, error) {
 	return NewCollectable(id, 0)
 }
 
-type CollectionRepository interface {
-	ByID(ctx context.Context, id int) (Card, error)
-	FindCollectedByName(ctx context.Context, name string, c Collector, p Page) (Cards, error)
-	Upsert(ctx context.Context, item Collectable, c Collector) error
-	Remove(ctx context.Context, item Collectable, c Collector) error
-}
-
 type CollectionService interface {
 	Search(ctx context.Context, name string, c Collector, p Page) (Cards, error)
 	Collect(ctx context.Context, item Collectable, c Collector) (Collectable, error)
 }
 
 type collectionService struct {
-	collectionRepo CollectionRepository
+	cardRepo CardRepository
 }
 
-func NewCollectionService(collectionRepo CollectionRepository) CollectionService {
+func NewCollectionService(cRepo CardRepository) CollectionService {
 	return &collectionService{
-		collectionRepo: collectionRepo,
+		cardRepo: cRepo,
 	}
 }
 
 func (s *collectionService) Search(ctx context.Context, name string, c Collector, page Page) (Cards, error) {
-	r, err := s.collectionRepo.FindCollectedByName(ctx, name, c, page)
+	filter := NewFilter().WithName(name).WithCollector(c).WithOnlyCollected()
+	r, err := s.cardRepo.Find(ctx, filter, page)
 	if err != nil {
 		return Empty(page), aerrors.NewUnknownError(err, "unable-to-execute-search-in-collected")
 	}
@@ -65,27 +58,27 @@ func (s *collectionService) Search(ctx context.Context, name string, c Collector
 }
 
 func (s *collectionService) Collect(ctx context.Context, item Collectable, c Collector) (Collectable, error) {
-	_, err := s.collectionRepo.ByID(ctx, item.ID)
+	exist, err := s.cardRepo.Exist(ctx, item.ID)
 	if err != nil {
-		if errors.Is(err, ErrCardNotFound) {
-			msg := fmt.Sprintf("item with id %d not found", item.ID)
-
-			return Collectable{}, aerrors.NewInvalidInputError(err, "unable-to-find-item", msg)
-		}
-
 		return Collectable{}, aerrors.NewUnknownError(err, "unable-to-find-item")
 	}
 
+	if !exist {
+		msg := fmt.Sprintf("item with id %d not found", item.ID)
+
+		return Collectable{}, aerrors.NewInvalidInputError(err, "unable-to-find-item", msg)
+	}
+
 	if item.Amount == 0 {
-		if err := s.collectionRepo.Remove(ctx, item, c); err != nil {
+		if err := s.cardRepo.Remove(ctx, item, c); err != nil {
 			return Collectable{}, aerrors.NewUnknownError(err, "unable-to-remove-item")
 		}
 
 		return item, nil
 	}
 
-	if err := s.collectionRepo.Upsert(ctx, item, c); err != nil {
-		return Collectable{}, aerrors.NewUnknownError(err, "unable-to-upsert-item")
+	if err := s.cardRepo.Collect(ctx, item, c); err != nil {
+		return Collectable{}, aerrors.NewUnknownError(err, "unable-to-collect-item")
 	}
 
 	return item, nil

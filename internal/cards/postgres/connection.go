@@ -34,8 +34,7 @@ func Connect(ctx context.Context, config config.Database) (*DBConnection, error)
 		return nil, fmt.Errorf("failed to create pool %w", err)
 	}
 
-	err = pool.Ping(ctx)
-	if err != nil {
+	if err = pool.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping database %w", err)
 	}
 

@@ -11,17 +11,12 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/image"
 )
 
-type DetectRepository interface {
-	Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (cards.Matches, error)
-	Top5MatchesByCollectorAndHash(ctx context.Context, c cards.Collector, hashes ...image.Hash) (cards.Matches, error)
-}
-
 type postgresDetectRepository struct {
 	db  *DBConnection
 	cfg config.Images
 }
 
-func NewDetectRepository(connection *DBConnection, cfg config.Images) DetectRepository {
+func NewDetectRepository(connection *DBConnection, cfg config.Images) cards.DetectRepository {
 	return &postgresDetectRepository{
 		db:  connection,
 		cfg: cfg,
@@ -29,14 +24,27 @@ func NewDetectRepository(connection *DBConnection, cfg config.Images) DetectRepo
 }
 
 func (r *postgresDetectRepository) Top5MatchesByHash(ctx context.Context,
-	hashes ...image.Hash) (cards.Matches, error) {
+	c cards.Collector, hashes ...image.Hash) (cards.Matches, error) {
 	defer cards.TimeTracker(time.Now(), "Top5MatchesByHash")
 	if len(hashes) == 0 {
 		return cards.Matches{}, nil
 	}
 
 	limit := 5
-	params := []any{limit, r.cfg.Host, cards.DefaultLang}
+	params := []any{limit, r.cfg.Host}
+	joinCollector := ""
+	amountColumn := ", 0"
+	if c.ID != "" {
+		amountColumn = ",coalesce(card_collection.amount, 0) "
+		joinCollector = `
+        LEFT JOIN
+            card_collection
+		ON
+			face.card_id = card_collection.card_id
+        AND
+            card_collection.user_id = $3`
+		params = append(params, c.ID)
+	}
 	var sb strings.Builder
 	sb.WriteString("LEAST(")
 	for i, hash := range hashes {
@@ -57,25 +65,34 @@ func (r *postgresDetectRepository) Top5MatchesByHash(ctx context.Context,
 
 	query := fmt.Sprintf(`
 		SELECT
-			 face.card_id, face.name,
+			 face.card_id, face.name, set.code, set.name,
 		     NULLIF(CONCAT($2::text, max(image.image_path)), $2::text),
              %s as score
+             %s
 		FROM
+            card AS card
+        INNER JOIN
+            card_set AS set
+        ON
+            card.card_set_code = set.code
+        INNER JOIN
 			card_face AS face
-	    JOIN
+        ON
+           card.id = face.card_id
+	    INNER JOIN
 			card_image as image
 		ON
 			face.card_id = image.card_id
-		AND
-			(face.id = image.face_id OR image.face_id IS NULL) 
+        %s
 		WHERE
-            (image.lang_lang = $3 OR image.lang_lang IS NULL) AND
+			(face.id = image.face_id OR image.face_id IS NULL) 
+		AND
             CAST(%s as int) < 60
 		GROUP BY
-			face.card_id, face.name, image.phash1, image.phash2, image.phash3, image.phash4
+			face.card_id, face.name, set.code, image.phash1, image.phash2, image.phash3, image.phash4
 		ORDER BY
 			%s, face.name
-		LIMIT $1`, sb.String(), sb.String(), sb.String())
+		LIMIT $1`, sb.String(), amountColumn, joinCollector, sb.String(), sb.String())
 	rows, err := r.db.Conn.Query(ctx, query, params...)
 	if err != nil {
 		return cards.Matches{}, fmt.Errorf("failed to execute top 5 phash select %w", err)
@@ -85,88 +102,19 @@ func (r *postgresDetectRepository) Top5MatchesByHash(ctx context.Context,
 	var result cards.Matches
 	for rows.Next() {
 		var entry matchDBCard
-		if err = rows.Scan(&entry.CardID, &entry.Name, &entry.Image, &entry.Score); err != nil {
+		err = rows.Scan(
+			&entry.CardID,
+			&entry.Name,
+			&entry.SetCode,
+			&entry.SetName,
+			&entry.ImageURL,
+			&entry.Score,
+			&entry.Amount,
+		)
+		if err != nil {
 			return cards.Matches{}, fmt.Errorf("failed to execute card scan after select %w", err)
 		}
-		result = append(result, toCardMatch(&entry))
-	}
-	if rows.Err() != nil {
-		return cards.Matches{}, fmt.Errorf("failed to read next row %w", rows.Err())
-	}
-
-	return result, err
-}
-
-func (r *postgresDetectRepository) Top5MatchesByCollectorAndHash(ctx context.Context,
-	c cards.Collector, hashes ...image.Hash) (cards.Matches, error) {
-	defer cards.TimeTracker(time.Now(), "Top5MatchesByHashAndCollector")
-
-	if len(hashes) == 0 {
-		return cards.Matches{}, nil
-	}
-
-	limit := 5
-	params := []any{limit, r.cfg.Host, cards.DefaultLang, c.ID}
-	var sb strings.Builder
-	sb.WriteString("LEAST(")
-	for i, hash := range hashes {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString("(")
-		for x, v := range hash.AsBase2() {
-			if x > 0 {
-				sb.WriteString("+")
-			}
-			params = append(params, v)
-			sb.WriteString(fmt.Sprintf("BIT_COUNT(image.phash%d # $%d)", x+1, len(params)))
-		}
-		sb.WriteString(")")
-	}
-	sb.WriteString(")")
-
-	query := fmt.Sprintf(`
-		SELECT
-			face.card_id, face.name,
-		    NULLIF(CONCAT($2::text, max(image.image_path)), $2::text),
-            coalesce(min(card_collection.amount), 0),
-            %s as score
-		FROM
-			card_face AS face
-		LEFT JOIN
-			card_collection
-		ON
-			face.card_id = card_collection.card_id
-		AND
-			card_collection.user_id = $4
-		LEFT JOIN
-			card_image as image
-		ON
-			face.card_id = image.card_id
-		AND
-			(face.id = image.face_id OR image.face_id IS NULL) 
-		WHERE
-            (image.lang_lang = $3 OR image.lang_lang IS NULL) AND
-            image.phash1 IS NOT NULL AND
-            CAST(%s as int) < 60
-		GROUP BY
-			face.card_id, face.name, image.phash1, image.phash2, image.phash3, image.phash4
-		ORDER BY
-			%s, face.name
-		LIMIT $1`, sb.String(), sb.String(), sb.String())
-	rows, err := r.db.Conn.Query(ctx, query, params...)
-	if err != nil {
-		return cards.Matches{}, fmt.Errorf("failed to execute top 5 phash with collector select %w", err)
-	}
-	defer rows.Close()
-
-	var result cards.Matches
-	for rows.Next() {
-		var entry matchDBCard
-		if err = rows.Scan(&entry.CardID, &entry.Name, &entry.Image, &entry.Amount, &entry.Score); err != nil {
-			return cards.Matches{}, fmt.Errorf("failed to execute card scan after select %w", err)
-		}
-		result = append(result, toCardMatch(&entry))
+		result = append(result, toCardMatch(entry))
 	}
 	if rows.Err() != nil {
 		return cards.Matches{}, fmt.Errorf("failed to read next row %w", rows.Err())
@@ -180,14 +128,9 @@ type matchDBCard struct {
 	Score int
 }
 
-func toCardMatch(dbCard *matchDBCard) cards.Match {
+func toCardMatch(dbCard matchDBCard) cards.Match {
 	return cards.Match{
-		Card: cards.Card{
-			ID:     dbCard.CardID,
-			Name:   dbCard.Name,
-			Image:  dbCard.Image.String,
-			Amount: dbCard.Amount,
-		},
+		Card:  toCard(dbCard.dbCard),
 		Score: dbCard.Score,
 	}
 }

@@ -53,6 +53,10 @@ func NewPage(page, size int) Page {
 	}
 }
 
+func DefaultPage() Page {
+	return NewPage(0, 0)
+}
+
 type PagedResult[T any] struct {
 	Result  []T
 	HasMore bool

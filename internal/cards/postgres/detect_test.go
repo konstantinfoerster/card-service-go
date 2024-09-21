@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/image"
@@ -28,7 +29,7 @@ func TestTop5MatchesByHash(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	result, err := detectRepo.Top5MatchesByHash(ctx, unknownHash, hash, unknownHash)
+	result, err := detectRepo.Top5MatchesByHash(ctx, cards.Collector{}, unknownHash, hash, unknownHash)
 
 	require.NoError(t, err)
 	require.Len(t, result, 3)
@@ -48,7 +49,7 @@ func Top5MatchesByHashNoResult(t *testing.T) {
 	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
 
 	ctx := context.Background()
-	result, err := detectRepo.Top5MatchesByHash(ctx, unknownHash)
+	result, err := detectRepo.Top5MatchesByHash(ctx, cards.Collector{}, unknownHash)
 
 	require.NoError(t, err)
 	require.Empty(t, result)
@@ -71,7 +72,7 @@ func Top5MatchesByCollectorAndHash(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	result, err := detectRepo.Top5MatchesByCollectorAndHash(ctx, collector, unknownHash, hash, unknownHash)
+	result, err := detectRepo.Top5MatchesByHash(ctx, collector, unknownHash, hash, unknownHash)
 
 	require.NoError(t, err)
 	require.Len(t, result, 3)
@@ -93,7 +94,7 @@ func Top5MatchesByCollectorAndHashNoResult(t *testing.T) {
 	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
 
 	ctx := context.Background()
-	result, err := detectRepo.Top5MatchesByCollectorAndHash(ctx, collector, unknownHash)
+	result, err := detectRepo.Top5MatchesByHash(ctx, collector, unknownHash)
 
 	require.NoError(t, err)
 	require.Empty(t, result)

@@ -1,3 +1,25 @@
+-- card sets
+INSERT INTO card_set(code, name, type, total_count)
+VALUES ('M10', 'Magic 2010', 'CORE', 100);
+
+INSERT INTO card_set(code, name, type, total_count)
+VALUES ('M11', 'Magic 2011', 'CORE', 100);
+
+INSERT INTO card_set(code, name, type, total_count)
+VALUES ('M12', 'Magic 2012', 'CORE', 100);
+
+INSERT INTO card_set(code, name, type, total_count)
+VALUES ('M13', 'Magic 2013', 'CORE', 100);
+
+INSERT INTO card_set(code, name, type, total_count)
+VALUES ('M14', 'Magic 2014', 'CORE', 100);
+
+INSERT INTO card_set(code, name, type, total_count)
+VALUES ('M15', 'Magic 2015', 'CORE', 100);
+
+INSERT INTO card_set(code, name, type, total_count)
+VALUES ('M16', 'Magic 2016', 'CORE', 100);
+
 -- Card 1
 INSERT INTO card(name, number, rarity, border, layout, card_set_code)
 VALUES ('Dummy Card 1', '1', 'COMMON', 'WHITE', 'NORMAL', 'M10');
@@ -25,6 +47,8 @@ INSERT INTO card_face(card_id, name, converted_mana_cost)
 VALUES (3, 'Dummy Card 3', 0);
 INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
 VALUES (3, 3, 'images/dummyCard3.png', 'eng', 'png');
+INSERT INTO card_collection(card_id, user_id, amount)
+VALUES (3, 'otherUser', 2);
 
 -- Card 4
 INSERT INTO card(name, number, rarity, border, layout, card_set_code)
@@ -73,7 +97,6 @@ INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
 VALUES (9, 8, 'images/BackFace.png', 'eng', 'png');
 INSERT INTO card_collection(card_id, user_id, amount)
 VALUES (8, 'myUser', 2);
-
 -- Card 9, face 10 is not collected
 INSERT INTO card(name, number, rarity, border, layout, card_set_code)
 VALUES ('Uncollected Card 1', '1', 'COMMON', 'WHITE', 'NORMAL', 'M14');
@@ -153,3 +176,30 @@ VALUES (15, 14, 'images/card14hash.png', 'eng', 'png',
 );
 INSERT INTO card_collection(card_id, user_id, amount)
 VALUES (14, 'myUser', 1);
+
+
+-- Card 15 with same name as card 1 but different set
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Dummy Card 1', '10', 'COMMON', 'WHITE', 'NORMAL', 'M16');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (15, 'Dummy Card 1', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (16, 15, 'images/dummyCard15.png', 'eng', 'png');
+INSERT INTO card_collection(card_id, user_id, amount)
+VALUES (15, 'myUser', 1);
+
+-- Card 16 with same name as card 1 but different set
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Baa Card', '20', 'COMMON', 'WHITE', 'NORMAL', 'M16');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (16, 'Baa Card', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (17, 16, 'images/dummyCard16.png', 'eng', 'png');
+
+-- Card 17 with same name as card 1 but different set
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Aa Card', '30', 'COMMON', 'WHITE', 'NORMAL', 'M16');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (17, 'Aa Card', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (18, 17, 'images/dummyCard17.png', 'eng', 'png');

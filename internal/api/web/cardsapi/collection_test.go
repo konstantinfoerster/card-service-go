@@ -291,7 +291,7 @@ func TestCollectItemNoSession(t *testing.T) {
 func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
-	repo, err := memory.NewCollectionRepository(seed)
+	repo, err := memory.NewCardRepository(seed, nil)
 	require.NoError(t, err)
 
 	collectSvc := cards.NewCollectionService(repo)

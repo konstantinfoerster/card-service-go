@@ -28,7 +28,7 @@ func newPagedResponse(pr cards.Cards) *PagedResponse[Card] {
 		data[i] = Card{
 			Item:  newItem(c.ID, c.Amount),
 			Name:  c.Name,
-			Image: c.Image,
+			Image: c.Image.URL,
 		}
 	}
 
@@ -44,6 +44,7 @@ type Card struct {
 	Score *int   `json:"score,omitempty"`
 	Name  string `json:"name"`
 	Image string `json:"image,omitempty"`
+	Set   Set    `json:"set"`
 	Item
 }
 
@@ -51,6 +52,11 @@ func (c Card) WithScore(v int) Card {
 	c.Score = &v
 
 	return c
+}
+
+type Set struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
 func newItem(id int, amount int) Item {

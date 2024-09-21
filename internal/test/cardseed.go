@@ -24,19 +24,19 @@ func CardSeed() ([]cards.Card, error) {
 
 	cards10E, err := readFromJSON(filepath.Join(dir, "testdata/cards10E.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read cards10E.json, %w", err)
 	}
 	cc = append(cc, cards10E...)
 
 	cards2ED, err := readFromJSON(filepath.Join(dir, "testdata/cards2ED.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read cards2ED.json, %w", err)
 	}
 	cc = append(cc, cards2ED...)
 
 	cards2X2, err := readFromJSON(filepath.Join(dir, "testdata/cards2X2.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read cards2X2.json, %w", err)
 	}
 	cc = append(cc, cards2X2...)
 

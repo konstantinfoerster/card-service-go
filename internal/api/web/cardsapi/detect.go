@@ -53,7 +53,7 @@ func newMatchesResponse(matches cards.Matches) *PagedResponse[Card] {
 		data[i] = Card{
 			Item:  newItem(m.ID, m.Amount),
 			Name:  m.Name,
-			Image: m.Image,
+			Image: m.Image.URL,
 			Score: &s,
 		}
 	}

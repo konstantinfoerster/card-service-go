@@ -164,7 +164,8 @@ func (r *databaseRunner) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	return r.container.Terminate(ctx)
+	// return r.container.Terminate(ctx)
+	return nil
 }
 
 func (r *databaseRunner) Config() config.Database {

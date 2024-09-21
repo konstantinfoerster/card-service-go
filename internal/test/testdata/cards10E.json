@@ -3,91 +3,93 @@
     "id": 1,
     "name": "Ancestor's Chosen",
     "number": "1",
-    "rarity": "UNCOMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E",
-    "image": "cardImage.jpg"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    },
+    "image": {
+      "URL": "cardImage.jpg"
+    }
   },
   {
     "id": 56,
     "name": "Beacon of Immortality",
     "number": "10",
-    "rarity": "RARE",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 33,
     "name": "Remove Soul",
     "number": "100",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 700,
     "name": "Robe of Mirrors",
     "number": "101",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 563,
     "name": "Robe of Mirrors",
     "number": "101★",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 34,
     "name": "Rootwater Commando",
     "number": "102",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 32,
     "name": "Rootwater Commando",
     "number": "102★",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 35,
     "name": "Rootwater Matriarch",
     "number": "103",
-    "rarity": "RARE",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 281,
     "name": "Sage Owl",
     "number": "104",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
     "id": 282,
     "name": "Sage Owl",
     "number": "104★",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   }
 ]
