@@ -84,7 +84,9 @@ func (s *Server) RegisterRoutes(routes func(app fiber.Router)) *Server {
 }
 
 func (s *Server) Test(req *http.Request) (*http.Response, error) {
-	return s.app.Test(req)
+	noTimeout := -1
+
+	return s.app.Test(req, noTimeout)
 }
 
 func (s *Server) Run() error {
