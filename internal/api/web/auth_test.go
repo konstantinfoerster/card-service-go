@@ -14,7 +14,7 @@ import (
 func TestUserFromCtx(t *testing.T) {
 	app := fiber.New()
 	app.Get("/test", func(c *fiber.Ctx) error {
-		c.Locals(web.UserContextKey, &web.User{})
+		c.Locals(web.UserContextKey, web.User{ID: "myuser"})
 
 		user, err := web.UserFromCtx(c)
 
@@ -65,7 +65,7 @@ func TestUserFromCtxInvalidInput(t *testing.T) {
 
 				user, err := web.UserFromCtx(c)
 
-				assert.Nil(t, user)
+				assert.Equal(t, web.User{}, user)
 				require.ErrorIs(t, err, web.ErrNoUserInContext)
 
 				return nil

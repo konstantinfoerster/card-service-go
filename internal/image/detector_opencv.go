@@ -18,8 +18,8 @@ import (
 	"golang.org/x/image/draw"
 )
 
-var ErrNoContours = fmt.Errorf("no contours found")
-var ErrNoCardContours = fmt.Errorf("after restrictions, %w", ErrNoContours)
+var ErrNoContours = errors.New("no contours found")
+var ErrNoCardContours = errors.Join(errors.New("after restrictions"), ErrNoContours)
 
 func NewDetector() Detector {
 	return boxDetector{}
@@ -28,10 +28,13 @@ func NewDetector() Detector {
 type boxDetector struct {
 }
 
-func (d boxDetector) Detect(img io.Reader) (Images, error) {
-	buf := new(bytes.Buffer)
+func (d boxDetector) Detect(in io.Reader) (Images, error) {
+	if in == nil {
+		return nil, ErrInvalidInput
+	}
 
-	if _, err := buf.ReadFrom(img); err != nil {
+	buf := new(bytes.Buffer)
+	if _, err := buf.ReadFrom(in); err != nil {
 		return nil, fmt.Errorf("failed to read image %w", err)
 	}
 

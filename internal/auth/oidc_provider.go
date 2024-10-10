@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,29 +15,74 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
+var (
+	ErrProviderNoConfig           = errors.New("missing provider configuration")
+	ErrProviderInvalidConfig      = errors.New("invalid provider configuration")
+	ErrProviderValidateToken      = errors.New("provider token validation failed")
+	ErrProviderCodeExchange       = errors.New("provider code exchange failed")
+	ErrProviderTokenRevoke        = errors.New("provider token revoke failed")
+	ErrProviderAuthInfo           = errors.New("provider auth info failed")
+	ErrProviderKeyMissing         = errors.New("missing provider key")
+	ErrProviderUnsupported        = errors.New("unsupported provider")
+	ErrProviderUnexpectedResponse = errors.New("provider returned unexpected response")
+)
+
+func NewProviders(provider ...Provider) Providers {
+	pp := make(map[string]Provider)
+	for _, p := range provider {
+		if p == nil {
+			continue
+		}
+
+		pp[strings.ToLower(p.GetName())] = p
+	}
+
+	return Providers{
+		provider: pp,
+	}
+}
+
+type Providers struct {
+	provider map[string]Provider
+}
+
+func (pp Providers) Find(key string) (Provider, error) {
+	if strings.TrimSpace(key) == "" {
+		return nil, ErrProviderKeyMissing
+	}
+
+	p, ok := pp.provider[strings.ToLower(key)]
+	if ok {
+		return p, nil
+	}
+
+	return nil, fmt.Errorf("%s not found, %w", key, ErrProviderUnsupported)
+}
+
 func TestProvider(cfg config.Provider, client *http.Client) Provider {
 	return &provider{
-		name:      "test",
-		authURL:   cfg.AuthURL,
-		tokenURL:  cfg.TokenURL,
-		revokeURL: cfg.RevokeURL,
-		client:    client,
-		clientID:  cfg.ClientID,
-		secret:    cfg.Secret,
-		scope:     cfg.Scope,
-		validate: func(ctx context.Context, token *JWT, clientID string) (*Claims, error) {
+		name:        "test",
+		authURL:     cfg.AuthURL,
+		tokenURL:    cfg.TokenURL,
+		revokeURL:   cfg.RevokeURL,
+		redirectURI: cfg.RedirectURI,
+		client:      client,
+		clientID:    cfg.ClientID,
+		secret:      cfg.Secret,
+		scope:       cfg.Scope,
+		validate: func(ctx context.Context, token *JWT, clientID string) (Claims, error) {
 			return NewClaims("1", "test@localhost"), nil
 		},
 	}
 }
 
-func FromConfiguration(cfg config.Oidc) ([]Provider, error) {
+func FromConfiguration(cfg config.Oidc) (Providers, error) {
 	client := &http.Client{
 		Timeout: cfg.ClientTimeout,
 	}
 
 	if len(cfg.Provider) == 0 {
-		return nil, fmt.Errorf("no provider configured")
+		return Providers{}, ErrProviderNoConfig
 	}
 
 	pp := make([]Provider, 0)
@@ -46,23 +92,23 @@ func FromConfiguration(cfg config.Oidc) ([]Provider, error) {
 		case "google":
 			p, err := googleProvider(client)
 			if err != nil {
-				return nil, fmt.Errorf("failed to configure google provider %w", err)
+				return Providers{}, errors.Join(err, ErrProviderInvalidConfig)
 			}
 
-			if err = apply(p, v); err != nil {
-				return nil, fmt.Errorf("failed to apply configuration for provider %s, %w", k, err)
+			if err = merge(p, v); err != nil {
+				return Providers{}, err
 			}
 
 			pp = append(pp, p)
 		default:
-			return nil, fmt.Errorf("unsupported provider %s, only google provider is supported for now", k)
+			return Providers{}, fmt.Errorf("unsupported provder %s, %w", k, ErrProviderInvalidConfig)
 		}
 	}
 
-	return pp, nil
+	return NewProviders(pp...), nil
 }
 
-func apply(p *provider, cfg config.Provider) error {
+func merge(p *provider, cfg config.Provider) error {
 	if cfg.AuthURL != "" {
 		p.authURL = cfg.AuthURL
 	}
@@ -72,17 +118,20 @@ func apply(p *provider, cfg config.Provider) error {
 	if cfg.RevokeURL != "" {
 		p.revokeURL = cfg.RevokeURL
 	}
+	if cfg.RedirectURI != "" {
+		p.redirectURI = cfg.RedirectURI
+	}
 	if cfg.Scope != "" {
 		p.scope = cfg.Scope
 	}
 
 	if cfg.ClientID == "" {
-		return fmt.Errorf("provider %s, client id must not be empty", p.name)
+		return fmt.Errorf("provider %s, client id must not be empty, %w", p.name, ErrProviderInvalidConfig)
 	}
 	p.clientID = cfg.ClientID
 
 	if cfg.Secret == "" {
-		return fmt.Errorf("provider %s, secret must not be empty", p.name)
+		return fmt.Errorf("provider %s, secret must not be empty, %w", p.name, ErrProviderInvalidConfig)
 	}
 	p.secret = cfg.Secret
 
@@ -91,134 +140,121 @@ func apply(p *provider, cfg config.Provider) error {
 
 type Provider interface {
 	GetName() string
-	GetAuthURL(state string, redirectURL string) string
-	ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*Claims, *JWT, error)
-	ValidateToken(ctx context.Context, token *JWT) (*Claims, error)
-	RevokeToken(ctx context.Context, token string) error
+	GetAuthURL(state string) string
+	ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error)
+	ValidateToken(ctx context.Context, token *JWT) (Claims, error)
+	RevokeToken(ctx context.Context, token *JWT) error
 	GenerateState() State
 }
 
 type provider struct {
-	client    *http.Client
-	validate  func(ctx context.Context, token *JWT, clientID string) (*Claims, error)
-	name      string
-	authURL   string
-	tokenURL  string
-	revokeURL string
-	clientID  string
-	secret    string
-	scope     string
+	client      *http.Client
+	validate    func(ctx context.Context, token *JWT, clientID string) (Claims, error)
+	name        string
+	authURL     string
+	tokenURL    string
+	revokeURL   string
+	redirectURI string
+	clientID    string
+	secret      string
+	scope       string
 }
 
 func (p *provider) GetName() string {
 	return p.name
 }
 
-func (p *provider) GetAuthURL(state string, redirectURI string) string {
+func (p *provider) GetAuthURL(state string) string {
 	return fmt.Sprintf("%s?state=%s&client_id=%s&redirect_uri=%s&scope=%s&response_type=code&access_type=offline",
-		p.authURL, url.QueryEscape(state), url.QueryEscape(p.clientID), url.QueryEscape(redirectURI),
+		p.authURL, url.QueryEscape(state), url.QueryEscape(p.clientID), url.QueryEscape(p.redirectURI),
 		url.QueryEscape(p.scope))
 }
 
-func (p *provider) ValidateToken(ctx context.Context, token *JWT) (*Claims, error) {
-	return p.validate(ctx, token, p.clientID)
+func (p *provider) ValidateToken(ctx context.Context, token *JWT) (Claims, error) {
+	c, err := p.validate(ctx, token, p.clientID)
+	if err != nil {
+		return Claims{}, errors.Join(err, ErrProviderValidateToken)
+	}
+
+	return c, nil
 }
 
-func (p *provider) getToken(ctx context.Context, code string, redirectURI string) (*JWT, error) {
-	resp, err := p.postRequest(ctx, p.tokenURL, url.Values{ //nolint:bodyclose
-		"code":          {code},
+func (p *provider) ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error) {
+	body, err := p.postRequest(ctx, p.tokenURL, url.Values{ //nolint:bodyclose
+		"code":          {authCode},
 		"client_id":     {p.clientID},
 		"client_secret": {p.secret},
-		"redirect_uri":  {redirectURI},
+		"redirect_uri":  {p.redirectURI},
 		"grant_type":    {"authorization_code"},
-	})
+	}, http.StatusOK)
 	if err != nil {
-		return nil, fmt.Errorf("code exchange request failed with %w", err)
+		return Claims{}, nil, fmt.Errorf("post failed duo to %w", errors.Join(err, ErrProviderCodeExchange))
 	}
-	defer aio.Close(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		// TODO: error struct
-		content, cErr := io.ReadAll(resp.Body)
-		if cErr != nil {
-			return nil, fmt.Errorf("unable to read code exchange response body %w", err)
-		}
-
-		return nil, fmt.Errorf("code exchange failed with response %s", content)
-	}
+	defer aio.Close(body)
 
 	var jwtToken JWT
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&jwtToken)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode code exchange response, due to %w", err)
+	if err := json.NewDecoder(body).Decode(&jwtToken); err != nil {
+		return Claims{}, nil, fmt.Errorf("unable to decode response, %w", errors.Join(err, ErrProviderCodeExchange))
 	}
 
 	jwtToken.Provider = p.name
 
-	return &jwtToken, nil
+	claims, err := p.ValidateToken(ctx, &jwtToken)
+	if err != nil {
+		return Claims{}, nil, err
+	}
+
+	return claims, &jwtToken, nil
 }
 
-func (p *provider) ExchangeCode(ctx context.Context, authCode string, redirectURI string) (*Claims,
-	*JWT, error) {
-	jwtToken, err := p.getToken(ctx, authCode, redirectURI)
+func (p *provider) RevokeToken(ctx context.Context, token *JWT) error {
+	if token == nil {
+		return errors.Join(errEmptyToken, ErrProviderTokenRevoke)
+	}
+	body, err := p.postRequest(ctx, p.revokeURL, url.Values{ //nolint:bodyclose
+		"token": {token.AccessToken},
+	}, http.StatusOK)
 	if err != nil {
-		return nil, nil, err
+		return fmt.Errorf("post failed duo to %w", errors.Join(err, ErrProviderTokenRevoke))
 	}
-
-	claims, err := p.ValidateToken(ctx, jwtToken)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return claims, jwtToken, nil
-}
-
-func (p *provider) RevokeToken(ctx context.Context, token string) error {
-	resp, err := p.postRequest(ctx, p.revokeURL, url.Values{ //nolint:bodyclose
-		"token": {token},
-	})
-	if err != nil {
-		return fmt.Errorf("token revoke request failed with %w", err)
-	}
-	defer aio.Close(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		content, cErr := io.ReadAll(resp.Body)
-		if cErr != nil {
-			return fmt.Errorf("unable to read token revoke response body %w", err)
-		}
-
-		return fmt.Errorf("token revoke endpoint return an error %s", content)
-	}
+	defer aio.Close(body)
 
 	return nil
 }
 
 func (p *provider) GenerateState() State {
-	return State{ID: uuid.New().String(), Provider: p.GetName()}
+	return State{ID: uuid.New().String()}
 }
 
-func (p *provider) postRequest(ctx context.Context, url string, data url.Values) (*http.Response, error) {
+func (p *provider) postRequest(ctx context.Context, url string, data url.Values,
+	expectedStatus int) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(data.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request, %w", err)
+		return nil, fmt.Errorf("failed to create post request, %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	return p.client.Do(req)
-}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request failed with, %w", err)
+	}
 
-// DecodeState decode given base64 url encoded State.
-func DecodeState(value string) (*State, error) {
-	return DecodeBase64[State](value)
+	if resp.StatusCode != expectedStatus {
+		defer aio.Close(resp.Body)
+		// TODO: decode into error struct
+		content, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("expected status %d but got %d, failed to read error response, %w",
+				expectedStatus, resp.StatusCode, err)
+		}
+
+		return nil, fmt.Errorf("expected status %d but got %d due to %s, %w",
+			expectedStatus, resp.StatusCode, content, ErrProviderUnexpectedResponse)
+	}
+
+	return resp.Body, nil
 }
 
 type State struct {
-	ID       string `json:"id"`
-	Provider string `json:"provider"`
-}
-
-func (s State) Encode() (string, error) {
-	return EncodeBase64(s)
+	ID string `json:"id"`
 }

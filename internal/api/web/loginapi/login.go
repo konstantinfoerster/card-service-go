@@ -18,7 +18,7 @@ const stateCookie = "TOKEN_STATE"
 
 // Routes All login and user related routes.
 func Routes(app fiber.Router, auth web.AuthMiddleware, cfg config.Oidc, svc auth.Service, tSvc auth.TimeService) {
-	app.Get("/login/callback", exchangeCode(cfg, svc, tSvc))
+	app.Get("/login/:provider/callback", exchangeCode(cfg, svc, tSvc))
 	app.Get("/login/:provider", login(cfg, svc, tSvc))
 	app.Get("/logout", logout(cfg, svc, tSvc))
 	app.Get("/user", auth.Required(), getCurrentUser())
@@ -47,6 +47,13 @@ func login(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Ha
 
 func exchangeCode(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		provider, err := requiredParam(c, "provider")
+		if err != nil {
+			log.Error().Err(err).Send()
+
+			return err
+		}
+
 		cookieValue := strings.TrimSpace(c.Cookies(stateCookie))
 		if cookieValue == "" {
 			return aerrors.NewInvalidInputMsg("code-exchange-missing-state", "missing state")
@@ -77,12 +84,7 @@ func exchangeCode(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) f
 			return aerrors.NewInvalidInputMsg("code-exchange-invalid-state", "invalid state")
 		}
 
-		state, err := auth.DecodeState(rawState)
-		if err != nil {
-			return err
-		}
-
-		claims, token, err := svc.Authenticate(c.Context(), state.Provider, code)
+		claims, token, err := svc.Authenticate(c.Context(), provider, code)
 		if err != nil {
 			return err
 		}
@@ -115,7 +117,7 @@ func logout(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.H
 		}
 		clearCookie(c, cfg.SessionCookieName, timeSvc.Now())
 
-		token, err := auth.DecodeToken(cookieValue)
+		token, err := auth.DecodeSession(cookieValue)
 		if err != nil {
 			return err
 		}
@@ -155,9 +157,10 @@ func requiredQuery(c *fiber.Ctx, name string) (string, error) {
 
 func required(value, name string) (string, error) {
 	if strings.TrimSpace(value) == "" {
-		sErr := fmt.Errorf("%s must not be empty", name)
+		msg := fmt.Sprintf("%s must not be empty", name)
+		err := fmt.Errorf("%s, %w", msg, web.ErrInvalidField)
 
-		return "", aerrors.NewInvalidInputError(sErr, "required-parameter", sErr.Error())
+		return "", aerrors.NewInvalidInputError(err, "required-parameter", msg)
 	}
 
 	return value, nil

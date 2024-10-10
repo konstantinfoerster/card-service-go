@@ -20,12 +20,12 @@ func searchCards(svc cards.CardService) fiber.Handler {
 		page := newPage(c)
 		log.Debug().Msgf("search for card with name %s on page %#v", searchTerm, page)
 		result, err := svc.Search(c.Context(), searchTerm, asCollector(user), page)
-
 		if err != nil {
 			return err
 		}
 
-		pagedResult := newPagedResponse(result)
+		pagedResult := newResponse(result.PagedResult)
+
 		if web.AcceptsHTML(c) || web.IsHTMX(c) {
 			data := fiber.Map{
 				"SearchTerm": searchTerm,

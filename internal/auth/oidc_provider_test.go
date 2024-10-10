@@ -20,9 +20,11 @@ func TestFromConfiguration(t *testing.T) {
 	}
 
 	provider, err := auth.FromConfiguration(cfg)
+	require.NoError(t, err)
+	p, err := provider.Find("google")
 
 	require.NoError(t, err)
-	assert.Len(t, provider, 1)
+	assert.Equal(t, "google", p.GetName())
 }
 
 func TestFromConfigurationMisconfigured(t *testing.T) {

@@ -5,8 +5,8 @@ on:
   pull_request:
 
 env:
-  GO_VERSION: 1.22
-  GO_LINT_VERSION: v1.59
+  GO_VERSION: '1.23.x'
+  GO_LINT_VERSION: 'v1.61'
 
 permissions:
   contents: read

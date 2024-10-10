@@ -20,13 +20,13 @@ func searchInPersonalCollection(svc cards.CollectionService) fiber.Handler {
 		}
 
 		searchTerm := c.Query("name")
-
-		result, err := svc.Search(c.Context(), searchTerm, cards.NewCollector(user.ID), newPage(c))
+		page := newPage(c)
+		result, err := svc.Search(c.Context(), searchTerm, cards.NewCollector(user.ID), page)
 		if err != nil {
 			return err
 		}
 
-		pagedResult := newPagedResponse(result)
+		pagedResult := newResponse(result.PagedResult)
 
 		if web.AcceptsHTML(c) || web.IsHTMX(c) {
 			data := fiber.Map{
@@ -61,7 +61,7 @@ func collect(svc cards.CollectionService) fiber.Handler {
 			return aerrors.NewInvalidInputMsg("invalid-body", "failed to parse body")
 		}
 
-		it, err := cards.NewCollectable(body.ID, body.Amount)
+		it, err := cards.NewCollectable(body.ID, body.Amount.Value())
 		if err != nil {
 			return err
 		}
@@ -71,10 +71,11 @@ func collect(svc cards.CollectionService) fiber.Handler {
 			return err
 		}
 
+		result := NewItem(item.ID, item.Amount)
 		if web.IsHTMX(c) {
-			return web.RenderPartial(c, "collect_action", newItem(item.ID, item.Amount))
+			return web.RenderPartial(c, "collect_action", result)
 		}
 
-		return web.RenderJSON(c, item)
+		return web.RenderJSON(c, result)
 	}
 }

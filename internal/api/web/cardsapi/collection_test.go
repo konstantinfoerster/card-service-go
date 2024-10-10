@@ -32,11 +32,35 @@ func TestSearchCollected(t *testing.T) {
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
-					{Item: cardsapi.Item{ID: 434, Amount: 1}, Name: "Demonic Attorney"},
-					{Item: cardsapi.Item{ID: 706, Amount: 3}, Name: "Demonic Hordes"},
-					{Item: cardsapi.Item{ID: 514, Amount: 5}, Name: "Demonic Tutor"},
+					{
+						ID:     434,
+						Amount: 1,
+						Name:   "Demonic Attorney",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
+					{
+						ID:     706,
+						Amount: 3,
+						Name:   "Demonic Hordes",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
+					{
+						ID:     514,
+						Amount: 5,
+						Name:   "Demonic Tutor",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -75,9 +99,17 @@ func TestSearchCollected(t *testing.T) {
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
-					{Item: cardsapi.Item{ID: 706, Amount: 3}, Name: "Demonic Hordes"},
+					{
+						ID:     706,
+						Amount: 3,
+						Name:   "Demonic Hordes",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
 				assert.True(t, body.HasMore)
 				assert.Equal(t, 2, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -201,7 +233,7 @@ func TestCollectItemAdd(t *testing.T) {
 				test.WithURL("http://localhost/mycards"),
 				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
-				test.WithJSONBody(t, cardsapi.Item{ID: 1, Amount: tc.amount}),
+				test.WithJSONBody(t, cardsapi.NewItem(cards.NewID(1), tc.amount)),
 			)
 
 			resp, err := srv.Test(req)
@@ -291,23 +323,24 @@ func TestCollectItemNoSession(t *testing.T) {
 func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
-	repo, err := memory.NewCollectionRepository(seed)
+	repo, err := memory.NewCollectRepository(seed)
 	require.NoError(t, err)
 
 	collectSvc := cards.NewCollectionService(repo)
 
+	validClaim := auth.NewClaims("myuser", "myUser")
 	collector := cards.NewCollector(validClaim.ID)
 	ctx := context.Background()
-	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: 434, Amount: 1}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(434), Amount: 1}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: 514, Amount: 5}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(514), Amount: 5}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: 706, Amount: 3}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(706), Amount: 3}, collector)
 	require.NoError(t, err)
 
 	oCfg := config.Oidc{}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
-	authSvc := auth.New(oCfg, provider)
+	authSvc := auth.New(oCfg, auth.NewProviders(provider))
 	srv := web.NewHTTPTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
 		cardsapi.CollectionRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), collectSvc)

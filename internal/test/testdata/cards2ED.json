@@ -1,92 +1,122 @@
 [
   {
-    "id": 406,
+    "id": {
+      "cardId": 406,
+      "faceId": 406
+    },
     "name": "Animate Wall",
     "number": "1",
-    "rarity": "RARE",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 1074,
+    "id": {
+      "cardId": 1074,
+      "faceId": 1074
+    },
     "name": "Circle of Protection: Black",
     "number": "10",
-    "rarity": "COMMON",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 629,
+    "id": {
+      "cardId": 629,
+      "faceId": 629
+    },
     "name": "Darkpact",
     "number": "100",
-    "rarity": "RARE",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 513,
+    "id": {
+      "cardId": 513,
+      "faceId": 513
+    },
     "name": "Deathgrip",
     "number": "101",
-    "rarity": "UNCOMMON",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 773,
+    "id": {
+      "cardId": 773,
+      "faceId": 773
+    },
     "name": "Deathlace",
     "number": "102",
-    "rarity": "RARE",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 434,
+    "id": {
+      "cardId": 434,
+      "faceId": 434
+    },
     "name": "Demonic Attorney",
     "number": "103",
-    "rarity": "RARE",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 706,
+    "id": {
+      "cardId": 706,
+      "faceId": 706
+    },
     "name": "Demonic Hordes",
     "number": "104",
-    "rarity": "RARE",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 514,
+    "id": {
+      "cardId": 514,
+      "faceId": 514
+    },
     "name": "Demonic Tutor",
     "number": "105",
-    "rarity": "UNCOMMON",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 777,
+    "id": {
+      "cardId": 777,
+      "faceId": 777
+    },
     "name": "Drain Life",
     "number": "106",
-    "rarity": "COMMON",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   },
   {
-    "id": 582,
+    "id": {
+      "cardId": 582,
+      "faceId": 582
+    },
     "name": "Drudge Skeletons",
     "number": "107",
-    "rarity": "COMMON",
-    "border": "WHITE",
-    "layout": "NORMAL",
-    "card_set_code": "2ED"
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
   }
 ]

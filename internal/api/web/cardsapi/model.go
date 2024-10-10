@@ -1,6 +1,7 @@
 package cardsapi
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,24 +16,18 @@ func newPage(c *fiber.Ctx) cards.Page {
 	return cards.NewPage(page, size)
 }
 
-type PagedResponse[T any] struct {
-	Data     []T  `json:"data"`
-	HasMore  bool `json:"hasMore"`
-	Page     int  `json:"page"`
-	NextPage int  `json:"nextPage"`
-}
-
-func newPagedResponse(pr cards.Cards) *PagedResponse[Card] {
+func newResponse[T any](pr cards.PagedResult[T]) *PagedResponse {
 	data := make([]Card, len(pr.Result))
-	for i, c := range pr.Result {
-		data[i] = Card{
-			Item:  newItem(c.ID, c.Amount),
-			Name:  c.Name,
-			Image: c.Image,
+	for i, r := range pr.Result {
+		switch v := any(r).(type) {
+		case cards.Card:
+			data[i] = newCard(v)
+		case cards.Match:
+			data[i] = newCard(v.Card).WithConfidence(v.Confidence)
 		}
 	}
 
-	return &PagedResponse[Card]{
+	return &PagedResponse{
 		Data:     data,
 		HasMore:  pr.HasMore,
 		Page:     pr.Page,
@@ -40,37 +35,78 @@ func newPagedResponse(pr cards.Cards) *PagedResponse[Card] {
 	}
 }
 
-type Card struct {
-	Score *int   `json:"score,omitempty"`
-	Name  string `json:"name"`
-	Image string `json:"image,omitempty"`
-	Item
+type PagedResponse struct {
+	Data     []Card `json:"data"`
+	HasMore  bool   `json:"hasMore"`
+	Page     int    `json:"page"`
+	NextPage int    `json:"nextPage"`
 }
 
-func (c Card) WithScore(v int) Card {
-	c.Score = &v
+func newCard(c cards.Card) Card {
+	return Card{
+		ID:     c.ID.CardID,
+		Amount: Amount(c.Amount),
+		Name:   c.Name,
+		Set: Set{
+			Code: c.Set.Code,
+			Name: c.Set.Name,
+		},
+		Image: c.Image.URL,
+	}
+}
+
+type Card struct {
+	// Confidence indicates the confidence level of the match, lower is better.
+	Confidence *int `json:"score,omitempty"`
+	// Set is the set the card belongs to.
+	Set Set `json:"set"`
+	// Name the name of the card face.
+	Name string `json:"name"`
+	// Image is the image URL.
+	Image string `json:"image,omitempty"`
+	// ID is the card ID.
+	ID int `json:"id"`
+	// Amount indicates how many copies the current user owns.
+	Amount Amount `json:"amount,omitempty"`
+}
+
+func (c Card) WithConfidence(v int) Card {
+	c.Confidence = &v
 
 	return c
 }
 
-func newItem(id int, amount int) Item {
+func (c Card) Title() string {
+	return fmt.Sprintf("%s - %s (%s)", c.Name, c.Set.Name, c.Set.Code)
+}
+
+type Set struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+func NewItem(id cards.ID, amount int) Item {
 	return Item{
-		ID:     id,
-		Amount: amount,
+		ID:     id.CardID,
+		Amount: Amount(amount),
 	}
 }
 
 type Item struct {
-	ID     int `json:"id"`
-	Amount int `json:"amount,omitempty"`
+	// ID is the card ID.
+	ID int `json:"id"`
+	// Amount the total amount of the given card.
+	Amount Amount `json:"amount,omitempty"`
 }
 
-func (i Item) NextAmount() int {
-	return i.Amount + 1
+type Amount int
+
+func (a Amount) Next() Amount {
+	return a + 1
 }
 
-func (i Item) PreviousAmount() int {
-	prev := i.Amount - 1
+func (a Amount) Previous() Amount {
+	prev := a - 1
 	if prev < 0 {
 		return 0
 	}
@@ -78,10 +114,10 @@ func (i Item) PreviousAmount() int {
 	return prev
 }
 
-func asCollector(u *web.User) cards.Collector {
-	if u == nil {
-		return cards.NewCollector("")
-	}
+func (a Amount) Value() int {
+	return int(a)
+}
 
+func asCollector(u web.User) cards.Collector {
 	return cards.NewCollector(u.ID)
 }

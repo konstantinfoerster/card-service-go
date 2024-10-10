@@ -18,6 +18,8 @@ import (
 
 const CookieEncryptionKey = "01234567890123456789012345678901"
 
+type RequestOpt func(*httpRequest)
+
 type httpRequest struct {
 	header  map[string]string
 	url     string
@@ -26,12 +28,16 @@ type httpRequest struct {
 	cookies []*http.Cookie
 }
 
-func NewRequest(options ...func(*httpRequest)) *http.Request {
+func NewRequest(options ...RequestOpt) *http.Request {
 	r := &httpRequest{
 		header:  make(map[string]string),
 		cookies: make([]*http.Cookie, 0),
 	}
 	for _, opt := range options {
+		if opt == nil {
+			continue
+		}
+
 		opt(r)
 	}
 
@@ -53,25 +59,25 @@ func NewRequest(options ...func(*httpRequest)) *http.Request {
 	return req
 }
 
-func WithURL(url string) func(*httpRequest) {
+func WithURL(url string) RequestOpt {
 	return func(req *httpRequest) {
 		req.url = url
 	}
 }
 
-func WithMethod(m string) func(*httpRequest) {
+func WithMethod(m string) RequestOpt {
 	return func(req *httpRequest) {
 		req.method = m
 	}
 }
 
-func WithBody(body []byte) func(*httpRequest) {
+func WithBody(body []byte) RequestOpt {
 	return func(req *httpRequest) {
 		req.body = body
 	}
 }
 
-func WithMultipartFile(t *testing.T, f io.Reader, name string) func(*httpRequest) {
+func WithMultipartFile(t *testing.T, f io.Reader, name string) RequestOpt {
 	return func(req *httpRequest) {
 		body := new(bytes.Buffer)
 		mw := multipart.NewWriter(body)
@@ -91,7 +97,7 @@ func WithMultipartFile(t *testing.T, f io.Reader, name string) func(*httpRequest
 	}
 }
 
-func WithAccept(mimeType string) func(*httpRequest) {
+func WithAccept(mimeType string) RequestOpt {
 	return func(req *httpRequest) {
 		WithHeader(map[string]string{
 			fiber.HeaderAccept: mimeType,
@@ -99,7 +105,7 @@ func WithAccept(mimeType string) func(*httpRequest) {
 	}
 }
 
-func HTMXRequest() func(*httpRequest) {
+func HTMXRequest() RequestOpt {
 	return func(req *httpRequest) {
 		WithHeader(map[string]string{
 			web.HeaderHTMXRequest: "true",
@@ -107,7 +113,7 @@ func HTMXRequest() func(*httpRequest) {
 	}
 }
 
-func WithJSONBody(t *testing.T, v interface{}) func(*httpRequest) {
+func WithJSONBody(t *testing.T, v interface{}) RequestOpt {
 	raw := ToJSON(t, v)
 
 	return func(req *httpRequest) {
@@ -117,7 +123,7 @@ func WithJSONBody(t *testing.T, v interface{}) func(*httpRequest) {
 	}
 }
 
-func WithHeader(header map[string]string) func(*httpRequest) {
+func WithHeader(header map[string]string) RequestOpt {
 	return func(req *httpRequest) {
 		for k, v := range header {
 			req.header[k] = v
@@ -125,7 +131,7 @@ func WithHeader(header map[string]string) func(*httpRequest) {
 	}
 }
 
-func WithCookie(name, value string) func(*httpRequest) {
+func WithCookie(name, value string) RequestOpt {
 	return func(req *httpRequest) {
 		if name == "" {
 			return
@@ -135,13 +141,13 @@ func WithCookie(name, value string) func(*httpRequest) {
 	}
 }
 
-func WithSessionCookie(value string) func(*httpRequest) {
+func WithSessionCookie(value string) RequestOpt {
 	return func(req *httpRequest) {
 		req.cookies = append(req.cookies, &http.Cookie{Name: "SESSION", Value: value})
 	}
 }
 
-func WithEncryptedCookie(t *testing.T, name, value string) func(*httpRequest) {
+func WithEncryptedCookie(t *testing.T, name, value string) RequestOpt {
 	return func(req *httpRequest) {
 		v, err := encryptcookie.EncryptCookie(value, CookieEncryptionKey)
 		require.NoError(t, err)

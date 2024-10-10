@@ -2,21 +2,14 @@ package auth
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
-func NewRedirectURL(p Provider, redirectURI string) (*RedirectURL, error) {
-	state, err := p.GenerateState().Encode()
-	if err != nil {
-		return nil, err
-	}
-
-	return &RedirectURL{
-		URL:   p.GetAuthURL(state, redirectURI),
+func NewRedirectURL(p Provider, state string) (RedirectURL, error) {
+	return RedirectURL{
+		URL:   p.GetAuthURL(state),
 		State: state,
 	}, nil
 }
@@ -26,9 +19,14 @@ type RedirectURL struct {
 	State string
 }
 
-// DecodeToken decode given base64 url encoded JSONWebToken.
-func DecodeToken(value string) (*JWT, error) {
-	return DecodeBase64[JWT](value)
+// DecodeSession decode given base64 url encoded JSONWebToken.
+func DecodeSession(value string) (*JWT, error) {
+	jwt, err := decodeBase64[JWT](value)
+	if err != nil {
+		return nil, aerrors.NewInvalidInputError(err, "invalid-session", "invalid session value")
+	}
+
+	return jwt, nil
 }
 
 type JWT struct {
@@ -42,7 +40,12 @@ type JWT struct {
 }
 
 func (t *JWT) Encode() (string, error) {
-	return EncodeBase64(t)
+	s, err := encodeBase64(t)
+	if err != nil {
+		return "", aerrors.NewUnknownError(err, "unable-to-encode-token")
+	}
+
+	return s, nil
 }
 
 type Claims struct {
@@ -50,98 +53,80 @@ type Claims struct {
 	Email string
 }
 
-func NewClaims(id, email string) *Claims {
-	return &Claims{ID: id, Email: email}
+func NewClaims(id, email string) Claims {
+	return Claims{ID: id, Email: email}
 }
 
 type Service interface {
-	AuthInfo(ctx context.Context, provider string, token *JWT) (*Claims, error)
-	AuthURL(provider string) (*RedirectURL, error)
-	Authenticate(ctx context.Context, provider string, code string) (*Claims, *JWT, error)
+	AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error)
+	AuthURL(provider string) (RedirectURL, error)
+	Authenticate(ctx context.Context, provider string, code string) (Claims, *JWT, error)
 	Logout(ctx context.Context, token *JWT) error
 }
 
-func New(cfg config.Oidc, provider ...Provider) Service {
-	pp := make(map[string]Provider)
-	for _, p := range provider {
-		if p == nil {
-			continue
-		}
-
-		pp[strings.ToLower(p.GetName())] = p
-	}
-
+func New(cfg config.Oidc, providers Providers) Service {
 	return &authFlowService{
-		provider: pp,
+		provider: providers,
 		cfg:      cfg,
 	}
 }
 
 type authFlowService struct {
-	provider map[string]Provider
+	provider Providers
 	cfg      config.Oidc
 }
 
-func (s *authFlowService) AuthURL(provider string) (*RedirectURL, error) {
-	p, err := s.getProvider(provider)
+func (s *authFlowService) AuthURL(provider string) (RedirectURL, error) {
+	p, err := s.provider.Find(provider)
 	if err != nil {
-		return nil, err
+		return RedirectURL{}, aerrors.NewInvalidInputError(err, "auth-url-provider-not-found", "provider not found")
 	}
 
-	return NewRedirectURL(p, s.cfg.RedirectURI)
+	encodedState, err := encodeBase64(p.GenerateState())
+	if err != nil {
+		return RedirectURL{}, aerrors.NewInvalidInputError(err, "invalid-state", "invalid state value")
+	}
+
+	return NewRedirectURL(p, encodedState)
 }
 
-func (s *authFlowService) Authenticate(
-	ctx context.Context, provider string, authCode string) (*Claims, *JWT, error) {
-	p, err := s.getProvider(provider)
+func (s *authFlowService) Authenticate(ctx context.Context, provider string, authCode string) (Claims, *JWT, error) {
+	p, err := s.provider.Find(provider)
 	if err != nil {
-		return nil, nil, err
+		return Claims{}, nil, aerrors.NewInvalidInputError(err, "authenticate-provider-not-found", "provider not found")
 	}
 
-	claims, jwtToken, err := p.ExchangeCode(ctx, authCode, s.cfg.RedirectURI)
+	claims, jwtToken, err := p.ExchangeCode(ctx, authCode)
 	if err != nil {
-		return nil, nil, aerrors.NewUnknownError(err, "exchange-code-failed")
+		return Claims{}, nil, aerrors.NewUnknownError(err, "exchange-code-failed")
 	}
 
 	return claims, jwtToken, nil
 }
 
-func (s *authFlowService) AuthInfo(ctx context.Context, provider string, token *JWT) (*Claims, error) {
-	p, err := s.getProvider(provider)
+func (s *authFlowService) AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error) {
+	p, err := s.provider.Find(provider)
 	if err != nil {
-		return nil, err
+		return Claims{}, aerrors.NewInvalidInputError(err, "auth-info-provider-not-found", "provider not found")
 	}
 
 	claims, err := p.ValidateToken(ctx, token)
 	if err != nil {
-		return nil, aerrors.NewUnknownError(err, "validate-token-failed")
+		return Claims{}, aerrors.NewUnknownError(err, "validate-token-failed")
 	}
 
 	return claims, nil
 }
 
 func (s *authFlowService) Logout(ctx context.Context, token *JWT) error {
-	p, err := s.getProvider(token.Provider)
+	p, err := s.provider.Find(token.Provider)
 	if err != nil {
-		return err
+		return aerrors.NewInvalidInputError(err, "revoke-token-provider-not-found", "provider not found")
 	}
 
-	return p.RevokeToken(ctx, token.AccessToken)
-}
-
-func (s *authFlowService) getProvider(key string) (Provider, error) {
-	if strings.TrimSpace(key) == "" {
-		err := fmt.Errorf("provider mut not be empty")
-
-		return nil, aerrors.NewInvalidInputError(err, "login-provider-empty", err.Error())
+	if err := p.RevokeToken(ctx, token); err != nil {
+		return aerrors.NewUnknownError(err, "revoke-token-failed")
 	}
 
-	p, ok := s.provider[strings.ToLower(key)]
-	if ok {
-		return p, nil
-	}
-
-	err := fmt.Errorf("provider '%s' not supported", key)
-
-	return nil, aerrors.NewInvalidInputError(err, "login-provider-not-supported", err.Error())
+	return nil
 }

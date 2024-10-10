@@ -31,11 +31,32 @@ func TestSearch(t *testing.T) {
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
-					{Item: cardsapi.Item{ID: 434}, Name: "Demonic Attorney"},
-					{Item: cardsapi.Item{ID: 706}, Name: "Demonic Hordes"},
-					{Item: cardsapi.Item{ID: 514}, Name: "Demonic Tutor"},
+					{
+						ID:   434,
+						Name: "Demonic Attorney",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
+					{
+						ID:   706,
+						Name: "Demonic Hordes",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
+					{
+						ID:   514,
+						Name: "Demonic Tutor",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -47,9 +68,16 @@ func TestSearch(t *testing.T) {
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
-					{Item: cardsapi.Item{ID: 706}, Name: "Demonic Hordes"},
+					{
+						ID:   706,
+						Name: "Demonic Hordes",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
 				assert.True(t, body.HasMore)
 				assert.Equal(t, 2, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -153,11 +181,34 @@ func TestSearchWithUser(t *testing.T) {
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
-					{Item: cardsapi.Item{ID: 434}, Name: "Demonic Attorney"},
-					{Item: cardsapi.Item{ID: 706, Amount: 3}, Name: "Demonic Hordes"},
-					{Item: cardsapi.Item{ID: 514, Amount: 5}, Name: "Demonic Tutor"},
+					{
+						ID:   434,
+						Name: "Demonic Attorney",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
+					{
+						ID:     706,
+						Amount: 3,
+						Name:   "Demonic Hordes",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
+					{
+						ID:     514,
+						Amount: 5,
+						Name:   "Demonic Tutor",
+						Set: cardsapi.Set{
+							Name: "Unlimited Edition",
+							Code: "2ED",
+						},
+					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -242,6 +293,7 @@ func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 
+	validClaim := auth.NewClaims("myuser", "myUser")
 	item1, err := cards.NewCollectable(514, 5)
 	require.NoError(t, err)
 	item2, err := cards.NewCollectable(706, 3)
@@ -257,7 +309,7 @@ func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 
 	oCfg := config.Oidc{}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
-	authSvc := auth.New(oCfg, provider)
+	authSvc := auth.New(oCfg, auth.NewProviders(provider))
 	searchSvc := cards.NewCardService(repo)
 	srv.RegisterRoutes(func(r fiber.Router) {
 		cardsapi.SearchRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), searchSvc)

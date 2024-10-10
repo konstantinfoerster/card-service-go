@@ -1,93 +1,125 @@
 [
   {
-    "id": 1,
+    "id": {
+      "cardId": 1,
+      "faceId": 1
+    },
     "name": "Ancestor's Chosen",
     "number": "1",
-    "rarity": "UNCOMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E",
-    "image": "cardImage.jpg"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    },
+    "image": {
+      "URL": "cardImage.jpg"
+    }
   },
   {
-    "id": 56,
+    "id": {
+      "cardId": 56,
+      "faceId": 56
+    },
     "name": "Beacon of Immortality",
     "number": "10",
-    "rarity": "RARE",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 33,
+    "id": {
+      "cardId": 33,
+      "faceId": 33
+    },
     "name": "Remove Soul",
     "number": "100",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 700,
+    "id": {
+      "cardId": 700,
+      "faceId": 700
+    },
     "name": "Robe of Mirrors",
     "number": "101",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 563,
+    "id": {
+      "cardId": 563,
+      "faceId": 564
+    },
     "name": "Robe of Mirrors",
     "number": "101★",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 34,
+    "id": {
+      "cardId": 34,
+      "faceId": 34
+    },
     "name": "Rootwater Commando",
     "number": "102",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 32,
+    "id": {
+      "cardId": 32,
+      "faceId": 32
+    },
     "name": "Rootwater Commando",
     "number": "102★",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 35,
+    "id": {
+      "cardId": 35,
+      "faceId": 35
+    },
     "name": "Rootwater Matriarch",
     "number": "103",
-    "rarity": "RARE",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 281,
+    "id": {
+      "cardId": 281,
+      "faceId": 281
+    },
     "name": "Sage Owl",
     "number": "104",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   },
   {
-    "id": 282,
+    "id": {
+      "cardId": 282,
+      "faceId": 282
+    },
     "name": "Sage Owl",
     "number": "104★",
-    "rarity": "COMMON",
-    "border": "BLACK",
-    "layout": "NORMAL",
-    "card_set_code": "10E"
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
   }
 ]

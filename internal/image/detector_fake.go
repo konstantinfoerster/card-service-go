@@ -1,7 +1,6 @@
 package image
 
 import (
-	"fmt"
 	"io"
 )
 
@@ -14,7 +13,7 @@ type fakeDetector struct {
 
 func (d fakeDetector) Detect(in io.Reader) (Images, error) {
 	if in == nil {
-		return nil, fmt.Errorf("image require for detection")
+		return nil, ErrInvalidInput
 	}
 
 	img, err := NewImage(in)

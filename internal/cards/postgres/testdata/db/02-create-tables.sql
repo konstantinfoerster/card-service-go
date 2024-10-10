@@ -205,6 +205,8 @@ CREATE TABLE card_face
     card_id             INTEGER REFERENCES card (id) ON DELETE CASCADE
 );
 
+CREATE INDEX idx_card_face_name_card_id on card_face(card_id, name);
+
 CREATE TABLE card_translation
 (
     id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -254,6 +256,8 @@ CREATE TABLE card_image
     lang_lang  CHAR(3) REFERENCES lang (lang),
     UNIQUE (image_path)
 );
+
+CREATE INDEX idx_card_image_hashes on card_image(phash1, phash2, phash3, phash4);
 
 CREATE TABLE card_collection
 (

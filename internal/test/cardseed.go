@@ -11,32 +11,30 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
-func currentDir() string {
-	_, cf, _, _ := runtime.Caller(0)
-
-	return path.Join(path.Dir(cf))
-}
-
 func CardSeed() ([]cards.Card, error) {
-	dir := currentDir()
+	_, cf, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("failed to get current dir")
+	}
+	dir := path.Join(path.Dir(cf))
 
 	cc := make([]cards.Card, 0)
 
 	cards10E, err := readFromJSON(filepath.Join(dir, "testdata/cards10E.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read cards10E.json, %w", err)
 	}
 	cc = append(cc, cards10E...)
 
 	cards2ED, err := readFromJSON(filepath.Join(dir, "testdata/cards2ED.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read cards2ED.json, %w", err)
 	}
 	cc = append(cc, cards2ED...)
 
 	cards2X2, err := readFromJSON(filepath.Join(dir, "testdata/cards2X2.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read cards2X2.json, %w", err)
 	}
 	cc = append(cc, cards2X2...)
 
