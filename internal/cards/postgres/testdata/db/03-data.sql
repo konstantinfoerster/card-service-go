@@ -72,7 +72,7 @@ VALUES ('No Image Card 2', '2', 'COMMON', 'WHITE', 'NORMAL', 'M11');
 INSERT INTO card_face(card_id, name, converted_mana_cost)
 VALUES (6, 'No Image Card 2', 0);
 INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
-VALUES (null, 6, 'images/noFace.png', 'eng', 'png');
+VALUES (null, 6, 'images/noFaceID.png', 'eng', 'png');
 INSERT INTO card_collection(card_id, user_id, amount)
 VALUES (6, 'myUser', 1);
 
@@ -203,3 +203,7 @@ INSERT INTO card_face(card_id, name, converted_mana_cost)
 VALUES (17, 'Aa Card', 0);
 INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
 VALUES (18, 17, 'images/dummyCard17.png', 'eng', 'png');
+
+-- Collected card that does not exists
+INSERT INTO card_collection(card_id, user_id, amount)
+VALUES (99999, 'myOtherUser', 1);

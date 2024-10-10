@@ -18,7 +18,7 @@ import (
 func TestOAuthMiddleware(t *testing.T) {
 	expectedClaims := auth.NewClaims("test-1", "test@localhost")
 	provider := auth.NewFakeProvider(auth.WithClaims(expectedClaims))
-	svc := auth.New(config.Oidc{}, provider)
+	svc := auth.New(config.Oidc{}, auth.NewProviders(provider))
 	app := fiber.New()
 	app.Use(auth.NewOAuthMiddleware(svc))
 	app.Get("/test", func(c *fiber.Ctx) error {
@@ -45,7 +45,7 @@ func TestOAuthMiddlewareWithCustomCookieName(t *testing.T) {
 	validClaims := auth.NewClaims("test-1", "test@localhost")
 	oCfg := config.Oidc{SessionCookieName: "MY_SESSION"}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaims))
-	svc := auth.New(oCfg, provider)
+	svc := auth.New(oCfg, auth.NewProviders(provider))
 	app := fiber.New()
 	app.Use(auth.NewOAuthMiddleware(svc, auth.WithConfig(oCfg)))
 	app.Get("/test", func(c *fiber.Ctx) error {
@@ -71,7 +71,7 @@ func TestOAuthMiddlewareWithCustomCookieName(t *testing.T) {
 func TestOAuthMiddlewareError(t *testing.T) {
 	cfg := config.Oidc{SessionCookieName: "SESSION"}
 	provider := auth.NewFakeProvider()
-	svc := auth.New(cfg, provider)
+	svc := auth.New(cfg, auth.NewProviders(provider))
 	cases := []struct {
 		name   string
 		cookie *http.Cookie

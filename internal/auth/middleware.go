@@ -1,31 +1,35 @@
 package auth
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
-var ErrNoClaimsInContext = fmt.Errorf("no claims in context")
+var (
+	ErrNoClaimsInContext = errors.New("no claims in context")
+	ErrUnauthorized      = errors.New("unauthorized")
+	ErrInvalidSession    = errors.New("invalid or expired session")
+)
 
 const ClaimsContextKey = "claims"
 
-func ClaimsFromCtx(ctx *fiber.Ctx) (*Claims, error) {
-	u, ok := ctx.Locals(ClaimsContextKey).(*Claims)
-	if ok && u != nil {
+func ClaimsFromCtx(ctx *fiber.Ctx) (Claims, error) {
+	u, ok := ctx.Locals(ClaimsContextKey).(Claims)
+	if ok && u.ID != "" {
 		return u, nil
 	}
 
-	return nil, ErrNoClaimsInContext
+	return Claims{}, ErrNoClaimsInContext
 }
 
 type MiddlewareConfig struct {
 	// Extractor defines how the token claims are extracted from the request
-	Extractor func(*fiber.Ctx, string) (*Claims, error)
+	Extractor func(*fiber.Ctx, string) (Claims, error)
 	// Authorized runs after valid claims are found
-	Authorized func(*fiber.Ctx, *Claims)
+	Authorized func(*fiber.Ctx, Claims)
 	// Key name of the session cookie
 	Key string
 	// AllowEmptyCookie allows unauthenticated access if true
@@ -34,24 +38,24 @@ type MiddlewareConfig struct {
 
 func NewOAuthMiddleware(svc Service, opts ...func(*MiddlewareConfig)) fiber.Handler {
 	c := MiddlewareConfig{
-		Extractor: func(c *fiber.Ctx, cookie string) (*Claims, error) {
+		Extractor: func(c *fiber.Ctx, cookie string) (Claims, error) {
 			if cookie == "" {
-				return nil, aerrors.NewAuthorizationError(fmt.Errorf("no running session found"), "no-session")
+				return Claims{}, ErrUnauthorized
 			}
 
-			jwtToken, err := DecodeBase64[JWT](cookie)
+			jwtToken, err := DecodeSession(cookie)
 			if err != nil {
-				return nil, err
+				return Claims{}, err
 			}
 
 			claims, err := svc.AuthInfo(c.Context(), jwtToken.Provider, jwtToken)
 			if err != nil {
-				return nil, err
+				return Claims{}, err
 			}
 
 			return claims, nil
 		},
-		Authorized: func(ctx *fiber.Ctx, claims *Claims) {
+		Authorized: func(ctx *fiber.Ctx, claims Claims) {
 			ctx.Locals(ClaimsContextKey, claims)
 		},
 	}
@@ -69,7 +73,7 @@ func WithConfig(cfg config.Oidc) func(*MiddlewareConfig) {
 	}
 }
 
-func WithAuthorized(fn func(*fiber.Ctx, *Claims)) func(*MiddlewareConfig) {
+func WithAuthorized(fn func(*fiber.Ctx, Claims)) func(*MiddlewareConfig) {
 	return func(c *MiddlewareConfig) {
 		c.Authorized = fn
 	}
@@ -102,21 +106,20 @@ func newTokenExtractHandler(config ...MiddlewareConfig) fiber.Handler {
 				return c.Next()
 			}
 
-			return aerrors.NewAuthorizationError(fmt.Errorf("unauthorized"), "unauthorized")
+			return aerrors.NewAuthorizationError(ErrUnauthorized, "unauthorized")
 		}
 
 		value, err := cfg.Extractor(c, cookieValue)
-
-		if err == nil && value != nil {
-			cfg.Authorized(c, value)
-
-			return c.Next()
-		}
-
 		if err != nil {
 			return aerrors.NewAuthorizationError(err, "unauthorized")
 		}
 
-		return aerrors.NewAuthorizationError(fmt.Errorf("invalid or expired session"), "unauthorized")
+		if value.ID == "" {
+			return aerrors.NewAuthorizationError(ErrInvalidSession, "unauthorized")
+		}
+
+		cfg.Authorized(c, value)
+
+		return c.Next()
 	}
 }

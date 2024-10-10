@@ -2,6 +2,7 @@ package cards
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -10,7 +11,54 @@ import (
 
 const DefaultLang = "eng"
 
-var ErrCardNotFound = fmt.Errorf("card not found")
+var ErrCardNotFound = errors.New("card not found")
+var ErrInvalidID = errors.New("invalid id")
+
+func NewID(id int) ID {
+	return ID{CardID: id, FaceID: 0}
+}
+
+type ID struct {
+	// CardID the card ID
+	CardID int
+	// FaceID the face ID
+	FaceID int
+}
+
+func (id ID) WithFace(faceID int) ID {
+	return ID{CardID: id.CardID, FaceID: faceID}
+}
+
+func (id ID) String() string {
+	return fmt.Sprintf("{ID - card %d, face %d}", id.CardID, id.FaceID)
+}
+
+func (id ID) Eq(o ID) bool {
+	if id.FaceID != 0 && o.FaceID != 0 {
+		return id.FaceID == o.FaceID
+	}
+	if id.CardID != 0 && o.CardID != 0 {
+		return id.CardID == o.CardID
+	}
+
+	return false
+}
+
+type IDs []ID
+
+func (ids IDs) NotEmpty() bool {
+	return len(ids) > 0
+}
+
+func (ids IDs) Find(oID ID) *ID {
+	for _, id := range ids {
+		if id.Eq(oID) {
+			return &id
+		}
+	}
+
+	return nil
+}
 
 type Card struct {
 	// Set the set that the card belongs to
@@ -20,7 +68,7 @@ type Card struct {
 	// Image the card image metadata
 	Image Image
 	// ID is the identifier of the card.
-	ID int
+	ID ID
 	// Amount show how often the card is in the users collection.
 	Amount int
 }
@@ -37,19 +85,19 @@ type Image struct {
 	URL string
 }
 
+func NewCards(cards []Card, p Page) Cards {
+	return Cards{
+		NewPagedResult(cards, p),
+	}
+}
+
 type Cards struct {
 	PagedResult[Card]
 }
 
-func Empty(p Page) Cards {
+func EmptyCards(p Page) Cards {
 	return Cards{
 		NewEmptyResult[Card](p),
-	}
-}
-
-func NewCards(cards []Card, p Page) Cards {
-	return Cards{
-		NewPagedResult(cards, p),
 	}
 }
 
@@ -69,6 +117,8 @@ func NewFilter() Filter {
 type Filter struct {
 	Collector     *Collector
 	Name          string
+	Lang          string
+	IDs           IDs
 	OnlyCollected bool
 }
 
@@ -94,15 +144,21 @@ func (f Filter) WithOnlyCollected() Filter {
 	return f
 }
 
+func (f Filter) WithID(id ...ID) Filter {
+	f.IDs = id
+
+	return f
+}
+
+func (f Filter) WithLanguage(lang string) Filter {
+	f.Lang = strings.TrimSpace(lang)
+
+	return f
+}
+
 type CardRepository interface {
 	// Find returns the cards for the requested page matching the given criteria.
 	Find(ctx context.Context, filter Filter, page Page) (Cards, error)
-	// Exist returns true if a card with the given ID exist, false otherwise.
-	Exist(ctx context.Context, id int) (bool, error)
-	// Collect adds or removes an card from a collection.
-	Collect(ctx context.Context, item Collectable, c Collector) error
-	// Remove removes the item from the collection.
-	Remove(ctx context.Context, item Collectable, c Collector) error
 }
 
 type CardService interface {
@@ -120,10 +176,13 @@ func NewCardService(repo CardRepository) CardService {
 }
 
 func (s *searchService) Search(ctx context.Context, name string, c Collector, page Page) (Cards, error) {
-	filter := NewFilter().WithName(name).WithCollector(c)
+	filter := NewFilter().
+		WithName(name).
+		WithLanguage(DefaultLang).
+		WithCollector(c)
 	r, err := s.repo.Find(ctx, filter, page)
 	if err != nil {
-		return Empty(page), aerrors.NewUnknownError(err, "unable-to-execute-search")
+		return EmptyCards(page), aerrors.NewUnknownError(err, "unable-to-execute-search")
 	}
 
 	return r, nil

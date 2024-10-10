@@ -25,7 +25,7 @@ func NewCardRepository(data []cards.Card, collected map[string][]cards.Collectab
 	}, nil
 }
 
-func NewCollectRepository(data []cards.Card) (cards.CardRepository, error) {
+func NewCollectRepository(data []cards.Card) (cards.CollectionRepository, error) {
 	return &inMemCardRepository{
 		cards:     data,
 		collected: make(map[string][]cards.Collectable),
@@ -33,21 +33,22 @@ func NewCollectRepository(data []cards.Card) (cards.CardRepository, error) {
 }
 
 func (r inMemCardRepository) Find(ctx context.Context, f cards.Filter, page cards.Page) (cards.Cards, error) {
-	// FIXME: allow empty name
-	if f.Name == "" {
-		return cards.Empty(page), nil
-	}
-
 	matches := make([]cards.Card, 0)
 	for _, c := range r.cards {
-		if !strings.Contains(strings.ToLower(c.Name), strings.ToLower(f.Name)) {
+		if f.Name != "" && !strings.Contains(strings.ToLower(c.Name), strings.ToLower(f.Name)) {
 			continue
+		}
+
+		if f.IDs.NotEmpty() {
+			if id := f.IDs.Find(c.ID); id == nil {
+				continue
+			}
 		}
 
 		if f.Collector != nil {
 			isCollected := false
 			for _, collected := range r.collected[f.Collector.ID] {
-				if collected.ID != c.ID {
+				if !collected.ID.Eq(c.ID) {
 					continue
 				}
 
@@ -72,9 +73,9 @@ func (r inMemCardRepository) Find(ctx context.Context, f cards.Filter, page card
 	return cards.NewCards(matches, page), nil
 }
 
-func (r inMemCardRepository) Exist(_ context.Context, id int) (bool, error) {
+func (r inMemCardRepository) Exist(_ context.Context, id cards.ID) (bool, error) {
 	for _, c := range r.cards {
-		if c.ID == id {
+		if c.ID.Eq(id) {
 			return true, nil
 		}
 	}
@@ -90,7 +91,7 @@ func (r inMemCardRepository) Collect(_ context.Context, item cards.Collectable, 
 	}
 
 	for i, c := range r.collected[cID] {
-		if c.ID == item.ID {
+		if c.ID.Eq(item.ID) {
 			r.collected[cID][i] = item
 
 			return nil
@@ -99,7 +100,7 @@ func (r inMemCardRepository) Collect(_ context.Context, item cards.Collectable, 
 
 	// not in collection yet
 	for _, c := range r.cards {
-		if c.ID == item.ID {
+		if c.ID.Eq(item.ID) {
 			r.collected[cID] = append(r.collected[cID], item)
 
 			return nil
@@ -114,7 +115,7 @@ func (r inMemCardRepository) Remove(_ context.Context, item cards.Collectable, c
 
 	toDelete := -1
 	for i, c := range r.collected[cID] {
-		if c.ID == item.ID {
+		if c.ID.Eq(item.ID) {
 			toDelete = i
 
 			break

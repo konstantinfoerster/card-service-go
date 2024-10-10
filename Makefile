@@ -3,6 +3,8 @@ CURRENT_DIR=$(shell pwd)
 
 build:
 	go build -o ${BINARY_NAME} cmd/main.go
+dbuild:
+	docker build -t card-service:local -f build/opencv.Dockerfile .
 utest:
 	go test --short --count=1 ./...
 test:

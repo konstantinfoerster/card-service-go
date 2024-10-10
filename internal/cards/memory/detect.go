@@ -14,20 +14,16 @@ import (
 )
 
 type InMemDetectRepository struct {
-	hasher    image.Hasher
-	collected map[string][]cards.Collectable
-	cards     []cards.Card
-	cfg       config.Images
+	hasher image.Hasher
+	cards  []cards.Card
+	cfg    config.Images
 }
 
-func NewDetectRepository(
-	data []cards.Card, collected map[string][]cards.Collectable, cfg config.Images, hasher image.Hasher,
-) (cards.DetectRepository, error) {
+func NewDetectRepository(data []cards.Card, cfg config.Images, hasher image.Hasher) (cards.DetectRepository, error) {
 	return &InMemDetectRepository{
-		cards:     data,
-		hasher:    hasher,
-		collected: collected,
-		cfg:       cfg,
+		cards:  data,
+		hasher: hasher,
+		cfg:    cfg,
 	}, nil
 }
 
@@ -46,31 +42,8 @@ func (r InMemDetectRepository) hash(c cards.Card) (image.Hash, error) {
 	return r.hasher.Hash(img)
 }
 
-func (r InMemDetectRepository) Top5MatchesByHash(
-	ctx context.Context, c cards.Collector, hashes ...image.Hash) (cards.Matches, error) {
-	result, err := r.allMatchesByHash(ctx, hashes...)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.ID != "" {
-		for _, c := range r.collected[c.ID] {
-			for i := range result {
-				result[i].Amount = c.Amount
-			}
-		}
-	}
-
-	limit := 5
-	if len(result) > limit {
-		return result[:limit], nil
-	}
-
-	return result, nil
-}
-
-func (r InMemDetectRepository) allMatchesByHash(_ context.Context, hashes ...image.Hash) (cards.Matches, error) {
-	var result cards.Matches
+func (r InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (cards.Scores, error) {
+	var result cards.Scores
 	for _, card := range r.cards {
 		if card.Image.URL == "" {
 			continue
@@ -91,15 +64,27 @@ func (r InMemDetectRepository) allMatchesByHash(_ context.Context, hashes ...ima
 				lowest = d
 			}
 		}
-		result = append(result, cards.Match{
-			Card:  card,
+
+		// only scores < 60 are allowed
+		minConfidence := 60
+		if lowest >= minConfidence {
+			continue
+		}
+
+		result = append(result, cards.Score{
+			ID:    card.ID,
 			Score: lowest,
 		})
 	}
 
-	slices.SortStableFunc(result, func(a cards.Match, b cards.Match) int {
+	slices.SortStableFunc(result, func(a cards.Score, b cards.Score) int {
 		return cmp.Compare(a.Score, b.Score)
 	})
+
+	limit := 5
+	if len(result) > limit {
+		return result[:limit], nil
+	}
 
 	return result, nil
 }

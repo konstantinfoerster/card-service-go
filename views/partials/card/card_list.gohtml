@@ -2,20 +2,20 @@
     {{- if .Page.Data -}}
         {{ $length := len .Page.Data }}
         {{- range $index, $card :=.Page.Data -}}
-          <div class="card-image-wrapper" title="{{ .Name}}">
+          <div class="card-image-wrapper" title="{{ .Title}}">
             <img
                 data-testid="card-{{$index}}"
                 width="332"
                 height="462"
                 class="card-image"
                 {{if .Image}}src="{{ .Image}}"{{end}}
-                alt="{{ $card.Name}}"
+                alt="{{ $card.Title}}"
             />
               {{- if $.User -}}{{- template  "collect_action" . -}}{{- end -}}
           </div>
           {{- if and ($.Page.HasMore) (isLastIndex $index $length) -}}
             <div class="card-image-wrapper hidden-card"
-                 hx-get="/api/v1/cards?name={{ $.SearchTerm}}&page={{ $.Page.NextPage }}"
+                 hx-get="/cards?name={{ $.SearchTerm}}&page={{ $.Page.NextPage }}"
                  hx-trigger="revealed"
                  hx-swap="outerHTML"
             ></div>

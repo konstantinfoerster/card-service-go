@@ -16,11 +16,11 @@ server:
     encryption_key: ""
 
 oidc:
-  redirect_uri: http://localhost:8000/login/callback
   session_cookie_name: SESSION
   state_cookie_age: 60s
   provider:
     google:
+      redirect_uri: http://localhost:3000/api/v1/login/google/callback
       client_id: "<client-id>"
       secret: "<client-secret>"
 

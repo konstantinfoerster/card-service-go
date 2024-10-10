@@ -7,17 +7,19 @@ import (
 )
 
 type dbCard struct {
+	Row      sql.NullInt64
 	Name     string
 	SetName  string
 	SetCode  string
 	ImageURL sql.NullString
 	CardID   int
+	FaceID   int
 	Amount   int
 }
 
 func toCard(dbCard dbCard) cards.Card {
 	return cards.Card{
-		ID:   dbCard.CardID,
+		ID:   cards.ID{CardID: dbCard.CardID, FaceID: dbCard.FaceID},
 		Name: dbCard.Name,
 		Image: cards.Image{
 			URL: dbCard.ImageURL.String,

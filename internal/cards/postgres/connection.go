@@ -53,23 +53,18 @@ func (d *DBConnection) Close() error {
 }
 
 func (d *DBConnection) WithTransaction(ctx context.Context, f func(conn *DBConnection) error) error {
-	switch d.Conn.(type) {
-	case pgx.Tx:
-		return fmt.Errorf("already inside a transaction")
-	default:
-		opts := pgx.TxOptions{AccessMode: pgx.ReadWrite, IsoLevel: pgx.ReadCommitted}
+	opts := pgx.TxOptions{AccessMode: pgx.ReadWrite, IsoLevel: pgx.ReadCommitted}
 
-		if err := pgx.BeginTxFunc(ctx, d.pgxCon, opts, func(t pgx.Tx) error {
-			return f(&DBConnection{
-				Conn:   t,
-				pgxCon: d.pgxCon,
-			})
-		}); err != nil {
-			return fmt.Errorf("transaction error %w", err)
-		}
-
-		return nil
+	if err := pgx.BeginTxFunc(ctx, d.pgxCon, opts, func(t pgx.Tx) error {
+		return f(&DBConnection{
+			Conn:   t,
+			pgxCon: d.pgxCon,
+		})
+	}); err != nil {
+		return fmt.Errorf("transaction failed, %w", err)
 	}
+
+	return nil
 }
 
 // DBConn implemented by pgx.Conn and pgx.Tx.

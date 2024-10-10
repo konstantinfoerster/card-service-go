@@ -1,6 +1,9 @@
 [
   {
-    "id": 1,
+    "id": {
+      "cardId": 1,
+      "faceId": 1
+    },
     "name": "Ancestor's Chosen",
     "number": "1",
     "set": {
@@ -12,7 +15,10 @@
     }
   },
   {
-    "id": 56,
+    "id": {
+      "cardId": 56,
+      "faceId": 56
+    },
     "name": "Beacon of Immortality",
     "number": "10",
     "set": {
@@ -21,7 +27,10 @@
     }
   },
   {
-    "id": 33,
+    "id": {
+      "cardId": 33,
+      "faceId": 33
+    },
     "name": "Remove Soul",
     "number": "100",
     "set": {
@@ -30,7 +39,10 @@
     }
   },
   {
-    "id": 700,
+    "id": {
+      "cardId": 700,
+      "faceId": 700
+    },
     "name": "Robe of Mirrors",
     "number": "101",
     "set": {
@@ -39,7 +51,10 @@
     }
   },
   {
-    "id": 563,
+    "id": {
+      "cardId": 563,
+      "faceId": 564
+    },
     "name": "Robe of Mirrors",
     "number": "101★",
     "set": {
@@ -48,7 +63,10 @@
     }
   },
   {
-    "id": 34,
+    "id": {
+      "cardId": 34,
+      "faceId": 34
+    },
     "name": "Rootwater Commando",
     "number": "102",
     "set": {
@@ -57,7 +75,10 @@
     }
   },
   {
-    "id": 32,
+    "id": {
+      "cardId": 32,
+      "faceId": 32
+    },
     "name": "Rootwater Commando",
     "number": "102★",
     "set": {
@@ -66,7 +87,10 @@
     }
   },
   {
-    "id": 35,
+    "id": {
+      "cardId": 35,
+      "faceId": 35
+    },
     "name": "Rootwater Matriarch",
     "number": "103",
     "set": {
@@ -75,7 +99,10 @@
     }
   },
   {
-    "id": 281,
+    "id": {
+      "cardId": 281,
+      "faceId": 281
+    },
     "name": "Sage Owl",
     "number": "104",
     "set": {
@@ -84,7 +111,10 @@
     }
   },
   {
-    "id": 282,
+    "id": {
+      "cardId": 282,
+      "faceId": 282
+    },
     "name": "Sage Owl",
     "number": "104★",
     "set": {

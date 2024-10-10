@@ -11,14 +11,12 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
-func currentDir() string {
-	_, cf, _, _ := runtime.Caller(0)
-
-	return path.Join(path.Dir(cf))
-}
-
 func CardSeed() ([]cards.Card, error) {
-	dir := currentDir()
+	_, cf, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("failed to get current dir")
+	}
+	dir := path.Join(path.Dir(cf))
 
 	cc := make([]cards.Card, 0)
 

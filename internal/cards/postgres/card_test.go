@@ -33,13 +33,13 @@ func TestFind(t *testing.T) {
 					Name:  "Aa Card",
 					Set:   cards.Set{Code: "M16", Name: "Magic 2016"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard17.png"},
-					ID:    17,
+					ID:    cards.NewID(17).WithFace(18),
 				},
 				{
 					Name:  "Baa Card",
 					Set:   cards.Set{Code: "M16", Name: "Magic 2016"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard16.png"},
-					ID:    16,
+					ID:    cards.NewID(16).WithFace(17),
 				},
 			},
 		},
@@ -52,13 +52,13 @@ func TestFind(t *testing.T) {
 					Name:  "Aa Card",
 					Set:   cards.Set{Code: "M16", Name: "Magic 2016"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard17.png"},
-					ID:    17,
+					ID:    cards.NewID(17).WithFace(18),
 				},
 				{
 					Name:  "Baa Card",
 					Set:   cards.Set{Code: "M16", Name: "Magic 2016"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard16.png"},
-					ID:    16,
+					ID:    cards.NewID(16).WithFace(17),
 				},
 			},
 		},
@@ -71,19 +71,19 @@ func TestFind(t *testing.T) {
 					Name:  "Dummy Card 1",
 					Set:   cards.Set{Code: "M10", Name: "Magic 2010"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard1.png"},
-					ID:    1,
+					ID:    cards.NewID(1).WithFace(1),
 				},
 				{
 					Name:  "Dummy Card 2",
 					Set:   cards.Set{Code: "M10", Name: "Magic 2010"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard2.png"},
-					ID:    2,
+					ID:    cards.NewID(2).WithFace(2),
 				},
 				{
 					Name:  "Dummy Card 3",
 					Set:   cards.Set{Code: "M10", Name: "Magic 2010"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard3.png"},
-					ID:    3,
+					ID:    cards.NewID(3).WithFace(3),
 				},
 			},
 		},
@@ -96,7 +96,7 @@ func TestFind(t *testing.T) {
 					Name:  "Dummy Card 4",
 					Set:   cards.Set{Code: "M10", Name: "Magic 2010"},
 					Image: cards.Image{URL: "http://localhost/images/dummyCard4.png"},
-					ID:    4,
+					ID:    cards.NewID(4).WithFace(4),
 				},
 			},
 		},
@@ -127,7 +127,7 @@ func TestFind(t *testing.T) {
 					Name:  "Front Face doubleFace",
 					Set:   cards.Set{Code: "M13", Name: "Magic 2013"},
 					Image: cards.Image{URL: "http://localhost/images/FrontFace.png"},
-					ID:    8,
+					ID:    cards.NewID(8).WithFace(8),
 				},
 			},
 		},
@@ -140,7 +140,7 @@ func TestFind(t *testing.T) {
 					Name:  "Back Face doubleFace",
 					Set:   cards.Set{Code: "M13", Name: "Magic 2013"},
 					Image: cards.Image{URL: "http://localhost/images/BackFace.png"},
-					ID:    8,
+					ID:    cards.NewID(8).WithFace(9),
 				},
 			},
 		},
@@ -153,7 +153,7 @@ func TestFind(t *testing.T) {
 					Name:  "Front Face doubleFace",
 					Set:   cards.Set{Code: "M13", Name: "Magic 2013"},
 					Image: cards.Image{URL: "http://localhost/images/FrontFace.png"},
-					ID:    8,
+					ID:    cards.NewID(8).WithFace(8),
 				},
 			},
 		},
@@ -166,20 +166,19 @@ func TestFind(t *testing.T) {
 					Name:  "No Image Card 1",
 					Set:   cards.Set{Code: "M11", Name: "Magic 2011"},
 					Image: cards.Image{URL: ""},
-					ID:    5,
+					ID:    cards.NewID(5).WithFace(5),
 				},
 			},
 		},
 		{
-			name:       "match card without face image",
+			name:       "match card without image face ID",
 			searchTerm: "No Image Card 2",
 			page:       cards.NewPage(1, 10),
 			expected: []cards.Card{
 				{
-					Name:  "No Image Card 2",
-					Set:   cards.Set{Code: "M11", Name: "Magic 2011"},
-					Image: cards.Image{URL: "http://localhost/images/noFace.png"},
-					ID:    6,
+					Name: "No Image Card 2",
+					Set:  cards.Set{Code: "M11", Name: "Magic 2011"},
+					ID:   cards.NewID(6).WithFace(6),
 				},
 			},
 		},
@@ -187,10 +186,13 @@ func TestFind(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			filter := cards.NewFilter().WithName(tc.searchTerm)
+			filter := cards.NewFilter().
+				WithName(tc.searchTerm).
+				WithLanguage(cards.DefaultLang)
 			result, err := cardRepo.Find(ctx, filter, tc.page)
 
 			require.NoError(t, err)
+			require.Len(t, result.Result, len(tc.expected))
 			assert.Equal(t, tc.page.Page(), result.Page)
 			assert.ElementsMatch(t, tc.expected, result.Result)
 		})
@@ -205,114 +207,231 @@ func TestFindWithCollector(t *testing.T) {
 	cardRepo := postgres.NewCardRepository(connection, cfg)
 
 	cases := []struct {
-		name       string
-		searchTerm string
-		expected   []cards.Card
+		name      string
+		filter    cards.Filter
+		collector cards.Collector
+		expected  []cards.Card
 	}{
 		{
-			name:       "match name with amount",
-			searchTerm: "ummy Card",
+			name: "match name with amount",
+			filter: cards.NewFilter().
+				WithName("ummy Card").
+				WithCollector(collector),
 			expected: []cards.Card{
 				{
 					Name:   "Dummy Card 1",
 					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
 					Image:  cards.Image{URL: "http://localhost/images/dummyCard1.png"},
-					ID:     1,
+					ID:     cards.NewID(1).WithFace(1),
 					Amount: 3,
 				},
 				{
 					Name:   "Dummy Card 2",
 					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
 					Image:  cards.Image{URL: "http://localhost/images/dummyCard2.png"},
-					ID:     2,
+					ID:     cards.NewID(2).WithFace(2),
 					Amount: 1,
 				},
 				{
 					Name:   "Dummy Card 3",
 					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
 					Image:  cards.Image{URL: "http://localhost/images/dummyCard3.png"},
-					ID:     3,
+					ID:     cards.NewID(3).WithFace(3),
 					Amount: 0,
 				},
 			},
 		},
 		{
-			name:       "card name match but face name does not match",
-			searchTerm: "Double Face",
-			expected:   []cards.Card{},
+			name: "card name match but face name does not match",
+			filter: cards.NewFilter().
+				WithName("Double Face").
+				WithCollector(collector),
+			expected: []cards.Card{},
 		},
 		{
-			name:       "match only front face name",
-			searchTerm: "Front face ",
+			name: "match only front face name",
+			filter: cards.NewFilter().
+				WithName("Front Face").
+				WithCollector(collector),
 			expected: []cards.Card{
 				{
 					Name:   "Front Face doubleFace",
 					Set:    cards.Set{Code: "M13", Name: "Magic 2013"},
 					Image:  cards.Image{URL: "http://localhost/images/FrontFace.png"},
-					ID:     8,
+					ID:     cards.NewID(8).WithFace(8),
 					Amount: 2,
 				},
 			},
 		},
 		{
-			name:       "match only back face name",
-			searchTerm: "Back Face",
+			name: "match only back face name",
+			filter: cards.NewFilter().
+				WithName("Back Face").
+				WithCollector(collector),
 			expected: []cards.Card{
 				{
 					Name:   "Back Face doubleFace",
 					Set:    cards.Set{Code: "M13", Name: "Magic 2013"},
 					Image:  cards.Image{URL: "http://localhost/images/BackFace.png"},
-					ID:     8,
+					ID:     cards.NewID(8).WithFace(9),
 					Amount: 2,
 				},
 			},
 		},
 		{
-			name:       "match both faces returns single card",
-			searchTerm: "doubleFace",
+			name: "match both faces returns single card",
+			filter: cards.NewFilter().
+				WithName("doubleface").
+				WithCollector(collector),
 			expected: []cards.Card{
 				{
 					Name:   "Front Face doubleFace",
 					Set:    cards.Set{Code: "M13", Name: "Magic 2013"},
 					Image:  cards.Image{URL: "http://localhost/images/FrontFace.png"},
-					ID:     8,
+					ID:     cards.NewID(8).WithFace(8),
 					Amount: 2,
 				},
 			},
 		},
 		{
-			name:       "match card without image",
-			searchTerm: "No Image Card 1",
+			name: "match card without image",
+			filter: cards.NewFilter().
+				WithName("No Image Card 1").
+				WithCollector(collector),
 			expected: []cards.Card{
 				{
 					Name:   "No Image Card 1",
 					Set:    cards.Set{Code: "M11", Name: "Magic 2011"},
 					Image:  cards.Image{URL: ""},
-					ID:     5,
+					ID:     cards.NewID(5).WithFace(5),
 					Amount: 5,
 				},
 			},
 		},
 		{
-			name:       "match card without face image",
-			searchTerm: "No Image Card 2",
+			name: "match card without image face ID",
+			filter: cards.NewFilter().
+				WithName("No Image Card 2").
+				WithCollector(collector),
 			expected: []cards.Card{
 				{
 					Name:   "No Image Card 2",
 					Set:    cards.Set{Code: "M11", Name: "Magic 2011"},
-					Image:  cards.Image{URL: "http://localhost/images/noFace.png"},
-					ID:     6,
+					ID:     cards.NewID(6).WithFace(6),
 					Amount: 1,
 				},
 			},
+		},
+		{
+			name: "collector without collection",
+			filter: cards.NewFilter().
+				WithName("ummy Card").
+				WithCollector(cards.NewCollector("differentCollector")),
+			expected: []cards.Card{
+				{
+					Name:   "Dummy Card 1",
+					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
+					Image:  cards.Image{URL: "http://localhost/images/dummyCard1.png"},
+					ID:     cards.NewID(1).WithFace(1),
+					Amount: 0,
+				},
+				{
+					Name:   "Dummy Card 2",
+					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
+					Image:  cards.Image{URL: "http://localhost/images/dummyCard2.png"},
+					ID:     cards.NewID(2).WithFace(2),
+					Amount: 0,
+				},
+				{
+					Name:   "Dummy Card 3",
+					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
+					Image:  cards.Image{URL: "http://localhost/images/dummyCard3.png"},
+					ID:     cards.NewID(3).WithFace(3),
+					Amount: 0,
+				},
+			},
+		},
+		{
+			name: "only collected with name filter",
+			filter: cards.NewFilter().
+				WithName("ummy Card").
+				WithCollector(collector).
+				WithOnlyCollected(),
+			expected: []cards.Card{
+				{
+					Name:   "Dummy Card 1",
+					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
+					Image:  cards.Image{URL: "http://localhost/images/dummyCard1.png"},
+					ID:     cards.NewID(1).WithFace(1),
+					Amount: 3,
+				},
+				{
+					Name:   "Dummy Card 2",
+					Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
+					Image:  cards.Image{URL: "http://localhost/images/dummyCard2.png"},
+					ID:     cards.NewID(2).WithFace(2),
+					Amount: 1,
+				},
+			},
+		},
+		{
+			name: "all collected",
+			filter: cards.NewFilter().
+				WithCollector(collector).
+				WithOnlyCollected(),
+			expected: []cards.Card{
+				{
+					Name:   "Back Face doubleFace",
+					Set:    cards.Set{Code: "M13", Name: "Magic 2013"},
+					Image:  cards.Image{URL: "http://localhost/images/BackFace.png"},
+					ID:     cards.NewID(8).WithFace(9),
+					Amount: 2,
+				},
+				{
+					Name:   "Card 11 with hash",
+					Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
+					Image:  cards.Image{URL: "http://localhost/images/card11Hash.png"},
+					ID:     cards.NewID(11).WithFace(12),
+					Amount: 3,
+				},
+				{
+					Name:   "Card 12 with hash",
+					Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
+					Image:  cards.Image{URL: "http://localhost/images/card12hash.png"},
+					ID:     cards.NewID(12).WithFace(13),
+					Amount: 1,
+				},
+			},
+		},
+		{
+			name: "only collected with name filter but empty collection",
+			filter: cards.NewFilter().
+				WithName("ummy Card").
+				WithCollector(cards.NewCollector("differentCollector")).
+				WithOnlyCollected(),
+			expected: []cards.Card{},
+		},
+		{
+			name: "all collected but empty collection",
+			filter: cards.NewFilter().
+				WithCollector(cards.NewCollector("differentCollector")).
+				WithOnlyCollected(),
+			expected: []cards.Card{},
+		},
+		{
+			name: "all collected with collection and unknown cards",
+			filter: cards.NewFilter().
+				WithCollector(cards.NewCollector("myOtherUser")).
+				WithOnlyCollected().
+				WithLanguage(cards.DefaultLang),
+			expected: []cards.Card{},
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			f := cards.NewFilter().WithName(tc.searchTerm).WithCollector(collector)
-			result, err := cardRepo.Find(ctx, f, cards.NewPage(1, 3))
+			result, err := cardRepo.Find(ctx, tc.filter, cards.NewPage(1, 3))
 
 			require.NoError(t, err)
 			assert.ElementsMatch(t, tc.expected, result.Result)
@@ -320,50 +439,15 @@ func TestFindWithCollector(t *testing.T) {
 	}
 }
 
-func TestFindOnlyCollected(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-	cfg := config.Images{Host: "http://localhost/"}
-	cardRepo := postgres.NewCardRepository(connection, cfg)
-	expected := []cards.Card{
-		{
-			Name:   "Dummy Card 1",
-			Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
-			Image:  cards.Image{URL: "http://localhost/images/dummyCard1.png"},
-			ID:     1,
-			Amount: 3,
-		},
-		{
-			Name:   "Dummy Card 2",
-			Set:    cards.Set{Code: "M10", Name: "Magic 2010"},
-			Image:  cards.Image{URL: "http://localhost/images/dummyCard2.png"},
-			ID:     2,
-			Amount: 1,
-		},
-	}
-
-	ctx := context.Background()
-	filter := cards.NewFilter().
-		WithName("ummy Card").
-		WithCollector(collector).
-		WithOnlyCollected()
-	result, err := cardRepo.Find(ctx, filter, cards.NewPage(1, 10))
-
-	require.NoError(t, err)
-	assert.Len(t, result.Result, 2)
-	assert.ElementsMatch(t, expected, result.Result)
-}
-
 func TestFindByID(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
 	cfg := config.Images{}
-	cardRepo := postgres.NewCardRepository(connection, cfg)
+	repo := postgres.NewCollectionRepository(connection, cfg)
 
 	ctx := context.Background()
-	exist, err := cardRepo.Exist(ctx, 1)
+	exist, err := repo.Exist(ctx, cards.NewID(1))
 
 	require.NoError(t, err)
 	assert.True(t, exist)
@@ -374,10 +458,10 @@ func TestFindByNoneExistingID(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	cfg := config.Images{}
-	cardRepo := postgres.NewCardRepository(connection, cfg)
+	repo := postgres.NewCollectionRepository(connection, cfg)
 
 	ctx := context.Background()
-	exist, err := cardRepo.Exist(ctx, 1000)
+	exist, err := repo.Exist(ctx, cards.NewID(1000))
 
 	require.NoError(t, err)
 	assert.False(t, exist)
@@ -388,23 +472,24 @@ func TestAddCards(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	cfg := config.Images{}
-	cardRepo := postgres.NewCardRepository(connection, cfg)
+	repo := postgres.NewCollectionRepository(connection, cfg)
 	item, err := cards.NewCollectable(9, 2)
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	err = cardRepo.Collect(ctx, item, collector)
+	err = repo.Collect(ctx, item, collector)
 	require.NoError(t, err)
 
 	filter := cards.NewFilter().
 		WithName("Uncollected Card 1").
 		WithCollector(collector).
-		WithOnlyCollected()
-	page, err := cardRepo.Find(ctx, filter, cards.NewPage(1, 10))
+		WithOnlyCollected().
+		WithLanguage(cards.DefaultLang)
+	page, err := repo.Find(ctx, filter, cards.NewPage(1, 10))
 	require.NoError(t, err)
 
 	require.Len(t, page.Result, 1)
-	assert.Equal(t, 9, page.Result[0].ID)
+	assert.Truef(t, cards.NewID(9).Eq(page.Result[0].ID), "want card ID 9 got %d", page.Result[0].ID)
 	assert.Equal(t, 2, page.Result[0].Amount)
 }
 
@@ -413,11 +498,11 @@ func TestAddNoneExistingCardNoError(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	cfg := config.Images{}
-	cardRepo := postgres.NewCardRepository(connection, cfg)
+	repo := postgres.NewCollectionRepository(connection, cfg)
 	noneExistingItem, _ := cards.NewCollectable(1000, 1)
 
 	ctx := context.Background()
-	err := cardRepo.Collect(ctx, noneExistingItem, collector)
+	err := repo.Collect(ctx, noneExistingItem, collector)
 
 	require.NoError(t, err)
 }
@@ -427,19 +512,20 @@ func TestRemoveCards(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	cfg := config.Images{}
-	cardRepo := postgres.NewCardRepository(connection, cfg)
-	item, err := cards.RemoveItem(10)
+	repo := postgres.NewCollectionRepository(connection, cfg)
+	item, err := cards.NewCollectable(10, 0)
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	err = cardRepo.Remove(ctx, item, collector)
+	err = repo.Remove(ctx, item, collector)
 	require.NoError(t, err)
 
 	filter := cards.NewFilter().
 		WithName("Remove Collected Card 1").
 		WithCollector(collector).
-		WithOnlyCollected()
-	page, err := cardRepo.Find(ctx, filter, cards.NewPage(1, 10))
+		WithOnlyCollected().
+		WithLanguage(cards.DefaultLang)
+	page, err := repo.Find(ctx, filter, cards.NewPage(1, 10))
 	require.NoError(t, err)
 
 	require.Empty(t, page.Result)
@@ -450,11 +536,11 @@ func TestRemoveUncollectedCardNoError(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 	cfg := config.Images{}
-	cardRepo := postgres.NewCardRepository(connection, cfg)
-	noneExistingItem, _ := cards.RemoveItem(2000)
+	repo := postgres.NewCollectionRepository(connection, cfg)
+	noneExistingItem, _ := cards.NewCollectable(2000, 0)
 
 	ctx := context.Background()
-	err := cardRepo.Remove(ctx, noneExistingItem, collector)
+	err := repo.Remove(ctx, noneExistingItem, collector)
 
 	require.NoError(t, err)
 }

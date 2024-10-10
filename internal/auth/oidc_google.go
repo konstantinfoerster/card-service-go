@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,10 +10,15 @@ import (
 	"google.golang.org/api/option"
 )
 
+var (
+	errEmptyToken     = errors.New("empty token")
+	errValidateGoogle = errors.New("validate google provider")
+)
+
 func googleProvider(client *http.Client) (*provider, error) {
 	validator, err := idtoken.NewValidator(context.Background(), option.WithHTTPClient(client))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create validator due to %w", err)
 	}
 
 	return &provider{
@@ -24,17 +30,20 @@ func googleProvider(client *http.Client) (*provider, error) {
 		clientID:  "",
 		secret:    "",
 		scope:     "openid email",
-		validate: func(ctx context.Context, token *JWT, clientID string) (*Claims, error) {
+		validate: func(ctx context.Context, token *JWT, clientID string) (Claims, error) {
+			if token == nil {
+				return Claims{}, errEmptyToken
+			}
 			payload, err := validator.Validate(ctx, token.IDToken, clientID)
 			if err != nil {
-				return nil, fmt.Errorf("id token invalid %w", err)
+				return Claims{}, fmt.Errorf("id token validation failed with %w", err)
 			}
 			cEmail := payload.Claims["email"]
 			cSub := payload.Claims["sub"]
 
 			id, ok := cSub.(string)
 			if !ok {
-				return nil, fmt.Errorf("claims.sub is not a string but %T", cSub)
+				return Claims{}, fmt.Errorf("claims.sub is not a string but %T, %w", cSub, errValidateGoogle)
 			}
 
 			email := ""
@@ -42,7 +51,7 @@ func googleProvider(client *http.Client) (*provider, error) {
 				var ok bool
 				email, ok = cEmail.(string)
 				if !ok {
-					return nil, fmt.Errorf("claims.email is not a string but %T", cEmail)
+					return Claims{}, fmt.Errorf("claims.email is not a string but %T, %w", cEmail, errValidateGoogle)
 				}
 			}
 

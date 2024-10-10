@@ -9,6 +9,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	ErrInvalidField = errors.New("invalid field value")
+)
+
 const ContentType = "application/problem+json"
 
 type ProblemJSON struct {
@@ -36,41 +40,35 @@ func NewProblemJSON(title string, key string, status int) *ProblemJSON {
 }
 
 func RespondWithProblemJSON(c *fiber.Ctx, err error) error {
+	var e *fiber.Error
+	if errors.As(err, &e) {
+		return sendError(c, e.Code, "api-error", e.Message, e)
+	}
+
 	var appErr aerrors.AppError
 	if !errors.As(err, &appErr) {
-		return internalError(c, "internal-error", err)
+		return sendError(c, StatusInternalServerError, "internal-error", "", err)
 	}
 
+	var code int
 	switch appErr.ErrorType {
 	case aerrors.ErrTypeInvalidInput:
-		return badRequest(c, appErr.Msg, appErr.Key, err)
+		code = StatusBadRequest
 	case aerrors.ErrTypeAuthorization:
-		return unauthorized(c, appErr.Key, err)
+		code = StatusUnauthorized
 	default:
-		return internalError(c, appErr.Key, err)
+		code = StatusInternalServerError
 	}
+
+	return sendError(c, code, appErr.Key, appErr.Msg, err)
 }
 
-func unauthorized(c *fiber.Ctx, key string, err error) error {
-	statusCode := StatusUnauthorized
-	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
+func sendError(c *fiber.Ctx, code int, key, title string, err error) error {
+	if title == "" {
+		title = http.StatusText(code)
+	}
+	log.Error().Err(err).Int("code", code).Str("key", key).Str("title", title).Send()
 
-	return c.Status(statusCode).
-		JSON(NewProblemJSON(http.StatusText(statusCode), key, statusCode), ContentType)
-}
-
-func badRequest(c *fiber.Ctx, title string, key string, err error) error {
-	statusCode := http.StatusBadRequest
-	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
-
-	return c.Status(statusCode).
-		JSON(NewProblemJSON(title, key, statusCode), ContentType)
-}
-
-func internalError(c *fiber.Ctx, key string, err error) error {
-	statusCode := http.StatusInternalServerError
-	log.Error().Err(err).Int("statusCode", statusCode).Str("key", key).Send()
-
-	return c.Status(statusCode).
-		JSON(NewProblemJSON(http.StatusText(statusCode), key, statusCode), ContentType)
+	return c.Status(code).
+		JSON(NewProblemJSON(title, key, code), ContentType)
 }

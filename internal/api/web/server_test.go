@@ -1,7 +1,6 @@
 package web_test
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"testing"
 
@@ -21,17 +20,17 @@ func TestNewHttpServerErrorHandler(t *testing.T) {
 	}{
 		{
 			name:       "Invalid input",
-			appErr:     aerrors.NewInvalidInputError(fmt.Errorf("some error"), "mykey", "mymsg"),
+			appErr:     aerrors.NewInvalidInputError(assert.AnError, "mykey", "mymsg"),
 			statusCode: web.StatusBadRequest,
 		},
 		{
 			name:       "Unauthorized",
-			appErr:     aerrors.NewAuthorizationError(fmt.Errorf("some error"), "myKey"),
+			appErr:     aerrors.NewAuthorizationError(assert.AnError, "myKey"),
 			statusCode: web.StatusUnauthorized,
 		},
 		{
 			name:       "Unknown error",
-			appErr:     aerrors.NewUnknownError(fmt.Errorf("some error"), "myKey"),
+			appErr:     aerrors.NewUnknownError(assert.AnError, "myKey"),
 			statusCode: web.StatusInternalServerError,
 		},
 	}

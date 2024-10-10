@@ -24,7 +24,8 @@ func searchCards(svc cards.CardService) fiber.Handler {
 			return err
 		}
 
-		pagedResult := newPagedResponse(result)
+		pagedResult := newResponse(result.PagedResult)
+
 		if web.AcceptsHTML(c) || web.IsHTMX(c) {
 			data := fiber.Map{
 				"SearchTerm": searchTerm,

@@ -79,18 +79,18 @@ func run(cfg *config.Config) error {
 	}
 
 	timeSvc := auth.NewTimeService()
-	authSvc := auth.New(cfg.Oidc, oidcProvider...)
+	authSvc := auth.New(cfg.Oidc, oidcProvider)
 	detector := image.NewDetector()
 	hasher := image.NewPHasher()
 
-	searchRepo := postgres.NewCardRepository(dbCon, cfg.Images)
-	searchSvc := cards.NewCardService(searchRepo)
+	cardRepo := postgres.NewCardRepository(dbCon, cfg.Images)
+	cardSvc := cards.NewCardService(cardRepo)
 
-	collectionRep := postgres.NewCollectionRepository(dbCon, cfg.Images)
-	collectSvc := cards.NewCollectionService(collectionRep)
+	collectRepo := postgres.NewCollectionRepository(dbCon, cfg.Images)
+	collectSvc := cards.NewCollectionService(collectRepo)
 
 	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
-	detectSvc := cards.NewDetectService(detectRep, detector, hasher)
+	detectSvc := cards.NewDetectService(cardRepo, detectRep, detector, hasher)
 
 	authMiddleware := web.NewAuthMiddleware(cfg.Oidc, authSvc)
 
@@ -98,7 +98,7 @@ func run(cfg *config.Config) error {
 		r.Static("/public", "./public")
 
 		cardsapi.DashboardRoutes(r, authMiddleware)
-		cardsapi.SearchRoutes(r, authMiddleware, searchSvc)
+		cardsapi.SearchRoutes(r, authMiddleware, cardSvc)
 		cardsapi.CollectionRoutes(r, authMiddleware, collectSvc)
 		cardsapi.DetectRoutes(r, authMiddleware, detectSvc)
 

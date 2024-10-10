@@ -3,7 +3,6 @@ package postgres_test
 import (
 	"context"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -61,7 +60,7 @@ type databaseRunner struct {
 func (r *databaseRunner) Start(ctx context.Context) error {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
-		return fmt.Errorf("failed to get caller")
+		panic("failed to get current dir")
 	}
 
 	dbDir, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(file), "testdata", "db"))
@@ -164,8 +163,7 @@ func (r *databaseRunner) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	// return r.container.Terminate(ctx)
-	return nil
+	return r.container.Terminate(ctx)
 }
 
 func (r *databaseRunner) Config() config.Database {

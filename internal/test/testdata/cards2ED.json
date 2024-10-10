@@ -1,6 +1,9 @@
 [
   {
-    "id": 406,
+    "id": {
+      "cardId": 406,
+      "faceId": 406
+    },
     "name": "Animate Wall",
     "number": "1",
     "set": {
@@ -9,7 +12,10 @@
     }
   },
   {
-    "id": 1074,
+    "id": {
+      "cardId": 1074,
+      "faceId": 1074
+    },
     "name": "Circle of Protection: Black",
     "number": "10",
     "set": {
@@ -18,7 +24,10 @@
     }
   },
   {
-    "id": 629,
+    "id": {
+      "cardId": 629,
+      "faceId": 629
+    },
     "name": "Darkpact",
     "number": "100",
     "set": {
@@ -27,7 +36,10 @@
     }
   },
   {
-    "id": 513,
+    "id": {
+      "cardId": 513,
+      "faceId": 513
+    },
     "name": "Deathgrip",
     "number": "101",
     "set": {
@@ -36,7 +48,10 @@
     }
   },
   {
-    "id": 773,
+    "id": {
+      "cardId": 773,
+      "faceId": 773
+    },
     "name": "Deathlace",
     "number": "102",
     "set": {
@@ -45,7 +60,10 @@
     }
   },
   {
-    "id": 434,
+    "id": {
+      "cardId": 434,
+      "faceId": 434
+    },
     "name": "Demonic Attorney",
     "number": "103",
     "set": {
@@ -54,7 +72,10 @@
     }
   },
   {
-    "id": 706,
+    "id": {
+      "cardId": 706,
+      "faceId": 706
+    },
     "name": "Demonic Hordes",
     "number": "104",
     "set": {
@@ -63,7 +84,10 @@
     }
   },
   {
-    "id": 514,
+    "id": {
+      "cardId": 514,
+      "faceId": 514
+    },
     "name": "Demonic Tutor",
     "number": "105",
     "set": {
@@ -72,7 +96,10 @@
     }
   },
   {
-    "id": 777,
+    "id": {
+      "cardId": 777,
+      "faceId": 777
+    },
     "name": "Drain Life",
     "number": "106",
     "set": {
@@ -81,7 +108,10 @@
     }
   },
   {
-    "id": 582,
+    "id": {
+      "cardId": 582,
+      "faceId": 582
+    },
     "name": "Drudge Skeletons",
     "number": "107",
     "set": {

@@ -1,6 +1,9 @@
 [
   {
-    "id": 745,
+    "id": {
+      "cardId": 745,
+      "faceId": 745
+    },
     "name": "Emrakul, the Aeons Torn",
     "number": "1",
     "set": {
@@ -9,7 +12,10 @@
     }
   },
   {
-    "id": 1065,
+    "id": {
+      "cardId": 1065,
+      "faceId": 1065
+    },
     "name": "Emiel the Blessed",
     "number": "10",
     "set": {
@@ -18,7 +24,10 @@
     }
   },
   {
-    "id": 911,
+    "id": {
+      "cardId": 911,
+      "faceId": 911
+    },
     "name": "Abbot of Keral Keep",
     "number": "100",
     "set": {
@@ -27,7 +36,10 @@
     }
   },
   {
-    "id": 1253,
+    "id": {
+      "cardId": 1253,
+      "faceId": 1253
+    },
     "name": "Alesha, Who Smiles at Death",
     "number": "101",
     "set": {
@@ -36,7 +48,10 @@
     }
   },
   {
-    "id": 774,
+    "id": {
+      "cardId": 774,
+      "faceId": 774
+    },
     "name": "Anger of the Gods",
     "number": "102",
     "set": {
@@ -45,7 +60,10 @@
     }
   },
   {
-    "id": 1097,
+    "id": {
+      "cardId": 1097,
+      "faceId": 1097
+    },
     "name": "Backdraft Hellkite",
     "number": "103",
     "set": {
@@ -54,7 +72,10 @@
     }
   },
   {
-    "id": 912,
+    "id": {
+      "cardId": 912,
+      "faceId": 912
+    },
     "name": "Bedlam Reveler",
     "number": "104",
     "set": {
@@ -63,7 +84,10 @@
     }
   },
   {
-    "id": 1098,
+    "id": {
+      "cardId": 1098,
+      "faceId": 1098
+    },
     "name": "Chaos Warp",
     "number": "105",
     "set": {
@@ -72,7 +96,10 @@
     }
   },
   {
-    "id": 775,
+    "id": {
+      "cardId": 775,
+      "faceId": 775
+    },
     "name": "Dark-Dweller Oracle",
     "number": "106",
     "set": {
@@ -81,7 +108,10 @@
     }
   },
   {
-    "id": 1215,
+    "id": {
+      "cardId": 1215,
+      "faceId": 1215
+    },
     "name": "Dockside Extortionist",
     "number": "107",
     "set": {

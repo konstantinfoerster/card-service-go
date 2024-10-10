@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -9,6 +10,11 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	ErrReadFile       = errors.New("cannot read file")
+	ErrInvalidContent = errors.New("unexpected file content")
 )
 
 type Config struct {
@@ -58,35 +64,27 @@ type Cookie struct {
 
 type Oidc struct {
 	Provider          map[string]Provider `yaml:"provider"`
-	RedirectURI       string              `yaml:"redirect_uri"`
 	SessionCookieName string              `yaml:"session_cookie_name"`
 	StateCookieAge    time.Duration       `yaml:"state_cookie_age"`
 	ClientTimeout     time.Duration       `yaml:"client_timeout"`
 }
 
 type Provider struct {
-	AuthURL   string `yaml:"auth_url"`
-	TokenURL  string `yaml:"token_url"`
-	RevokeURL string `yaml:"revoke_url"`
-	ClientID  string `yaml:"client_id"`
-	Secret    string `yaml:"secret"`
-	Scope     string `yaml:"scope"`
+	AuthURL     string `yaml:"auth_url"`
+	TokenURL    string `yaml:"token_url"`
+	RevokeURL   string `yaml:"revoke_url"`
+	RedirectURI string `yaml:"redirect_uri"`
+	ClientID    string `yaml:"client_id"`
+	Secret      string `yaml:"secret"`
+	Scope       string `yaml:"scope"`
 }
 
 func NewConfig(path string) (*Config, error) {
 	p := filepath.Clean(path)
 
-	s, err := os.Stat(p)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file info for %s, %w", p, err)
-	}
-	if s.IsDir() {
-		return nil, fmt.Errorf("'%s' is a directory, not a regular file", p)
-	}
-
 	data, err := os.ReadFile(p)
 	if err != nil {
-		return nil, fmt.Errorf("can't read config file: %w", err)
+		return nil, errors.Join(err, ErrReadFile)
 	}
 
 	defaultTimeoutSec := 5
@@ -106,7 +104,7 @@ func NewConfig(path string) (*Config, error) {
 
 	err = yaml.Unmarshal(data, &defaultConfig)
 	if err != nil {
-		return nil, fmt.Errorf("config unmarshal failed with: %w", err)
+		return nil, errors.Join(err, ErrInvalidContent)
 	}
 
 	// TODO: validate config content

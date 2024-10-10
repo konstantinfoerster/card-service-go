@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -28,11 +29,6 @@ func TestLogin(t *testing.T) {
 	provider := auth.NewFakeProvider(
 		auth.WithClaims(user),
 		auth.WithStateID("state-0"),
-		auth.WithProviderCfg(config.Provider{
-			ClientID: "my-client-id",
-			Scope:    "oidc email",
-			AuthURL:  "http://localhost/auth",
-		}),
 	)
 	srv := loginServer(staticTimeSvc, provider)
 	req := test.NewRequest(
@@ -57,9 +53,9 @@ func TestLogin(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, web.StatusFound, resp.StatusCode)
 	assert.Truef(t, strings.HasPrefix(location, "http://localhost/auth"), "location header want http://localhost/auth, got %s", location)
-	assert.Contains(t, location, "state="+expectedState)
-	assert.Contains(t, location, "client_id=my-client-id")
-	assert.Contains(t, location, "scope=oidc+email")
+	assert.Contains(t, location, "state="+url.QueryEscape(expectedState))
+	assert.Contains(t, location, "client_id=client-id")
+	assert.Contains(t, location, "scope=openid")
 	assert.Contains(t, location, "response_type=code")
 	assert.Contains(t, location, "redirect_uri=http%3A%2F%2Flocalhost%2Fhome")
 	assertEqualCookie(t, expectedCookie, resp.Cookies()[0])
@@ -133,7 +129,7 @@ func TestExchangeCode(t *testing.T) {
 			rawState := test.Base64Encoded(t, provider.GenerateState())
 			req := test.NewRequest(
 				test.WithMethod(http.MethodGet),
-				test.WithURL(fmt.Sprintf("http://localhost/login/callback?code=%s&state=%s", user.ID, rawState)),
+				test.WithURL(fmt.Sprintf("http://localhost/login/testProvider/callback?code=%s&state=%s", user.ID, rawState)),
 				test.WithCookie("TOKEN_STATE", encryptCookieValue(t, rawState)),
 			)
 			if tc.acceptHeader != "" {
@@ -163,6 +159,12 @@ func TestExchangeInvalidInput(t *testing.T) {
 		statusCode  int
 	}{
 		{
+			name:        "unknown provider",
+			queryParams: "",
+			provider:    nil,
+			statusCode:  http.StatusBadRequest,
+		},
+		{
 			name:        "No state cookie",
 			queryParams: fmt.Sprintf("?code=myUser&state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
 			provider:    nil,
@@ -171,16 +173,14 @@ func TestExchangeInvalidInput(t *testing.T) {
 		{
 			name:        "No auth code",
 			queryParams: fmt.Sprintf("?state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
-			provider:    nil,
+			provider:    auth.NewFakeProvider(),
 			statusCode:  http.StatusBadRequest,
 		},
 		{
 			name:        "No auth state",
 			queryParams: "?code=myuser",
-			provider: auth.NewFakeProvider(
-				auth.WithClaims(auth.NewClaims("myuser", "myUser")),
-			),
-			statusCode: http.StatusBadRequest,
+			provider:    auth.NewFakeProvider(auth.WithClaims(auth.NewClaims("myuser", "myUser"))),
+			statusCode:  http.StatusBadRequest,
 		},
 		{
 			name:       "No auth code and no auth state",
@@ -188,20 +188,16 @@ func TestExchangeInvalidInput(t *testing.T) {
 			statusCode: http.StatusBadRequest,
 		},
 		{
-			name: "State mismatch",
-			queryParams: fmt.Sprintf("?code=myuser&state=%s",
-				test.Base64Encoded(t, auth.State{ID: "state-1", Provider: "testProvider"}),
-			),
-			provider:   auth.NewFakeProvider(),
-			statusCode: http.StatusBadRequest,
+			name:        "State mismatch",
+			queryParams: fmt.Sprintf("?code=myuser&state=%s", test.Base64Encoded(t, auth.State{ID: "state-1"})),
+			provider:    auth.NewFakeProvider(),
+			statusCode:  http.StatusBadRequest,
 		},
 		{
-			name: "Failed authentication",
-			queryParams: fmt.Sprintf("?code=myAuthCode&state=%s",
-				test.Base64Encoded(t, auth.State{ID: "state-0", Provider: "testProvider"}),
-			),
-			provider:   auth.NewFakeProvider(),
-			statusCode: http.StatusInternalServerError,
+			name:        "Failed authentication",
+			queryParams: fmt.Sprintf("?code=myAuthCode&state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
+			provider:    auth.NewFakeProvider(),
+			statusCode:  http.StatusInternalServerError,
 		},
 	}
 
@@ -210,7 +206,7 @@ func TestExchangeInvalidInput(t *testing.T) {
 			srv := loginServer(staticTimeSvc, tc.provider)
 			req := test.NewRequest(
 				test.WithMethod(http.MethodGet),
-				test.WithURL("http://localhost/login/callback"+tc.queryParams),
+				test.WithURL("http://localhost/login/testProvider/callback"+tc.queryParams),
 			)
 			if tc.provider != nil {
 				state := test.Base64Encoded(t, tc.provider.GenerateState())
@@ -289,7 +285,7 @@ func TestLogout(t *testing.T) {
 			rawState := test.Base64Encoded(t, provider.GenerateState())
 			reqLogin := test.NewRequest(
 				test.WithMethod(http.MethodGet),
-				test.WithURL(fmt.Sprintf("http://localhost/login/callback?code=%s&state=%s", user.ID, rawState)),
+				test.WithURL(fmt.Sprintf("http://localhost/login/testProvider/callback?code=%s&state=%s", user.ID, rawState)),
 				test.WithCookie("TOKEN_STATE", encryptCookieValue(t, rawState)),
 			)
 			respLogin, err := srv.Test(reqLogin)
@@ -426,9 +422,8 @@ func loginServer(timeSvc auth.TimeService, provider auth.Provider) *web.Server {
 	oCfg := config.Oidc{
 		StateCookieAge:    5 * time.Second,
 		SessionCookieName: "SESSION",
-		RedirectURI:       "http://localhost/home",
 	}
-	svc := auth.New(oCfg, provider)
+	svc := auth.New(oCfg, auth.NewProviders(provider))
 	srv := web.NewHTTPTestServer()
 	cookieEncryptionKey = srv.Cfg.Cookie.EncryptionKey
 	srv.RegisterRoutes(func(r fiber.Router) {

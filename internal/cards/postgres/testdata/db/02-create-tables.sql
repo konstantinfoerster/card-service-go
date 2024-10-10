@@ -257,6 +257,8 @@ CREATE TABLE card_image
     UNIQUE (image_path)
 );
 
+CREATE INDEX idx_card_image_hashes on card_image(phash1, phash2, phash3, phash4);
+
 CREATE TABLE card_collection
 (
     id      INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

@@ -20,18 +20,18 @@ type Server struct {
 	Cfg config.Server
 }
 
-func currentDir() string {
-	_, cf, _, _ := runtime.Caller(0)
-
-	return path.Join(path.Dir(cf))
-}
-
 func NewHTTPTestServer() *Server {
+	_, cf, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("failed to get current dir")
+	}
+	currentDir := path.Join(path.Dir(cf))
+
 	cfg := config.Server{
 		Cookie: config.Cookie{
 			EncryptionKey: "01234567890123456789012345678901",
 		},
-		TemplateDir: path.Join(currentDir(), "../../../views"),
+		TemplateDir: path.Join(currentDir, "../../../views"),
 	}
 
 	return NewHTTPServer(cfg)

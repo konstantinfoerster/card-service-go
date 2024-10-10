@@ -5,5 +5,4 @@ logging:
 oidc:
   session_cookie_name: SESSION_TEST
   state_cookie_age: 120m
-  redirect_uri: http://localhost:3000/test
 

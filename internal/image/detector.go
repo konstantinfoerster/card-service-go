@@ -1,6 +1,7 @@
 package image
 
 import (
+	"errors"
 	"image"
 	"io"
 
@@ -8,6 +9,8 @@ import (
 
 	"github.com/anthonynsimon/bild/transform"
 )
+
+var ErrInvalidInput = errors.New("invalid input reader")
 
 type Degree int
 
@@ -18,6 +21,10 @@ const (
 )
 
 func NewImage(in io.Reader) (Image, error) {
+	if in == nil {
+		return Image{}, ErrInvalidInput
+	}
+
 	dImg, _, err := image.Decode(in)
 	if err != nil {
 		return Image{}, err

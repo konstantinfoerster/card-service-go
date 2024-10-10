@@ -33,7 +33,7 @@ func Detect(svc cards.DetectService) fiber.Handler {
 			return err
 		}
 
-		pagedResult := newMatchesResponse(result)
+		pagedResult := newResponse(result.PagedResult)
 		if web.AcceptsHTML(c) || web.IsHTMX(c) {
 			data := fiber.Map{
 				"Page": pagedResult,
@@ -43,28 +43,5 @@ func Detect(svc cards.DetectService) fiber.Handler {
 		}
 
 		return web.RenderJSON(c, pagedResult)
-	}
-}
-
-func newMatchesResponse(matches cards.Matches) *PagedResponse[Card] {
-	data := make([]Card, len(matches))
-	for i, m := range matches {
-		s := m.Score
-		data[i] = Card{
-			Item:  newItem(m.ID, m.Amount),
-			Name:  m.Name,
-			Image: m.Image.URL,
-			Score: &s,
-		}
-	}
-
-	firstPage := 1
-	nextPage := 2
-
-	return &PagedResponse[Card]{
-		Data:     data,
-		HasMore:  false,
-		Page:     firstPage,
-		NextPage: nextPage,
 	}
 }
