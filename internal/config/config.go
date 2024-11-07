@@ -22,6 +22,7 @@ type Config struct {
 	Logging  Logging  `yaml:"logging"`
 	Images   Images   `yaml:"images"`
 	Server   Server   `yaml:"server"`
+	Probes   Server   `yaml:"probes"`
 	Oidc     Oidc     `yaml:"oidc"`
 }
 
@@ -50,7 +51,14 @@ type Server struct {
 	Host        string `yaml:"host"`
 	Cookie      Cookie `yaml:"cookie"`
 	TemplateDir string `yaml:"template_path"`
+	TLS         TLS    `yaml:"tls"`
 	Port        int    `yaml:"port"`
+}
+
+type TLS struct {
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
+	Enabled  bool   `yaml:"enabled"`
 }
 
 func (s Server) Addr() string {

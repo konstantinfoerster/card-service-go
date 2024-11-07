@@ -9,9 +9,11 @@ run:
 .PHONY: build
 build:
 	go build -o $(BINARY_NAME) cmd/main.go
+.PHONY: docker
 docker:
-	echo $(VERSION)
 	docker build --build-arg RELEASE="$(VERSION)" -t card-service:$(VERSION) -f build/opencv.Dockerfile .
+docker-run: docker
+	docker run -it --rm -v ./configs:/config card-service:$(VERSION)
 test-unit:
 	go test --short --count=1 ./...
 .PHONY: test

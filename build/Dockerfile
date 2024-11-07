@@ -31,7 +31,8 @@ RUN set -eux; \
 
 USER nobody
 
-CMD ["/usr/bin/service", "--config", "/config/application.yaml"]
+ENTRYPOINT ["/usr/bin/service"]
+CMD ["--config", "/config/application.yaml"]
 
 LABEL org.opencontainers.image.title="Card-Manager Service" \
       org.opencontainers.image.description="Application that helps you to manage your card collection" \

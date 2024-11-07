@@ -23,7 +23,8 @@ RUN go build -tags opencv -ldflags="-s -w" -o service cmd/main.go \
 
 USER nobody
 
-CMD ["/usr/bin/service", "--config", "/config/application-service.yaml"]
+ENTRYPOINT ["/usr/bin/service"]
+CMD ["--config", "/config/application.yaml"]
 
 LABEL org.opencontainers.image.title="Card-Manager Service" \
       org.opencontainers.image.description="Application that helps you to manage your card collection" \
