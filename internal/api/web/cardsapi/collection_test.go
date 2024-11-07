@@ -341,7 +341,7 @@ func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	oCfg := config.Oidc{}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
 	authSvc := auth.New(oCfg, auth.NewProviders(provider))
-	srv := web.NewHTTPTestServer()
+	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
 		cardsapi.CollectionRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), collectSvc)
 	})

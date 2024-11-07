@@ -1,8 +1,11 @@
 package web_test
 
 import (
+	"context"
 	"net/http/httptest"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
@@ -10,9 +13,10 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
-func TestNewHttpServerErrorHandler(t *testing.T) {
+func TestNewServerErrorHandler(t *testing.T) {
 	cases := []struct {
 		name       string
 		appErr     aerrors.AppError
@@ -37,7 +41,7 @@ func TestNewHttpServerErrorHandler(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := web.NewHTTPTestServer()
+			srv := web.NewTestServer()
 			srv.RegisterRoutes(func(app fiber.Router) {
 				app.Get("/", func(c *fiber.Ctx) error {
 					return tc.appErr
@@ -58,8 +62,8 @@ func TestNewHttpServerErrorHandler(t *testing.T) {
 	}
 }
 
-func TestNewHttpServerCookieEncryption(t *testing.T) {
-	srv := web.NewHTTPTestServer()
+func TestNewServerCookieEncryption(t *testing.T) {
+	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(app fiber.Router) {
 		app.Get("/", func(c *fiber.Ctx) error {
 			c.Cookie(&fiber.Cookie{
@@ -77,4 +81,40 @@ func TestNewHttpServerCookieEncryption(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotEqual(t, "myValue", resp.Cookies()[0].Value)
+}
+
+func TestNewServerShutdownOnInteruptSignal(t *testing.T) {
+	srv := web.NewTestServer()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	errg, ctx := errgroup.WithContext(ctx)
+	errg.Go(func() error {
+		return srv.Run(ctx)
+	})
+	waitForStartup(t, srv)
+
+	killErr := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+	require.NoError(t, killErr)
+	err := errg.Wait()
+
+	require.NoError(t, err)
+	assert.False(t, srv.IsRunning())
+}
+
+func waitForStartup(t *testing.T, srv *web.Server) {
+	maxTries := 3
+	count := 0
+	for {
+		time.Sleep(10 * time.Millisecond)
+		if srv.IsRunning() {
+			break
+		}
+
+		count++
+		if count == maxTries {
+			assert.Fail(t, "server not start in time")
+
+			break
+		}
+	}
 }

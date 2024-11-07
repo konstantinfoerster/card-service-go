@@ -4,16 +4,23 @@ logging:
 
 database:
   host: 127.0.0.1
-  port: 15432
+  port: 5432
   database: cardmanager
-  username: tester
-  password: tester
+  username: changeit
+  password: changeit
 
 server:
-  port: 3000
+  port: 8080
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
   cookie:
     # must be a 32 character string
-    encryption_key: ""
+    encryption_key: "12345678901234567890123456789012"
+
+probes:
+  port: 8081
 
 oidc:
   session_cookie_name: SESSION

@@ -96,7 +96,7 @@ func TestDetect(t *testing.T) {
 }
 
 func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
-	srv := web.NewHTTPTestServer()
+	srv := web.NewTestServer()
 
 	cfg := config.Images{Host: "testdata"}
 	hasher := image.NewPHasher()

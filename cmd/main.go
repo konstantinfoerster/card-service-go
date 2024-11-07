@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
+	"golang.org/x/sync/errgroup"
 )
 
 func setup() *config.Config {
@@ -94,7 +95,7 @@ func run(cfg *config.Config) error {
 
 	authMiddleware := web.NewAuthMiddleware(cfg.Oidc, authSvc)
 
-	srv := web.NewHTTPServer(cfg.Server).RegisterRoutes(func(r fiber.Router) {
+	srv := web.NewServer(cfg.Server).RegisterRoutes(func(r fiber.Router) {
 		r.Static("/public", "./public")
 
 		cardsapi.DashboardRoutes(r, authMiddleware)
@@ -107,5 +108,24 @@ func run(cfg *config.Config) error {
 		loginapi.Routes(apiV1, authMiddleware, cfg.Oidc, authSvc, timeSvc)
 	})
 
-	return srv.Run()
+	errg, ctx := errgroup.WithContext(context.Background())
+    // start web-server
+	errg.Go(func() error {
+		return srv.Run(ctx)
+	})
+
+	readinessProbe := func(c *fiber.Ctx) bool {
+		return true
+	}
+	livenessProbe := func(c *fiber.Ctx) bool {
+		return true
+	}
+    // start probe-server
+	probeSrv := web.NewProbeServer(cfg.Probes, livenessProbe, readinessProbe)
+    // start probe-server
+	errg.Go(func() error {
+		return probeSrv.Run(ctx)
+	})
+
+	return errg.Wait()
 }

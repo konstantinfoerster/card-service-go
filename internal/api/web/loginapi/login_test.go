@@ -424,7 +424,7 @@ func loginServer(timeSvc auth.TimeService, provider auth.Provider) *web.Server {
 		SessionCookieName: "SESSION",
 	}
 	svc := auth.New(oCfg, auth.NewProviders(provider))
-	srv := web.NewHTTPTestServer()
+	srv := web.NewTestServer()
 	cookieEncryptionKey = srv.Cfg.Cookie.EncryptionKey
 	srv.RegisterRoutes(func(r fiber.Router) {
 		loginapi.Routes(r.Group("/"), web.NewAuthMiddleware(oCfg, svc), oCfg, svc, timeSvc)

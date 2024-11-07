@@ -288,7 +288,7 @@ func TestSearchWithInvalidUser(t *testing.T) {
 }
 
 func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
-	srv := web.NewHTTPTestServer()
+	srv := web.NewTestServer()
 
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
