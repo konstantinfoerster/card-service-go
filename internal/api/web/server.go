@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"path"
 	"runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 type Server struct {
 	app     *fiber.App
 	Cfg     config.Server
-	running bool
+	running atomic.Bool
 }
 
 func NewTestServer() *Server {
@@ -150,12 +151,12 @@ func (s *Server) Run(ctx context.Context) error {
 		s.app.Hooks().OnListen(func(ld fiber.ListenData) error {
 			log.Info().Msgf("starting server at %s", addr)
 
-			s.running = true
+			s.running.Store(true)
 
 			return nil
 		})
 		s.app.Hooks().OnShutdown(func() error {
-			s.running = false
+			s.running.Store(false)
 
 			return nil
 		})
@@ -197,5 +198,5 @@ func (s *Server) shutdown(ctx context.Context) error {
 }
 
 func (s *Server) IsRunning() bool {
-	return s.running
+	return s.running.Load()
 }
