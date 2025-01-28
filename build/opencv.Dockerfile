@@ -1,4 +1,4 @@
-FROM ghcr.io/hybridgroup/opencv:4.10.0
+FROM ghcr.io/hybridgroup/opencv:4.11.0
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"
