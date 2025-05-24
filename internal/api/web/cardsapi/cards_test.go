@@ -442,7 +442,20 @@ func TestPrints(t *testing.T) {
 			},
 		},
 		{
-			name: "card prints with size",
+			name: "card prints without user does not render amount",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD0zMyZmYWNlPTMz", // 33
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Equalf(t, 0, strings.Count(body, "data-testid=\"card-print-amount"), "expected no amount rendered in %s", body)
+			},
+		},
+		{
+			name: "card prints with size parameter",
 			header: map[string]string{
 				web.HeaderHTMXRequest: "true",
 			},

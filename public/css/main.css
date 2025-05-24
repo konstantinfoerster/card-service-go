@@ -351,6 +351,7 @@ p {
   border-radius: 0;
   line-height: 2;
   background-color: var(--clr-body-background);
+  font-size: var(--fs-0);
 }
 
 .card-actions button:nth-child(3) {
