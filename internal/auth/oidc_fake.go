@@ -8,26 +8,6 @@ import (
 
 type ProviderOption func(*FakeProvider)
 
-func NewFakeProvider(opts ...ProviderOption) *FakeProvider {
-	p := &FakeProvider{
-		name:         "testProvider",
-		clientID:     "client-id",
-		scope:        "openid",
-		authURL:      "http://localhost/auth",
-		redirectURI:  "http://localhost/home",
-		claims:       []Claims{},
-		loggedIn:     []string{},
-		tokenExpires: 0,
-		stateID:      "state-0",
-	}
-
-	for _, opt := range opts {
-		opt(p)
-	}
-
-	return p
-}
-
 func WithClaims(c Claims) ProviderOption {
 	return func(p *FakeProvider) {
 		p.claims = append(p.claims, c)
@@ -55,6 +35,26 @@ type FakeProvider struct {
 	claims       []Claims
 	loggedIn     []string
 	tokenExpires int64
+}
+
+func NewFakeProvider(opts ...ProviderOption) *FakeProvider {
+	p := &FakeProvider{
+		name:         "testProvider",
+		clientID:     "client-id",
+		scope:        "openid",
+		authURL:      "http://localhost/auth",
+		redirectURI:  "http://localhost/home",
+		claims:       []Claims{},
+		loggedIn:     []string{},
+		tokenExpires: 0,
+		stateID:      "state-0",
+	}
+
+	for _, opt := range opts {
+		opt(p)
+	}
+
+	return p
 }
 
 func (p *FakeProvider) GetName() string {

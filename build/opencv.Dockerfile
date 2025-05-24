@@ -12,14 +12,15 @@ RUN go mod download && go mod verify
 # copy source files
 COPY . /app
 
-## Task: build project
+# build project
 ENV GOOS="linux"
 ENV GOARCH="amd64"
 ENV CGO_ENABLED="1"
 
 RUN go build -tags opencv -ldflags="-s -w" -o service cmd/main.go \
       && chmod 0755 /app/service \
-      && cp /app/service /usr/bin/service
+      && cp /app/service /usr/bin/service \
+      && go clean -modcache -cache
 
 USER nobody
 

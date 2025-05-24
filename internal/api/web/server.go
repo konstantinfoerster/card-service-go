@@ -58,11 +58,9 @@ func NewProbeServer(cfg config.Server,
 		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
 	}))
 	app.Use(healthcheck.New(healthcheck.Config{
-		LivenessProbe:    livenessProbe,
-		LivenessEndpoint: "/livez",
-		ReadinessProbe: func(c *fiber.Ctx) bool {
-			return true
-		},
+		LivenessProbe:     livenessProbe,
+		LivenessEndpoint:  "/livez",
+		ReadinessProbe:    readinessProbe,
 		ReadinessEndpoint: "/readyz",
 	}))
 
@@ -74,11 +72,11 @@ func NewProbeServer(cfg config.Server,
 
 func NewServer(cfg config.Server) *Server {
 	engine := html.New(cfg.TemplateDir, ".gohtml")
-	engine.AddFunc(
-		"isLastIndex", func(index, length int) bool {
+	engine.AddFuncMap(map[string]interface{}{
+		"isLastIndex": func(index, length int) bool {
 			return index+1 == length
 		},
-	)
+	})
 
 	// FIXME: make body size configurable
 	app := fiber.New(fiber.Config{
@@ -178,6 +176,10 @@ func (s *Server) Run(ctx context.Context) error {
 	return errg.Wait()
 }
 
+func (s *Server) IsRunning() bool {
+	return s.running.Load()
+}
+
 func (s *Server) shutdown(ctx context.Context) error {
 	addr := s.Cfg.Addr()
 	log.Info().Msgf("shutdown server at %s, waiting to close open connections ...", addr)
@@ -195,8 +197,4 @@ func (s *Server) shutdown(ctx context.Context) error {
 	log.Info().Msgf("shutdown server at %s successfully", addr)
 
 	return nil
-}
-
-func (s *Server) IsRunning() bool {
-	return s.running.Load()
 }

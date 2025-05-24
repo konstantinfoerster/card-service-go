@@ -12,17 +12,18 @@ import (
 const DefaultLang = "eng"
 
 var ErrCardNotFound = errors.New("card not found")
+var ErrResultMismatch = errors.New("result mismatch")
 var ErrInvalidID = errors.New("invalid id")
-
-func NewID(id int) ID {
-	return ID{CardID: id, FaceID: 0}
-}
 
 type ID struct {
 	// CardID the card ID
 	CardID int
 	// FaceID the face ID
 	FaceID int
+}
+
+func NewID(id int) ID {
+	return ID{CardID: id, FaceID: 0}
 }
 
 func (id ID) WithFace(faceID int) ID {
@@ -65,6 +66,8 @@ type Card struct {
 	Set Set
 	// Name is the name of the card.
 	Name string
+	// Number the card number.
+	Number string
 	// Image the card image metadata
 	Image Image
 	// ID is the identifier of the card.
@@ -85,14 +88,14 @@ type Image struct {
 	URL string
 }
 
+type Cards struct {
+	PagedResult[Card]
+}
+
 func NewCards(cards []Card, p Page) Cards {
 	return Cards{
 		NewPagedResult(cards, p),
 	}
-}
-
-type Cards struct {
-	PagedResult[Card]
 }
 
 func EmptyCards(p Page) Cards {
@@ -101,8 +104,33 @@ func EmptyCards(p Page) Cards {
 	}
 }
 
-func NewCollector(id string) Collector {
-	return Collector{ID: id}
+type CardPrint struct {
+	ID     ID
+	Name   string
+	Number string
+	Code   string
+	Amount int
+}
+
+func EmptyCardPrints(p Page) CardPrints {
+	return CardPrints{
+		NewEmptyResult[CardPrint](p),
+	}
+}
+
+type CardPrints struct {
+	PagedResult[CardPrint]
+}
+
+func NewCardPrints(prints []CardPrint, p Page) CardPrints {
+	return CardPrints{
+		NewPagedResult(prints, p),
+	}
+}
+
+type CardDetail struct {
+	Card   Card
+	Prints CardPrints
 }
 
 // Collector user who interacts with his collection.
@@ -110,8 +138,8 @@ type Collector struct {
 	ID string
 }
 
-func NewFilter() Filter {
-	return Filter{}
+func NewCollector(id string) Collector {
+	return Collector{ID: id}
 }
 
 type Filter struct {
@@ -120,6 +148,10 @@ type Filter struct {
 	Lang          string
 	IDs           IDs
 	OnlyCollected bool
+}
+
+func NewFilter() Filter {
+	return Filter{}
 }
 
 func (f Filter) WithName(name string) Filter {
@@ -159,10 +191,12 @@ func (f Filter) WithLanguage(lang string) Filter {
 type CardRepository interface {
 	// Find returns the cards for the requested page matching the given criteria.
 	Find(ctx context.Context, filter Filter, page Page) (Cards, error)
+	Prints(ctx context.Context, name string, collector Collector, page Page) (CardPrints, error)
 }
 
 type CardService interface {
 	Search(ctx context.Context, name string, collector Collector, page Page) (Cards, error)
+	Detail(ctx context.Context, id ID, collector Collector, page Page) (CardDetail, error)
 }
 
 type searchService struct {
@@ -186,4 +220,39 @@ func (s *searchService) Search(ctx context.Context, name string, c Collector, pa
 	}
 
 	return r, nil
+}
+
+func (s searchService) Detail(ctx context.Context, id ID, collector Collector, page Page) (CardDetail, error) {
+	filter := NewFilter().
+		WithLanguage(DefaultLang).
+		WithID(id).
+		WithCollector(collector)
+
+	r, err := s.repo.Find(ctx, filter, DefaultPage())
+	if err != nil {
+		return CardDetail{}, aerrors.NewUnknownError(err, "unable-to-execute-detail-search")
+	}
+
+	if r.Size == 0 {
+		err := fmt.Errorf("card with id %v not found, %w", id, ErrCardNotFound)
+
+		return CardDetail{}, aerrors.NewNotFoundError(err, "card-detail-not-found")
+	}
+
+	if r.Size > 1 {
+		err := fmt.Errorf("expected one card with id %v but found %d, %w", id, r.Size, ErrResultMismatch)
+
+		return CardDetail{}, aerrors.NewUnknownError(err, "unexpected-detail-result")
+	}
+
+	match := r.Result[0]
+	prints, err := s.repo.Prints(ctx, match.Name, collector, page)
+	if err != nil {
+		return CardDetail{}, aerrors.NewUnknownError(err, "unable-to-execute-prints-search")
+	}
+
+	return CardDetail{
+		Card:   match,
+		Prints: prints,
+	}, nil
 }

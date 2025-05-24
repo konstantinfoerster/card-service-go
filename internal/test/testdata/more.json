@@ -1,0 +1,50 @@
+[
+  {
+    "id": {
+      "cardId": 745,
+      "faceId": 745
+    },
+    "name": "Emrakul, the Aeons Torn",
+    "number": "1",
+    "set": {
+      "name": "Double Masters 2022",
+      "code": "2X2"
+    }
+  },
+  {
+    "id": {
+      "cardId": 911,
+      "faceId": 911
+    },
+    "name": "Abbot of Keral Keep",
+    "number": "100",
+    "set": {
+      "name": "Double Masters 2022",
+      "code": "2X2"
+    }
+  },
+  {
+    "id": {
+      "cardId": 281,
+      "faceId": 281
+    },
+    "name": "Sage Owl",
+    "number": "104",
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
+  },
+  {
+    "id": {
+      "cardId": 282,
+      "faceId": 282
+    },
+    "name": "Sage Owl",
+    "number": "104★",
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    }
+  }
+]

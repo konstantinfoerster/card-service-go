@@ -7,9 +7,10 @@ type ErrorType struct {
 }
 
 var (
-	ErrTypeUnknown       = ErrorType{"unknown"}       //nolint:gochecknoglobals
-	ErrTypeInvalidInput  = ErrorType{"invalid-input"} //nolint:gochecknoglobals
-	ErrTypeAuthorization = ErrorType{"authorization"} //nolint:gochecknoglobals
+	ErrUnknown       = ErrorType{"unknown"}       //nolint:gochecknoglobals
+	ErrNotFound      = ErrorType{"not-found"}     //nolint:gochecknoglobals
+	ErrInvalidInput  = ErrorType{"invalid-input"} //nolint:gochecknoglobals
+	ErrAuthorization = ErrorType{"authorization"} //nolint:gochecknoglobals
 )
 
 type AppError struct {
@@ -17,6 +18,43 @@ type AppError struct {
 	Msg       string
 	Cause     error
 	ErrorType ErrorType
+}
+
+func NewAuthorizationError(err error, key string) AppError {
+	return AppError{
+		Cause:     errors.WithStack(err),
+		Key:       key,
+		ErrorType: ErrAuthorization,
+	}
+}
+
+func NewInvalidInputError(err error, key string, msg string) AppError {
+	return AppError{
+		Cause:     errors.WithStack(err),
+		Key:       key,
+		Msg:       msg,
+		ErrorType: ErrInvalidInput,
+	}
+}
+
+func NewInvalidInputMsg(key string, msg string) AppError {
+	return NewInvalidInputError(errors.New(msg), key, msg)
+}
+
+func NewNotFoundError(err error, key string) AppError {
+	return AppError{
+		Cause:     errors.WithStack(err),
+		Key:       key,
+		ErrorType: ErrNotFound,
+	}
+}
+
+func NewUnknownError(err error, key string) AppError {
+	return AppError{
+		Cause:     errors.WithStack(err),
+		Key:       key,
+		ErrorType: ErrUnknown,
+	}
 }
 
 func (e AppError) Error() string {
@@ -29,38 +67,4 @@ func (e AppError) Error() string {
 
 func (e AppError) Unwrap() error {
 	return e.Cause
-}
-
-func NewAuthorizationError(err error, key string) AppError {
-	return AppError{
-		Cause:     errors.WithStack(err),
-		Key:       key,
-		ErrorType: ErrTypeAuthorization,
-	}
-}
-
-func NewInvalidInputError(err error, key string, msg string) AppError {
-	return AppError{
-		Cause:     errors.WithStack(err),
-		Key:       key,
-		Msg:       msg,
-		ErrorType: ErrTypeInvalidInput,
-	}
-}
-
-func NewInvalidInputMsg(key string, msg string) AppError {
-	return AppError{
-		Cause:     errors.New(msg),
-		Key:       key,
-		Msg:       msg,
-		ErrorType: ErrTypeInvalidInput,
-	}
-}
-
-func NewUnknownError(err error, key string) AppError {
-	return AppError{
-		Cause:     errors.WithStack(err),
-		Key:       key,
-		ErrorType: ErrTypeUnknown,
-	}
 }

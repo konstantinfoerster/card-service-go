@@ -1,0 +1,17 @@
+[
+  {
+    "id": {
+      "cardId": 1,
+      "faceId": 1
+    },
+    "name": "Ancestor's Chosen",
+    "number": "1",
+    "set": {
+      "name": "Tenth Edition",
+      "code": "10E"
+    },
+    "image": {
+      "URL": "cardImage.jpg"
+    }
+  }
+]

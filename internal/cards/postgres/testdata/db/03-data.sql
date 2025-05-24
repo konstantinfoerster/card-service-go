@@ -207,3 +207,31 @@ VALUES (18, 17, 'images/dummyCard17.png', 'eng', 'png');
 -- Collected card that does not exists
 INSERT INTO card_collection(card_id, user_id, amount)
 VALUES (99999, 'myOtherUser', 1);
+
+-- Card 18 first print
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Print Card', '31', 'COMMON', 'WHITE', 'NORMAL', 'M16');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (18, 'Print Card', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (19, 18, 'images/dummyCard18.png', 'eng', 'png');
+INSERT INTO card_collection(card_id, user_id, amount)
+VALUES (18, 'myUser', 3);
+
+-- Card 19 second print
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Print Card', '32', 'COMMON', 'WHITE', 'NORMAL', 'M15');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (19, 'Print Card', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (20, 19, 'images/dummyCard19.png', 'eng', 'png');
+
+
+-- Card 20 third print
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Print Card', '33', 'COMMON', 'WHITE', 'NORMAL', 'M14');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (20, 'Print Card', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (21, 20, 'images/dummyCard20.png', 'eng', 'png');
+

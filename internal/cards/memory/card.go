@@ -68,7 +68,7 @@ func (r inMemCardRepository) Find(ctx context.Context, f cards.Filter, page card
 		return cmp.Compare(a.Name, b.Name)
 	})
 
-	matches = cards.GetPage(matches, page)
+	matches = getPage(matches, page)
 
 	return cards.NewCards(matches, page), nil
 }
@@ -127,4 +127,56 @@ func (r inMemCardRepository) Remove(_ context.Context, item cards.Collectable, c
 	}
 
 	return nil
+}
+
+func (r inMemCardRepository) Prints(
+	ctx context.Context, name string, collector cards.Collector, page cards.Page) (cards.CardPrints, error) {
+	matches := make([]cards.CardPrint, 0)
+	for _, c := range r.cards {
+		if !strings.EqualFold(name, c.Name) {
+			continue
+		}
+
+		amount := 0
+		if collector.ID != "" {
+			for _, collected := range r.collected[collector.ID] {
+				if collected.ID.Eq(c.ID) {
+					amount = collected.Amount
+
+					break
+				}
+			}
+		}
+
+		matches = append(matches, cards.CardPrint{
+			ID:     c.ID,
+			Name:   c.Name,
+			Number: c.Number,
+			Code:   c.Set.Code,
+			Amount: amount,
+		})
+	}
+
+	slices.SortStableFunc(matches, func(a cards.CardPrint, b cards.CardPrint) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+
+	matches = getPage(matches, page)
+
+	return cards.NewCardPrints(matches, page), nil
+}
+
+func getPage[T any](data []T, page cards.Page) []T {
+	offset := page.Offset()
+	if len(data) < offset {
+		return []T{}
+	}
+
+	limit := page.Size()
+	maxIdx := offset + limit
+	if len(data) >= maxIdx {
+		return data[offset:maxIdx]
+	}
+
+	return data[offset:]
 }

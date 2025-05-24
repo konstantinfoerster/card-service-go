@@ -1,0 +1,39 @@
+{{- define "card_prints" -}}
+    {{- range $index, $print :=.Prints.Data -}}
+      {{- if $print.IsSame $.Card.ID -}}
+        <div class="current" data-testid="card-print-id-{{ $print.ID }}">
+          {{- if $.User -}}
+            <span class="badge" data-testid="card-print-amount-{{ $print.Amount.Print }}">{{- $print.Amount.Print -}}</span> 
+          {{- end -}}
+          {{ $print.Name }} #{{ $print.Number}} ({{ $print.Code }})
+        </div>
+      {{- else -}}
+        <div data-testid="card-print-id-{{ $print.ID }}">
+           <a href="#"
+              data-testid="card-detail-link"
+              hx-get="/cards/{{ $print.ID }}"
+              hx-trigger="click" 
+              hx-target="#sidebar"
+              hx-swap="innerHtml"
+           >
+           {{- if $.User -}}
+             <span class="badge" data-testid="card-print-amount-{{ $print.Amount.Print }}">{{ $print.Amount.Print }}</span>
+           {{- end -}}
+           {{ $print.Name }} #{{ $print.Number}} ({{ $print.Code }})</a>
+        </div>
+      {{- end -}}
+    {{- end -}}
+    {{- if .Prints.HasMore -}}
+      <div id="card-print-more">
+        <a href="#"
+           data-testid="card-print-more"
+           hx-get="/cards/{{ $.Card.ID }}/prints?page={{ $.Prints.NextPage }}"
+           hx-trigger="click" 
+           hx-trigger="click" 
+           hx-swap="outerHTML"
+           hx-target="#card-print-more"
+        >
+        more ...</a>
+      </div>
+    {{- end -}}
+{{- end -}}

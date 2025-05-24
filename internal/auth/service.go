@@ -7,16 +7,16 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
+type RedirectURL struct {
+	URL   string
+	State string
+}
+
 func NewRedirectURL(p Provider, state string) (RedirectURL, error) {
 	return RedirectURL{
 		URL:   p.GetAuthURL(state),
 		State: state,
 	}, nil
-}
-
-type RedirectURL struct {
-	URL   string
-	State string
 }
 
 // DecodeSession decode given base64 url encoded JSONWebToken.

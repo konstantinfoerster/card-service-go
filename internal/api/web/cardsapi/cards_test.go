@@ -32,31 +32,34 @@ func TestSearch(t *testing.T) {
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
 					{
-						ID:   434,
+						ID:   "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
 						Name: "Demonic Attorney",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "103",
 					},
 					{
-						ID:   706,
+						ID:   "Y2FyZD03MDYmZmFjZT03MDY=", // 706
 						Name: "Demonic Hordes",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "104",
 					},
 					{
-						ID:   514,
+						ID:   "Y2FyZD01MTQmZmFjZT01MTQ=", // 514
 						Name: "Demonic Tutor",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "105",
 					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -69,15 +72,16 @@ func TestSearch(t *testing.T) {
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
 					{
-						ID:   706,
+						ID:   "Y2FyZD03MDYmZmFjZT03MDY=", // 706
 						Name: "Demonic Hordes",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "104",
 					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
 				assert.True(t, body.HasMore)
 				assert.Equal(t, 2, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -182,33 +186,36 @@ func TestSearchWithUser(t *testing.T) {
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
 					{
-						ID:   434,
+						ID:   "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
 						Name: "Demonic Attorney",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "103",
 					},
 					{
-						ID:     706,
+						ID:     "Y2FyZD03MDYmZmFjZT03MDY=", // 706
 						Amount: 3,
 						Name:   "Demonic Hordes",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "104",
 					},
 					{
-						ID:     514,
+						ID:     "Y2FyZD01MTQmZmFjZT01MTQ=", // 514
 						Amount: 5,
 						Name:   "Demonic Tutor",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "105",
 					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -287,6 +294,279 @@ func TestSearchWithInvalidUser(t *testing.T) {
 	assert.Equal(t, web.StatusUnauthorized, resp.StatusCode)
 }
 
+func TestDetail(t *testing.T) {
+	srv, provider := searchServer(t)
+	token := provider.Token("myuser")
+	cases := []struct {
+		name                string
+		header              map[string]string
+		cardID              string
+		user                func() test.RequestOpt
+		expectedContentType string
+		assertContent       func(t *testing.T, rBody io.Reader)
+	}{
+		{
+			name: "card detail with few prints has no more button",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD0zMyZmYWNlPTMz", // 33
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Contains(t, body, "data-testid=\"card-detail\"")
+				assert.Contains(t, body, "data-testid=\"card-detail-img\"")
+				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-print-id"), "expected 3 prints in %s", body)
+				assert.Equalf(t, 2, strings.Count(body, "data-testid=\"card-detail-link"), "expected 2 card detail links in %s", body)
+			},
+		},
+		{
+			name: "card detail with many prints has more button",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD00MDYmZmFjZT00MDY=", // 406
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Contains(t, body, "data-testid=\"card-detail\"")
+				assert.Contains(t, body, "data-testid=\"card-detail-img\"")
+				assert.Contains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 10, strings.Count(body, "data-testid=\"card-print-id"), "expected 10 prints in %s", body)
+				assert.Equalf(t, 9, strings.Count(body, "data-testid=\"card-detail-link"), "expected 9 card detail links in %s", body)
+			},
+		},
+		{
+			name: "card detail with multiple collected prints shows correct amount",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			user: func() test.RequestOpt {
+				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+			},
+			cardID:              "Y2FyZD01ODImZmFjZT01ODI=", // 582
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Contains(t, body, "data-testid=\"card-detail\"")
+				assert.Contains(t, body, "data-testid=\"card-detail-img\"")
+				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-print-id-"), "expected 3 prints in %s", body)
+				assert.Equalf(t, 2, strings.Count(body, "data-testid=\"card-detail-link"), "expected 2 card detail links in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-03"), "expected 1 print with amount 03 in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-01"), "expected 1 print with amount 01 in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-00"), "expected 1 print with amount 00 in %s", body)
+				assert.Equal(t, 1, strings.Count(body, "data-testid=\"add-card-btn\""))
+				assert.Equal(t, 1, strings.Count(body, "data-testid=\"remove-card-btn\""))
+			},
+		},
+		{
+			name: "card detail with user and uncollected card",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			user: func() test.RequestOpt {
+				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+			},
+			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Contains(t, body, "data-testid=\"card-detail\"")
+				assert.Contains(t, body, "data-testid=\"card-detail-img\"")
+				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-id-"), "expected 1 prints in %s", body)
+				assert.Equalf(t, 0, strings.Count(body, "data-testid=\"card-detail-link"), "expected 0 card detail links in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-00"), "expected 1 print with amount 00 in %s", body)
+				assert.Equal(t, 1, strings.Count(body, "data-testid=\"add-card-btn\""))
+				assert.Equal(t, 0, strings.Count(body, "data-testid=\"remove-card-btn\""), "expected no remove button")
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			user := tc.user
+			if user == nil {
+				user = func() test.RequestOpt { return nil }
+			}
+
+			req := test.NewRequest(
+				test.WithMethod(web.MethodGet),
+				test.WithURLf("http://localhost/cards/%s", tc.cardID),
+				test.WithHeader(tc.header),
+				user(),
+			)
+
+			resp, err := srv.Test(req)
+			defer test.Close(t, resp)
+
+			require.NoError(t, err)
+			require.Equal(t, web.StatusOK, resp.StatusCode)
+			assert.Equal(t, tc.expectedContentType, resp.Header.Get(fiber.HeaderContentType))
+			tc.assertContent(t, resp.Body)
+		})
+	}
+}
+
+func TestPrints(t *testing.T) {
+	srv, provider := searchServer(t)
+	token := provider.Token("myuser")
+	cases := []struct {
+		name                string
+		header              map[string]string
+		cardID              string
+		queryParameter      string
+		user                func() test.RequestOpt
+		expectedContentType string
+		assertContent       func(t *testing.T, rBody io.Reader)
+	}{
+		{
+			name: "card prints with few prints has no more button",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD0zMyZmYWNlPTMz", // 33
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-print-id"), "expected 3 prints in %s", body)
+				assert.Equalf(t, 2, strings.Count(body, "data-testid=\"card-detail-link"), "expected 2 card detail links in %s", body)
+			},
+		},
+		{
+			name: "card prints without user does not render amount",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD0zMyZmYWNlPTMz", // 33
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Equalf(t, 0, strings.Count(body, "data-testid=\"card-print-amount"), "expected no amount rendered in %s", body)
+			},
+		},
+		{
+			name: "card prints with size parameter",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			queryParameter:      "?size=1",
+			cardID:              "Y2FyZD0zMyZmYWNlPTMz", // 33
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Contains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-id"), "expected 1 prints in %s", body)
+				assert.Equalf(t, 0, strings.Count(body, "data-testid=\"card-detail-link"), "expected 0 card detail links in %s", body)
+			},
+		},
+		{
+			name: "card prints many prints has more button",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD00MDYmZmFjZT00MDY=", // 406
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Contains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 10, strings.Count(body, "data-testid=\"card-print-id"), "expected 10 prints in %s", body)
+				assert.Equalf(t, 9, strings.Count(body, "data-testid=\"card-detail-link"), "expected 9 card detail links in %s", body)
+			},
+		},
+		{
+			name: "card prints second page with last card",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD00MDYmZmFjZT00MDY=", // 406
+			queryParameter:      "?page=2",
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-id"), "expected 1 prints in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-detail-link"), "expected 1 card detail links in %s", body)
+			},
+		},
+		{
+			name: "card prints with multiple collected prints shows correct amount",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			user: func() test.RequestOpt {
+				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+			},
+			cardID:              "Y2FyZD01ODImZmFjZT01ODI=", // 582
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-print-id-"), "expected 3 prints in %s", body)
+				assert.Equalf(t, 2, strings.Count(body, "data-testid=\"card-detail-link"), "expected 2 card detail links in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-03"), "expected 1 print with amount 03 in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-01"), "expected 1 print with amount 01 in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-00"), "expected 1 print with amount 00 in %s", body)
+			},
+		},
+		{
+			name: "card prints with user and uncollected card",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			user: func() test.RequestOpt {
+				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+			},
+			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-id-"), "expected 1 prints in %s", body)
+				assert.Equalf(t, 0, strings.Count(body, "data-testid=\"card-detail-link"), "expected 0 card detail links in %s", body)
+				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-00"), "expected 1 print with amount 00 in %s", body)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			user := tc.user
+			if user == nil {
+				user = func() test.RequestOpt { return nil }
+			}
+
+			req := test.NewRequest(
+				test.WithMethod(web.MethodGet),
+				test.WithURLf("http://localhost/cards/%s/prints%s", tc.cardID, tc.queryParameter),
+				test.WithHeader(tc.header),
+				user(),
+			)
+
+			resp, err := srv.Test(req)
+			defer test.Close(t, resp)
+
+			require.NoError(t, err)
+			require.Equal(t, web.StatusOK, resp.StatusCode)
+			assert.Equal(t, tc.expectedContentType, resp.Header.Get(fiber.HeaderContentType))
+			tc.assertContent(t, resp.Body)
+		})
+	}
+}
 func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	srv := web.NewTestServer()
 
@@ -294,14 +574,16 @@ func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	require.NoError(t, err)
 
 	validClaim := auth.NewClaims("myuser", "myUser")
-	item1, err := cards.NewCollectable(514, 5)
+	item1, err := cards.NewCollectable(cards.NewID(514), 5)
 	require.NoError(t, err)
-	item2, err := cards.NewCollectable(706, 3)
+	item2, err := cards.NewCollectable(cards.NewID(706), 3)
 	require.NoError(t, err)
-	item3, err := cards.NewCollectable(1, 1)
+	item4, err := cards.NewCollectable(cards.NewID(10582), 1)
+	require.NoError(t, err)
+	item5, err := cards.NewCollectable(cards.NewID(582), 3)
 	require.NoError(t, err)
 	collected := map[string][]cards.Collectable{
-		validClaim.ID: {item1, item2, item3},
+		validClaim.ID: {item1, item2, item4, item5},
 	}
 
 	repo, err := memory.NewCardRepository(seed, collected)

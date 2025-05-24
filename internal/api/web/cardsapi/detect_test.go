@@ -34,13 +34,14 @@ func TestDetect(t *testing.T) {
 			img:  "cardImageModified.jpg",
 			expected: []cardsapi.Card{
 				{
-					ID:    1,
+					ID:    "Y2FyZD0xJmZhY2U9MQ==",
 					Name:  "Ancestor's Chosen",
 					Image: "cardImage.jpg",
 					Set: cardsapi.Set{
 						Code: "10E",
 						Name: "Tenth Edition",
 					},
+					Number:     "1",
 					Confidence: &four,
 				},
 			},
@@ -53,7 +54,7 @@ func TestDetect(t *testing.T) {
 			),
 			expected: []cardsapi.Card{
 				{
-					ID:     1,
+					ID:     "Y2FyZD0xJmZhY2U9MQ==",
 					Amount: 1,
 					Name:   "Ancestor's Chosen",
 					Image:  "cardImage.jpg",
@@ -61,6 +62,7 @@ func TestDetect(t *testing.T) {
 						Code: "10E",
 						Name: "Tenth Edition",
 					},
+					Number:     "1",
 					Confidence: &four,
 				},
 			},
@@ -87,7 +89,7 @@ func TestDetect(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, web.StatusOK, resp.StatusCode)
-			body := test.FromJSON[cardsapi.PagedResponse](t, resp.Body)
+			body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, resp.Body)
 			assert.False(t, body.HasMore)
 			assert.Equal(t, 1, body.Page)
 			assert.ElementsMatch(t, tc.expected, body.Data)
@@ -104,7 +106,7 @@ func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	require.NoError(t, err)
 	dRepo, err := memory.NewDetectRepository(seed, cfg, hasher)
 	require.NoError(t, err)
-	item, err := cards.NewCollectable(1, 1)
+	item, err := cards.NewCollectable(cards.NewID(1), 1)
 	require.NoError(t, err)
 	collected := map[string][]cards.Collectable{
 		"myuser": {item},

@@ -7,7 +7,7 @@ Web application that help you to manage your card collection.
 
 ## Requirements
 
-- go version >= 1.22
+- go version >= 1.23
 
 ## Run locally
 

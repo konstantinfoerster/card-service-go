@@ -18,27 +18,23 @@ func CardSeed() ([]cards.Card, error) {
 	}
 	dir := path.Join(path.Dir(cf))
 
-	cc := make([]cards.Card, 0)
-
-	cards10E, err := readFromJSON(filepath.Join(dir, "testdata/cards10E.json"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cards10E.json, %w", err)
+	files := []string{
+		"testdata/search.json",
+		"testdata/collected.json",
+		"testdata/detect.json",
+		"testdata/more.json",
+		"testdata/detail.json",
 	}
-	cc = append(cc, cards10E...)
-
-	cards2ED, err := readFromJSON(filepath.Join(dir, "testdata/cards2ED.json"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cards2ED.json, %w", err)
+	seed := make([]cards.Card, 0)
+	for _, f := range files {
+		cc, err := readFromJSON(filepath.Join(dir, f))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s, %w", f, err)
+		}
+		seed = append(seed, cc...)
 	}
-	cc = append(cc, cards2ED...)
 
-	cards2X2, err := readFromJSON(filepath.Join(dir, "testdata/cards2X2.json"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read cards2X2.json, %w", err)
-	}
-	cc = append(cc, cards2X2...)
-
-	return cc, nil
+	return seed, nil
 }
 
 func readFromJSON(path string) ([]cards.Card, error) {

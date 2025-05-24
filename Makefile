@@ -4,13 +4,14 @@ ifndef VERSION
 override VERSION = local-dev
 endif
 
+.PHONY: run
 run:
-	go run cmd/main.go -c application-local.yaml
+	go run cmd/main.go -c configs/application-local.yaml
 .PHONY: build
 build:
 	go build -o $(BINARY_NAME) cmd/main.go
 .PHONY: docker
-docker:
+docker-build:
 	docker build --build-arg RELEASE="$(VERSION)" -t card-service:$(VERSION) -f build/opencv.Dockerfile .
 docker-run: docker
 	docker run -it --rm -v ./configs:/config card-service:$(VERSION)

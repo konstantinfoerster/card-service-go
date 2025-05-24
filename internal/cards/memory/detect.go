@@ -27,21 +27,6 @@ func NewDetectRepository(data []cards.Card, cfg config.Images, hasher image.Hash
 	}, nil
 }
 
-func (r InMemDetectRepository) hash(c cards.Card) (image.Hash, error) {
-	fImg, err := os.Open(path.Join(r.cfg.Host, c.Image.URL))
-	if err != nil {
-		return image.Hash{}, err
-	}
-	defer aio.Close(fImg)
-
-	img, err := image.NewImage(fImg)
-	if err != nil {
-		return image.Hash{}, err
-	}
-
-	return r.hasher.Hash(img)
-}
-
 func (r InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (cards.Scores, error) {
 	var result cards.Scores
 	for _, card := range r.cards {
@@ -87,4 +72,19 @@ func (r InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...
 	}
 
 	return result, nil
+}
+
+func (r InMemDetectRepository) hash(c cards.Card) (image.Hash, error) {
+	fImg, err := os.Open(path.Join(r.cfg.Host, c.Image.URL))
+	if err != nil {
+		return image.Hash{}, err
+	}
+	defer aio.Close(fImg)
+
+	img, err := image.NewImage(fImg)
+	if err != nil {
+		return image.Hash{}, err
+	}
+
+	return r.hasher.Hash(img)
 }

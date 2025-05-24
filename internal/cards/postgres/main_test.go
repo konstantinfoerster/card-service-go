@@ -139,6 +139,18 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 	return nil
 }
 
+func (r *databaseRunner) Stop(ctx context.Context) error {
+	if !r.running {
+		return nil
+	}
+
+	return r.container.Terminate(ctx)
+}
+
+func (r *databaseRunner) Config() config.Database {
+	return r.cfg
+}
+
 func (r *databaseRunner) enableDebugIfRequired(ctx context.Context) error {
 	if e := log.Debug(); e.Enabled() {
 		logs, err := r.container.Logs(ctx)
@@ -156,16 +168,4 @@ func (r *databaseRunner) enableDebugIfRequired(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *databaseRunner) Stop(ctx context.Context) error {
-	if !r.running {
-		return nil
-	}
-
-	return r.container.Terminate(ctx)
-}
-
-func (r *databaseRunner) Config() config.Database {
-	return r.cfg
 }

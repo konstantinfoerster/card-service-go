@@ -15,7 +15,7 @@ import (
 func TestCollectItem(t *testing.T) {
 	ctx := context.Background()
 	svc := newCollectionService(t)
-	item, err := cards.NewCollectable(1, 2)
+	item, err := cards.NewCollectable(cards.NewID(1), 2)
 	require.NoError(t, err)
 
 	collect, err := svc.Collect(ctx, item, cards.NewCollector("myUser"))
@@ -28,7 +28,7 @@ func TestCollectItem(t *testing.T) {
 func TestCollectNoneExistingItem(t *testing.T) {
 	ctx := context.Background()
 	svc := newCollectionService(t)
-	noneExistingItem, err := cards.NewCollectable(1000, 1)
+	noneExistingItem, err := cards.NewCollectable(cards.NewID(1000), 1)
 	require.NoError(t, err)
 
 	collect, err := svc.Collect(ctx, noneExistingItem, cards.NewCollector("myUser"))
@@ -36,7 +36,7 @@ func TestCollectNoneExistingItem(t *testing.T) {
 	assert.Equal(t, cards.Collectable{}, collect)
 	var appErr aerrors.AppError
 	require.ErrorAs(t, err, &appErr)
-	assert.Equal(t, aerrors.ErrTypeInvalidInput, appErr.ErrorType)
+	assert.Equal(t, aerrors.ErrInvalidInput, appErr.ErrorType)
 }
 
 func newCollectionService(t *testing.T) cards.CollectionService {

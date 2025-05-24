@@ -33,34 +33,37 @@ func TestSearchCollected(t *testing.T) {
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
 					{
-						ID:     434,
+						ID:     "Y2FyZD0xMTQzNCZmYWNlPTExNDM0", // 11434
 						Amount: 1,
-						Name:   "Demonic Attorney",
+						Name:   "Domonic Attorney",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "104",
 					},
 					{
-						ID:     706,
+						ID:     "Y2FyZD0xMTcwNiZmYWNlPTExNzA2", // 11706
 						Amount: 3,
-						Name:   "Demonic Hordes",
+						Name:   "Domonic Hordes",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "105",
 					},
 					{
-						ID:     514,
+						ID:     "Y2FyZD0xMTUxNCZmYWNlPTExNTE0", // 11514
 						Amount: 5,
-						Name:   "Demonic Tutor",
+						Name:   "Domonic Tutor",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
+						Number: "106",
 					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
 				assert.False(t, body.HasMore)
 				assert.Equal(t, 1, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -100,16 +103,17 @@ func TestSearchCollected(t *testing.T) {
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				expected := []cardsapi.Card{
 					{
-						ID:     706,
+						ID:     "Y2FyZD0xMTcwNiZmYWNlPTExNzA2", // 11706
 						Amount: 3,
-						Name:   "Demonic Hordes",
+						Number: "105",
+						Name:   "Domonic Hordes",
 						Set: cardsapi.Set{
 							Name: "Unlimited Edition",
 							Code: "2ED",
 						},
 					},
 				}
-				body := test.FromJSON[cardsapi.PagedResponse](t, rBody)
+				body := test.FromJSON[cardsapi.PagedResponse[cardsapi.Card]](t, rBody)
 				assert.True(t, body.HasMore)
 				assert.Equal(t, 2, body.Page)
 				assert.ElementsMatch(t, expected, body.Data)
@@ -159,7 +163,7 @@ func TestSearchCollected(t *testing.T) {
 			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
-				test.WithURL("http://localhost/mycards?name=Demonic&"+tc.page),
+				test.WithURL("http://localhost/mycards?name=Domonic&"+tc.page),
 				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
 			)
@@ -204,7 +208,7 @@ func TestCollectItemAdd(t *testing.T) {
 			expectedContentType: fiber.MIMEApplicationJSONCharsetUTF8,
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				body := test.FromJSON[cardsapi.Item](t, rBody)
-				assert.Equal(t, &cardsapi.Item{ID: 1, Amount: 1}, body)
+				assert.Equal(t, &cardsapi.Item{ID: "Y2FyZD0xMjQwNg==", Amount: 1}, body)
 			},
 		},
 		{
@@ -220,8 +224,8 @@ func TestCollectItemAdd(t *testing.T) {
 
 				assert.Contains(t, body, "data-testid=\"add-card-btn\"", "expect to have add button")
 				assert.Contains(t, body, "data-testid=\"remove-card-btn\"", "expect remove button")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 2 }'", "expect add value attributes")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 0 }'", "expect remove value attributes")
+				assert.Contains(t, body, "hx-vals='{ \"id\": \"Y2FyZD0xMjQwNg==\",\"amount\": 2 }'", "expect add value attributes")
+				assert.Contains(t, body, "hx-vals='{ \"id\": \"Y2FyZD0xMjQwNg==\",\"amount\": 0 }'", "expect remove value attributes")
 			},
 		},
 	}
@@ -233,7 +237,7 @@ func TestCollectItemAdd(t *testing.T) {
 				test.WithURL("http://localhost/mycards"),
 				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
-				test.WithJSONBody(t, cardsapi.NewItem(cards.NewID(1), tc.amount)),
+				test.WithJSONBody(t, cardsapi.NewItem(cards.NewID(12406), tc.amount)),
 			)
 
 			resp, err := srv.Test(req)
@@ -268,8 +272,8 @@ func TestCollectItemRemove(t *testing.T) {
 
 				assert.Contains(t, body, "data-testid=\"add-card-btn\"", "expect to have add button")
 				assert.NotContains(t, body, "data-testid=\"remove-card-btn\"", "expect disabled remove button")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 1 }'", "expect add value attributes")
-				assert.Contains(t, body, "hx-vals='{ \"id\": 1,\"amount\": 0 }'", "expect remove value attributes")
+				assert.Contains(t, body, "hx-vals='{ \"id\": \"Y2FyZD0xMjQwNg==\",\"amount\": 1 }'", "expect add value attributes")
+				assert.Contains(t, body, "hx-vals='{ \"id\": \"Y2FyZD0xMjQwNg==\",\"amount\": 0 }'", "expect remove value attributes")
 			},
 		},
 	}
@@ -281,7 +285,7 @@ func TestCollectItemRemove(t *testing.T) {
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
 				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
-				test.WithJSONBody(t, cardsapi.Item{ID: 1, Amount: 1}),
+				test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0xMjQwNg==", Amount: 1}),
 			)
 			respAdd, _ := srv.Test(reqAdd)
 			defer test.Close(t, respAdd)
@@ -291,7 +295,7 @@ func TestCollectItemRemove(t *testing.T) {
 				test.WithURL("http://localhost/mycards"),
 				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
 				test.WithHeader(tc.header),
-				test.WithJSONBody(t, cardsapi.Item{ID: 1, Amount: 0}),
+				test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0xMjQwNg==", Amount: 0}),
 			)
 
 			resp, err := srv.Test(reqRemove)
@@ -310,7 +314,7 @@ func TestCollectItemNoSession(t *testing.T) {
 	req := test.NewRequest(
 		test.WithMethod(web.MethodPost),
 		test.WithURL("http://localhost/mycards"),
-		test.WithJSONBody(t, cardsapi.Item{ID: 1}),
+		test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0x"}),
 	)
 
 	resp, err := srv.Test(req)
@@ -331,11 +335,11 @@ func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	validClaim := auth.NewClaims("myuser", "myUser")
 	collector := cards.NewCollector(validClaim.ID)
 	ctx := context.Background()
-	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(434), Amount: 1}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11434), Amount: 1}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(514), Amount: 5}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11514), Amount: 5}, collector)
 	require.NoError(t, err)
-	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(706), Amount: 3}, collector)
+	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11706), Amount: 3}, collector)
 	require.NoError(t, err)
 
 	oCfg := config.Oidc{}

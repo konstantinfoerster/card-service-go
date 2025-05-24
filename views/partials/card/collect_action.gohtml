@@ -8,7 +8,7 @@
   <button
       class="btn btn-primary"
       hx-post="/mycards"
-      hx-vals='{ "id": {{ .ID }},"amount": {{ .Amount.Next }} }'
+      hx-vals='{ "id": "{{ .ID }}","amount": {{ .Amount.Next }} }'
       data-testid="add-card-btn"
   > +
   </button>
@@ -17,7 +17,7 @@
       class="btn btn-primary"
       {{ if .Amount  }}data-testid="remove-card-btn"{{ else }}disabled{{ end }}
       hx-post="/mycards"
-      hx-vals='{ "id": {{ .ID }},"amount": {{ .Amount.Previous }} }'
+      hx-vals='{ "id": "{{ .ID }}","amount": {{ .Amount.Previous }} }'
   > -
   </button>
 </div>

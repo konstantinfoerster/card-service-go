@@ -35,6 +35,10 @@ type Match struct {
 	Confidence int
 }
 
+type Matches struct {
+	PagedResult[Match]
+}
+
 func NewMatches(cards Cards, scores Scores, page Page) Matches {
 	matches := make([]Match, 0)
 	for _, c := range cards.Result {
@@ -46,10 +50,6 @@ func NewMatches(cards Cards, scores Scores, page Page) Matches {
 	return Matches{
 		NewPagedResult(matches, page),
 	}
-}
-
-type Matches struct {
-	PagedResult[Match]
 }
 
 func EmptyMatches(p Page) Matches {

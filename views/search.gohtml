@@ -1,9 +1,15 @@
 {{define "title"}}Search{{end}}
-{{- if .Page.Data -}}
-  <p data-testid="search-result-txt">Search result for <b>{{ .SearchTerm}}</b></p>
-  <div class="grid">
-      {{template "card_list" .}}
-  </div>
-{{else}}
-  <p>Nothing found</p>
-{{end}}
+
+<div class="cards-wrapper">
+    <div class="cards-result">
+        {{- if .Page.Data -}}
+          <p data-testid="search-result-txt">Search result for <b>{{ .SearchTerm}}</b></p>
+          <div class="grid-auto-fit">
+              {{template "card_list" .}}
+          </div>
+        {{else}}
+          <p>Nothing found</p>
+        {{end}}
+    </div>
+</div>
+<aside id="sidebar"></aside>

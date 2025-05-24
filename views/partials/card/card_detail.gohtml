@@ -1,0 +1,29 @@
+{{- define "card_detail" -}}
+<div id="card-detail" data-testid="card-detail">
+    <div class="header">
+        <div class="text">
+          <h5>{{ .Card.Name }}</h5>
+          <div class="fs-small">#{{ .Card.Number }} ({{ .Card.Set.Code }})</div>
+        </div>
+        <button class="btn close" 
+          onclick='document.getElementById("card-detail").remove()'>
+        </button>
+    </div>
+    <div class="card-image-wrapper">
+      <div class="card-image">
+        <img
+            data-testid="card-detail-img"
+            src="{{ .Card.Image}}"
+            onerror="this.onerror=null; this.src='';"
+            onload="this.className = 'loaded'"
+            alt="{{ .Card.Title}}"
+        />
+      </div>
+      {{- if $.User -}}{{- template  "collect_action" .Card -}}{{- end -}}
+    </div>
+    <div class="prints">
+      <div>Prints</div>
+      {{- template  "card_prints" .  -}}
+    </div>
+</div>
+{{- end -}}

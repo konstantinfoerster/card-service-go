@@ -1,5 +1,3 @@
-//go:build opencv
-
 package main
 
 import (
@@ -19,7 +17,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	cardspg "github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/rs/zerolog"
@@ -68,7 +65,7 @@ func main() {
 
 func run(cfg *config.Config) error {
 	ctx := context.Background()
-	dbCon, err := cardspg.Connect(ctx, cfg.Database)
+	dbCon, err := postgres.Connect(ctx, cfg.Database)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database %w", err)
 	}
@@ -109,20 +106,23 @@ func run(cfg *config.Config) error {
 	})
 
 	errg, ctx := errgroup.WithContext(context.Background())
-    // start web-server
+	// start web-server
 	errg.Go(func() error {
 		return srv.Run(ctx)
 	})
 
 	readinessProbe := func(c *fiber.Ctx) bool {
+		// TODO: implement readiness probe
 		return true
 	}
 	livenessProbe := func(c *fiber.Ctx) bool {
+		// TODO: implement liveness probe
 		return true
 	}
-    // start probe-server
+	// TODO: rethink that second server, maybe just add probes to
+	// main server
 	probeSrv := web.NewProbeServer(cfg.Probes, livenessProbe, readinessProbe)
-    // start probe-server
+	// start probe-server
 	errg.Go(func() error {
 		return probeSrv.Run(ctx)
 	})
