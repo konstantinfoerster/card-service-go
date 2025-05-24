@@ -28,17 +28,17 @@ func TestUnsupportedProvider(t *testing.T) {
 		{
 			name:     "Unknown provider",
 			provider: "unknown",
-			errType:  aerrors.ErrTypeInvalidInput,
+			errType:  aerrors.ErrInvalidInput,
 		},
 		{
 			name:     "empty provider",
 			provider: "",
-			errType:  aerrors.ErrTypeInvalidInput,
+			errType:  aerrors.ErrInvalidInput,
 		},
 		{
 			name:     "space only provider",
 			provider: "  ",
-			errType:  aerrors.ErrTypeInvalidInput,
+			errType:  aerrors.ErrInvalidInput,
 		},
 	}
 
@@ -145,7 +145,7 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 
 	var appErr aerrors.AppError
 	require.ErrorAs(t, err, &appErr)
-	assert.Equal(t, aerrors.ErrTypeUnknown, appErr.ErrorType)
+	assert.Equal(t, aerrors.ErrUnknown, appErr.ErrorType)
 }
 
 func TestAuthInfo(t *testing.T) {

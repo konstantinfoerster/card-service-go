@@ -14,15 +14,15 @@ var (
 
 const UserContextKey = "userid"
 
-// NewUser creates a new User.
-func NewUser(id, username string) User {
-	return User{ID: id, Username: username}
-}
-
 // User represents an authenticated user in the system.
 type User struct {
 	ID       string
 	Username string
+}
+
+// NewUser creates a new User.
+func NewUser(id, username string) User {
+	return User{ID: id, Username: username}
 }
 
 // UserFromCtx returns an authenticated User or an ErrNoUserInContext if there is no user.
@@ -33,6 +33,11 @@ func UserFromCtx(ctx *fiber.Ctx) (User, error) {
 	}
 
 	return User{}, ErrNoUserInContext
+}
+
+type AuthMiddleware struct {
+	relaxed  fiber.Handler
+	required fiber.Handler
 }
 
 // NewAuthMiddleware provides fiber.Handler that can be used to ensure an authentciated access.
@@ -51,11 +56,6 @@ func NewAuthMiddleware(cfg config.Oidc, svc auth.Service) AuthMiddleware {
 	}
 }
 
-type AuthMiddleware struct {
-	relaxed  fiber.Handler
-	required fiber.Handler
-}
-
 // Relaxed ensures that the access is authenticated when the correct credentials are provided.
 // Does not forbid the access if no credentials are found.
 func (r AuthMiddleware) Relaxed() func(*fiber.Ctx) error {
@@ -65,6 +65,11 @@ func (r AuthMiddleware) Relaxed() func(*fiber.Ctx) error {
 // Required ensures that the access is authenticated.
 func (r AuthMiddleware) Required() func(*fiber.Ctx) error {
 	return r.required
+}
+
+type ClientUser struct {
+	Username string `json:"username"`
+	Initials string `json:"initials"`
 }
 
 func NewClientUser(u User) *ClientUser {
@@ -83,9 +88,4 @@ func NewClientUser(u User) *ClientUser {
 		Username: username,
 		Initials: string(initials),
 	}
-}
-
-type ClientUser struct {
-	Username string `json:"username"`
-	Initials string `json:"initials"`
 }

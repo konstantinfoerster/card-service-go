@@ -13,8 +13,8 @@ type Collectable struct {
 	Amount int
 }
 
-func NewCollectable(id int, amount int) (Collectable, error) {
-	if id <= 0 {
+func NewCollectable(id ID, amount int) (Collectable, error) {
+	if id.CardID <= 0 {
 		return Collectable{}, aerrors.NewInvalidInputMsg("invalid-id", "invalid id")
 	}
 
@@ -23,7 +23,7 @@ func NewCollectable(id int, amount int) (Collectable, error) {
 	}
 
 	return Collectable{
-		ID:     NewID(id),
+		ID:     id,
 		Amount: amount,
 	}, nil
 }

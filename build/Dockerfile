@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine3.20 as builder
+FROM golang:1.23-alpine3.20 AS builder
 
 WORKDIR /app
 
@@ -15,9 +15,10 @@ ENV GOARCH="amd64"
 ENV CGO_ENABLED="0"
 
 RUN go build -ldflags="-s -w" -o service cmd/main.go \
-      && chmod 0755 /app/service
+      && chmod 0755 /app/service \
+      && go clean -modcache -cache
 
-FROM alpine:3.20 as dev
+FROM alpine:3.20 AS dev
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"

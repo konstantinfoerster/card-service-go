@@ -1,8 +1,9 @@
 {{define "title"}}My Cards{{end}}
 {{- if .Page.Data -}}
-  <div class="grid" data-testid="mycards-list">
+  <div class="grid-auto-fit" data-testid="mycards-list">
       {{template "card_list" .}}
   </div>
 {{else}}
   <p>Nothing here</p>
 {{end}}
+<aside id="sidebar"></aside>

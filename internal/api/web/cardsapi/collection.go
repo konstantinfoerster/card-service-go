@@ -26,7 +26,7 @@ func searchInPersonalCollection(svc cards.CollectionService) fiber.Handler {
 			return err
 		}
 
-		pagedResult := newResponse(result.PagedResult)
+		pagedResult := newPagedResponse(result.PagedResult)
 
 		if web.AcceptsHTML(c) || web.IsHTMX(c) {
 			data := fiber.Map{
@@ -58,10 +58,13 @@ func collect(svc cards.CollectionService) fiber.Handler {
 
 		var body Item
 		if err = c.BodyParser(&body); err != nil {
-			return aerrors.NewInvalidInputMsg("invalid-body", "failed to parse body")
+			return aerrors.NewInvalidInputError(err, "invalid-body", "invalid body format")
 		}
-
-		it, err := cards.NewCollectable(body.ID, body.Amount.Value())
+		id, err := toID(body.ID)
+		if err != nil {
+			return aerrors.NewInvalidInputMsg("invalid-id", "invalid id format")
+		}
+		it, err := cards.NewCollectable(id, body.Amount.Value())
 		if err != nil {
 			return err
 		}

@@ -33,7 +33,7 @@ func Detect(svc cards.DetectService) fiber.Handler {
 			return err
 		}
 
-		pagedResult := newResponse(result.PagedResult)
+		pagedResult := newPagedResponse(result.PagedResult)
 		if web.AcceptsHTML(c) || web.IsHTMX(c) {
 			data := fiber.Map{
 				"Page": pagedResult,

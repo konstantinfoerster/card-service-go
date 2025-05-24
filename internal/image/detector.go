@@ -20,6 +20,10 @@ const (
 	Degree180
 )
 
+type Image struct {
+	image.Image
+}
+
 func NewImage(in io.Reader) (Image, error) {
 	if in == nil {
 		return Image{}, ErrInvalidInput
@@ -31,10 +35,6 @@ func NewImage(in io.Reader) (Image, error) {
 	}
 
 	return Image{dImg}, nil
-}
-
-type Image struct {
-	image.Image
 }
 
 func (img Image) Rotate(angle Degree) Image {

@@ -130,7 +130,7 @@ func TestOAuthMiddlewareError(t *testing.T) {
 					}
 
 					switch appErr.ErrorType {
-					case aerrors.ErrTypeAuthorization:
+					case aerrors.ErrAuthorization:
 						return c.Status(http.StatusUnauthorized).SendString(err.Error())
 					default:
 						return c.Status(http.StatusInternalServerError).SendString(err.Error())

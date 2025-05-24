@@ -1,0 +1,38 @@
+[
+  {
+    "id": {
+      "cardId": 434,
+      "faceId": 434
+    },
+    "name": "Demonic Attorney",
+    "number": "103",
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
+  },
+  {
+    "id": {
+      "cardId": 706,
+      "faceId": 706
+    },
+    "name": "Demonic Hordes",
+    "number": "104",
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
+  },
+  {
+    "id": {
+      "cardId": 514,
+      "faceId": 514
+    },
+    "name": "Demonic Tutor",
+    "number": "105",
+    "set": {
+      "name": "Unlimited Edition",
+      "code": "2ED"
+    }
+  }
+]

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -62,6 +63,12 @@ func NewRequest(options ...RequestOpt) *http.Request {
 func WithURL(url string) RequestOpt {
 	return func(req *httpRequest) {
 		req.url = url
+	}
+}
+
+func WithURLf(url string, args ...any) RequestOpt {
+	return func(req *httpRequest) {
+		req.url = fmt.Sprintf(url, args...)
 	}
 }
 

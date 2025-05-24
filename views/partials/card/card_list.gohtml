@@ -3,15 +3,22 @@
         {{ $length := len .Page.Data }}
         {{- range $index, $card :=.Page.Data -}}
           <div class="card-image-wrapper" title="{{ .Title}}">
-            <img
-                data-testid="card-{{$index}}"
-                width="332"
-                height="462"
-                class="card-image"
-                {{if .Image}}src="{{ .Image}}"{{end}}
-                alt="{{ $card.Title}}"
-            />
-              {{- if $.User -}}{{- template  "collect_action" . -}}{{- end -}}
+            <div class="card-image">
+                <img
+                    data-testid="card-{{$index}}"
+                    src="{{ .Image}}"
+                    onerror="this.onerror=null; this.src='';"
+                    onload="this.className = 'loaded'"
+                    alt="{{ $card.Title}}"
+                    hx-get="/cards/{{ $card.ID }}"
+                    hx-trigger="click" 
+                    hx-target="#sidebar"
+                    hx-swap="innerHtml"
+                />
+            </div>
+              {{- if $.User -}}
+                {{- template  "collect_action" . -}}
+              {{- end -}}
           </div>
           {{- if and ($.Page.HasMore) (isLastIndex $index $length) -}}
             <div class="card-image-wrapper hidden-card"

@@ -52,9 +52,9 @@ func RespondWithProblemJSON(c *fiber.Ctx, err error) error {
 
 	var code int
 	switch appErr.ErrorType {
-	case aerrors.ErrTypeInvalidInput:
+	case aerrors.ErrInvalidInput:
 		code = StatusBadRequest
-	case aerrors.ErrTypeAuthorization:
+	case aerrors.ErrAuthorization:
 		code = StatusUnauthorized
 	default:
 		code = StatusInternalServerError

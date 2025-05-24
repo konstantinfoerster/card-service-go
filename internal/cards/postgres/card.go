@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
@@ -71,7 +72,7 @@ func (r postgresCardRepository) Find(ctx context.Context, f cards.Filter, page c
 		tplParams["onlyCollected"] = f.OnlyCollected
 	}
 
-	queryTpl, err := template.New("selectcard").Parse(`
+	queryTpl, err := template.New("findcards").Parse(`
 WITH
   cte
 AS 
@@ -79,7 +80,7 @@ AS
   SELECT
     DISTINCT ON (face.name)
     row_number() over (partition by face.card_id) as rn,
-    face.card_id, face.id, face.name, set.code, set.name,
+    face.card_id, face.id, face.name, card.number, set.code, set.name,
     NULLIF(CONCAT(@baseURL::text, image.image_path), @baseURL::text)
     {{if .user}}, coalesce(card_collection.amount, 0) {{else}}, 0 {{end}}
   FROM
@@ -138,16 +139,16 @@ WHERE
 LIMIT @limit
 OFFSET @offset`)
 	if err != nil {
-		return cards.EmptyCards(page), fmt.Errorf("failed to parse card select template %w", err)
+		return cards.Cards{}, fmt.Errorf("failed to parse card find template %w", err)
 	}
 	var query bytes.Buffer
 	if err = queryTpl.Execute(&query, tplParams); err != nil {
-		return cards.EmptyCards(page), fmt.Errorf("failed to execute query template %w", err)
+		return cards.Cards{}, fmt.Errorf("failed to execute query template %w", err)
 	}
 
 	rows, err := r.db.Conn.Query(ctx, query.String(), queryArgs)
 	if err != nil {
-		return cards.EmptyCards(page), fmt.Errorf("failed to execute paged card face select %w", err)
+		return cards.Cards{}, fmt.Errorf("failed to execute paged card face select %w", err)
 	}
 	defer rows.Close()
 
@@ -159,21 +160,102 @@ OFFSET @offset`)
 			&entry.CardID,
 			&entry.FaceID,
 			&entry.Name,
+			&entry.Number,
 			&entry.SetCode,
 			&entry.SetName,
 			&entry.ImageURL,
 			&entry.Amount,
 		)
 		if err != nil {
-			return cards.EmptyCards(page), fmt.Errorf("failed to execute card scan after select %w", err)
+			return cards.Cards{}, fmt.Errorf("failed to execute card scan after select %w", err)
 		}
 		result = append(result, toCard(entry))
 	}
 	if rows.Err() != nil {
-		return cards.EmptyCards(page), fmt.Errorf("failed to read next row %w", rows.Err())
+		return cards.Cards{}, fmt.Errorf("failed to read next row %w", rows.Err())
 	}
 
 	return cards.NewCards(result, page), nil
+}
+
+func (r postgresCardRepository) Prints(
+	ctx context.Context, name string, collector cards.Collector, page cards.Page) (cards.CardPrints, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return cards.EmptyCardPrints(page), nil
+	}
+	queryArgs := pgx.NamedArgs{
+		"name":   name,
+		"limit":  page.Size(),
+		"offset": page.Offset(),
+	}
+
+	tplParams := make(map[string]any)
+	if collector.ID != "" {
+		queryArgs["user"] = collector.ID
+		tplParams["user"] = collector.ID
+	}
+
+	queryTpl, err := template.New("printcards").Parse(`
+SELECT 
+  face.name, face.card_id, face.id, card.number, card.card_set_code
+  {{if .user}}, coalesce(card_collection.amount, 0) {{else}}, 0 {{end}}
+FROM
+  card AS card
+INNER JOIN
+  card_face AS face
+ON
+  card.id = face.card_id
+  {{if .user}}
+    LEFT JOIN
+      card_collection
+	ON
+  	  face.card_id = card_collection.card_id
+	AND
+	  card_collection.user_id = @user
+  {{end}}
+WHERE
+  face.name = @name
+ORDER BY
+  card.id
+LIMIT @limit
+OFFSET @offset`)
+	if err != nil {
+		return cards.CardPrints{}, fmt.Errorf("failed to parse card print template %w", err)
+	}
+
+	var query bytes.Buffer
+	if err = queryTpl.Execute(&query, tplParams); err != nil {
+		return cards.CardPrints{}, fmt.Errorf("failed to execute query template %w", err)
+	}
+
+	rows, err := r.db.Conn.Query(ctx, query.String(), queryArgs)
+	if err != nil {
+		return cards.CardPrints{}, fmt.Errorf("failed to execute paged card print select %w", err)
+	}
+	defer rows.Close()
+
+	var result []cards.CardPrint
+	for rows.Next() {
+		var entry cards.CardPrint
+		err = rows.Scan(
+			&entry.Name,
+			&entry.ID.CardID,
+			&entry.ID.FaceID,
+			&entry.Number,
+			&entry.Code,
+			&entry.Amount,
+		)
+		if err != nil {
+			return cards.CardPrints{}, fmt.Errorf("failed to execute card print scan after select %w", err)
+		}
+		result = append(result, entry)
+	}
+	if rows.Err() != nil {
+		return cards.CardPrints{}, fmt.Errorf("failed to read next row %w", rows.Err())
+	}
+
+	return cards.NewCardPrints(result, page), nil
 }
 
 func (r postgresCardRepository) Exist(ctx context.Context, id cards.ID) (bool, error) {

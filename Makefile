@@ -4,6 +4,7 @@ ifndef VERSION
 override VERSION = local-dev
 endif
 
+.PHONY: run
 run:
 	go run cmd/main.go -c application-local.yaml
 .PHONY: build

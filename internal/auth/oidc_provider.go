@@ -27,6 +27,10 @@ var (
 	ErrProviderUnexpectedResponse = errors.New("provider returned unexpected response")
 )
 
+type Providers struct {
+	provider map[string]Provider
+}
+
 func NewProviders(provider ...Provider) Providers {
 	pp := make(map[string]Provider)
 	for _, p := range provider {
@@ -41,11 +45,6 @@ func NewProviders(provider ...Provider) Providers {
 		provider: pp,
 	}
 }
-
-type Providers struct {
-	provider map[string]Provider
-}
-
 func (pp Providers) Find(key string) (Provider, error) {
 	if strings.TrimSpace(key) == "" {
 		return nil, ErrProviderKeyMissing
@@ -180,7 +179,7 @@ func (p *provider) ValidateToken(ctx context.Context, token *JWT) (Claims, error
 }
 
 func (p *provider) ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error) {
-	body, err := p.postRequest(ctx, p.tokenURL, url.Values{ //nolint:bodyclose
+	body, err := p.postRequest(ctx, p.tokenURL, url.Values{
 		"code":          {authCode},
 		"client_id":     {p.clientID},
 		"client_secret": {p.secret},
@@ -211,7 +210,7 @@ func (p *provider) RevokeToken(ctx context.Context, token *JWT) error {
 	if token == nil {
 		return errors.Join(errEmptyToken, ErrProviderTokenRevoke)
 	}
-	body, err := p.postRequest(ctx, p.revokeURL, url.Values{ //nolint:bodyclose
+	body, err := p.postRequest(ctx, p.revokeURL, url.Values{
 		"token": {token.AccessToken},
 	}, http.StatusOK)
 	if err != nil {
