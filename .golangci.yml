@@ -52,6 +52,8 @@ linters:
     - gosmopolitan
     - govet
     - ineffassign
+    - iface
+    - ireturn
     - lll
     - loggercheck
     - makezero
@@ -92,6 +94,14 @@ linters:
       package-average: 10
     errcheck:
       check-type-assertions: true
+    ireturn:
+      allow:
+       - anon
+       - error
+       - empty
+       - stdlib
+       - Detectable
+       - Provider
     mnd:
       ignored-functions:
         - os.Chmod

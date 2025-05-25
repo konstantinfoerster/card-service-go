@@ -12,9 +12,9 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,10 +101,9 @@ func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	srv := web.NewTestServer()
 
 	cfg := config.Images{Host: "testdata"}
-	hasher := image.NewPHasher()
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
-	dRepo, err := memory.NewDetectRepository(seed, cfg, hasher)
+	dRepo, err := memory.NewDetectRepository(seed, cfg)
 	require.NoError(t, err)
 	item, err := cards.NewCollectable(cards.NewID(1), 1)
 	require.NoError(t, err)
@@ -118,8 +117,8 @@ func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	validClaim := auth.NewClaims("myuser", "myUser")
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
 	authSvc := auth.New(oCfg, auth.NewProviders(provider))
-	detector := image.NewFakeDetector()
-	svc := cards.NewDetectService(cRepo, dRepo, detector, hasher)
+	detector := imaging.NewFakeDetector()
+	svc := cards.NewDetectService(cRepo, dRepo, detector)
 	srv.RegisterRoutes(func(r fiber.Router) {
 		cardsapi.DetectRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), svc)
 	})

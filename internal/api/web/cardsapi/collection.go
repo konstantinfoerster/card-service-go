@@ -1,18 +1,25 @@
 package cardsapi
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
-func CollectionRoutes(r fiber.Router, auth web.AuthMiddleware, cSvc cards.CollectionService) {
+type CollectionService interface {
+	Search(ctx context.Context, name string, c cards.Collector, p cards.Page) (cards.Cards, error)
+	Collect(ctx context.Context, item cards.Collectable, c cards.Collector) (cards.Collectable, error)
+}
+
+func CollectionRoutes(r fiber.Router, auth web.AuthMiddleware, cSvc CollectionService) {
 	r.Get("/mycards", auth.Required(), searchInPersonalCollection(cSvc))
 	r.Post("/mycards", auth.Required(), collect(cSvc))
 }
 
-func searchInPersonalCollection(svc cards.CollectionService) fiber.Handler {
+func searchInPersonalCollection(svc CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, err := web.UserFromCtx(c)
 		if err != nil {
@@ -49,7 +56,7 @@ func searchInPersonalCollection(svc cards.CollectionService) fiber.Handler {
 	}
 }
 
-func collect(svc cards.CollectionService) fiber.Handler {
+func collect(svc CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, err := web.UserFromCtx(c)
 		if err != nil {

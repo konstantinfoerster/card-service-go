@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,6 +14,10 @@ var (
 	ErrUnauthorized      = errors.New("unauthorized")
 	ErrInvalidSession    = errors.New("invalid or expired session")
 )
+
+type Service interface {
+	AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error)
+}
 
 const ClaimsContextKey = "claims"
 

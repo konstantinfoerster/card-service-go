@@ -32,7 +32,7 @@ func RenderPartial(c *fiber.Ctx, tmplName string, data any) error {
 	return c.Render(tmplName, data)
 }
 
-func RenderJSON(c *fiber.Ctx, data interface{}) error {
+func RenderJSON(c *fiber.Ctx, data any) error {
 	err := c.JSON(data)
 	c.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSONCharsetUTF8)
 

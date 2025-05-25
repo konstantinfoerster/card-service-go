@@ -1,6 +1,8 @@
 package cardsapi
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
@@ -13,13 +15,18 @@ const (
 	printsTmpl  = "card_prints"
 )
 
-func SearchRoutes(r fiber.Router, auth web.AuthMiddleware, searchSvc cards.CardService) {
+type CardService interface {
+	Search(ctx context.Context, name string, collector cards.Collector, page cards.Page) (cards.Cards, error)
+	Detail(ctx context.Context, id cards.ID, collector cards.Collector, page cards.Page) (cards.CardDetail, error)
+}
+
+func SearchRoutes(r fiber.Router, auth web.AuthMiddleware, searchSvc CardService) {
 	r.Get("/cards", auth.Relaxed(), searchCards(searchSvc))
 	r.Get("/cards/:id", auth.Relaxed(), details(searchSvc, detailsTmpl))
 	r.Get("/cards/:id/prints", auth.Relaxed(), details(searchSvc, printsTmpl))
 }
 
-func searchCards(svc cards.CardService) fiber.Handler {
+func searchCards(svc CardService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, _ := web.UserFromCtx(c)
 
@@ -57,7 +64,7 @@ func searchCards(svc cards.CardService) fiber.Handler {
 	}
 }
 
-func details(svc cards.CardService, tmplName string) fiber.Handler {
+func details(svc CardService, tmplName string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		if !web.IsHTMX(c) {
 			return aerrors.NewInvalidInputMsg("invalid-accept-header", "only htmlx supported")

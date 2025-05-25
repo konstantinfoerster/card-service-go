@@ -1,6 +1,6 @@
 //go:build opencv
 
-package image
+package imaging
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 	"math"
 	"sort"
 
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/rs/zerolog/log"
 	"gocv.io/x/gocv"
 	"golang.org/x/image/draw"
@@ -21,14 +22,14 @@ import (
 var ErrNoContours = errors.New("no contours found")
 var ErrNoCardContours = errors.Join(errors.New("after restrictions"), ErrNoContours)
 
-func NewDetector() Detector {
-	return boxDetector{}
+func NewDetector() *BoxDetector {
+	return &BoxDetector{}
 }
 
-type boxDetector struct {
+type BoxDetector struct {
 }
 
-func (d boxDetector) Detect(in io.Reader) (Images, error) {
+func (d BoxDetector) Detect(in io.Reader) ([]cards.Detectable, error) {
 	if in == nil {
 		return nil, ErrInvalidInput
 	}
@@ -54,7 +55,7 @@ func (d boxDetector) Detect(in io.Reader) (Images, error) {
 	candidates, err := findCandidates(orig, normalized)
 	if err != nil {
 		if errors.Is(err, ErrNoContours) {
-			return NewImages(), nil
+			return make([]cards.Detectable, 0), nil
 		}
 
 		return nil, err
@@ -120,14 +121,14 @@ func normalizeColors(orig gocv.Mat) gocv.Mat {
 	return normalized
 }
 
-func findCandidates(orig gocv.Mat, normalized gocv.Mat) (Images, error) {
+func findCandidates(orig gocv.Mat, normalized gocv.Mat) ([]cards.Detectable, error) {
 	contours, err := findContours(orig)
 	if err != nil {
 		return nil, err
 	}
 	defer contours.Close()
 
-	images := NewImages()
+	images := make([]cards.Detectable, 0)
 	for i := 0; i < contours.Size(); i++ {
 		pv := contours.At(i)
 

@@ -4,31 +4,27 @@ import (
 	"time"
 )
 
-type TimeService interface {
-	Now() time.Time
+type ClockService struct {
 }
 
-func NewTimeService() TimeService {
-	return &clockService{}
+func NewTimeService() *ClockService {
+	return &ClockService{}
 }
 
-type clockService struct {
-}
-
-func (s *clockService) Now() time.Time {
+func (s *ClockService) Now() time.Time {
 	return time.Now()
 }
 
-func NewFakeTimeService(time time.Time) TimeService {
-	return &fakeClockService{
+type FakeClockService struct {
+	time time.Time
+}
+
+func NewFakeTimeService(time time.Time) *FakeClockService {
+	return &FakeClockService{
 		time: time,
 	}
 }
 
-type fakeClockService struct {
-	time time.Time
-}
-
-func (s *fakeClockService) Now() time.Time {
+func (s *FakeClockService) Now() time.Time {
 	return s.time
 }

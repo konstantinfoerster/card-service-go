@@ -9,25 +9,23 @@ import (
 
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/image"
 )
 
 type InMemDetectRepository struct {
-	hasher image.Hasher
-	cards  []cards.Card
-	cfg    config.Images
+	cards []cards.Card
+	cfg   config.Images
 }
 
-func NewDetectRepository(data []cards.Card, cfg config.Images, hasher image.Hasher) (cards.DetectRepository, error) {
+func NewDetectRepository(data []cards.Card, cfg config.Images) (*InMemDetectRepository, error) {
 	return &InMemDetectRepository{
-		cards:  data,
-		hasher: hasher,
-		cfg:    cfg,
+		cards: data,
+		cfg:   cfg,
 	}, nil
 }
 
-func (r InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (cards.Scores, error) {
+func (r *InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...cards.Hash) (cards.Scores, error) {
 	var result cards.Scores
 	for _, card := range r.cards {
 		if card.Image.URL == "" {
@@ -41,7 +39,7 @@ func (r InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...
 
 		lowest := 1000
 		for _, h := range hashes {
-			d, err := r.hasher.Distance(cHash, h)
+			d, err := imaging.Distance(cHash, h)
 			if err != nil {
 				return nil, err
 			}
@@ -74,17 +72,17 @@ func (r InMemDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...
 	return result, nil
 }
 
-func (r InMemDetectRepository) hash(c cards.Card) (image.Hash, error) {
+func (r *InMemDetectRepository) hash(c cards.Card) (cards.Hash, error) {
 	fImg, err := os.Open(path.Join(r.cfg.Host, c.Image.URL))
 	if err != nil {
-		return image.Hash{}, err
+		return cards.Hash{}, err
 	}
 	defer aio.Close(fImg)
 
-	img, err := image.NewImage(fImg)
+	img, err := imaging.NewImage(fImg)
 	if err != nil {
-		return image.Hash{}, err
+		return cards.Hash{}, err
 	}
 
-	return r.hasher.Hash(img)
+	return img.Hash()
 }

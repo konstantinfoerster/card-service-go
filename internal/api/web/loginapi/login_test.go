@@ -418,7 +418,7 @@ func expiresIn(d time.Duration) time.Time {
 	return staticTimeSvc.Now().Add(d).Truncate(time.Second).UTC()
 }
 
-func loginServer(timeSvc auth.TimeService, provider auth.Provider) *web.Server {
+func loginServer(timeSvc loginapi.TimeService, provider auth.Provider) *web.Server {
 	oCfg := config.Oidc{
 		StateCookieAge:    5 * time.Second,
 		SessionCookieName: "SESSION",

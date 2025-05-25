@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,8 +17,8 @@ func TestTop5MatchesByHash(t *testing.T) {
 	}
 
 	detectRepo := postgres.NewDetectRepository(connection, config.Images{})
-	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
-	hash := image.Hash{
+	unknownHash := cards.Hash{Value: []uint64{1, 2, 3, 4}}
+	hash := cards.Hash{
 		Value: []uint64{
 			9223372036854775807,
 			8828676655832293646,
@@ -44,7 +44,7 @@ func Top5MatchesByHashNoResult(t *testing.T) {
 	}
 	cfg := config.Images{}
 	detectRepo := postgres.NewDetectRepository(connection, cfg)
-	unknownHash := image.Hash{Value: []uint64{1, 2, 3, 4}}
+	unknownHash := cards.Hash{Value: []uint64{1, 2, 3, 4}}
 
 	ctx := context.Background()
 	result, err := detectRepo.Top5MatchesByHash(ctx, unknownHash)

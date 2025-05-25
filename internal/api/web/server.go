@@ -72,7 +72,7 @@ func NewProbeServer(cfg config.Server,
 
 func NewServer(cfg config.Server) *Server {
 	engine := html.New(cfg.TemplateDir, ".gohtml")
-	engine.AddFuncMap(map[string]interface{}{
+	engine.AddFuncMap(map[string]any{
 		"isLastIndex": func(index, length int) bool {
 			return index+1 == length
 		},

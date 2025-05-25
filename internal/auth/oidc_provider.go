@@ -27,6 +27,15 @@ var (
 	ErrProviderUnexpectedResponse = errors.New("provider returned unexpected response")
 )
 
+type Provider interface {
+	GetName() string
+	GetAuthURL(state string) string
+	ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error)
+	ValidateToken(ctx context.Context, token *JWT) (Claims, error)
+	RevokeToken(ctx context.Context, token *JWT) error
+	GenerateState() State
+}
+
 type Providers struct {
 	provider map[string]Provider
 }
@@ -45,6 +54,7 @@ func NewProviders(provider ...Provider) Providers {
 		provider: pp,
 	}
 }
+
 func (pp Providers) Find(key string) (Provider, error) {
 	if strings.TrimSpace(key) == "" {
 		return nil, ErrProviderKeyMissing
@@ -58,8 +68,8 @@ func (pp Providers) Find(key string) (Provider, error) {
 	return nil, fmt.Errorf("%s not found, %w", key, ErrProviderUnsupported)
 }
 
-func TestProvider(cfg config.Provider, client *http.Client) Provider {
-	return &provider{
+func TestProvider(cfg config.Provider, client *http.Client) OIDCProvider {
+	return OIDCProvider{
 		name:        "test",
 		authURL:     cfg.AuthURL,
 		tokenURL:    cfg.TokenURL,
@@ -94,7 +104,7 @@ func FromConfiguration(cfg config.Oidc) (Providers, error) {
 				return Providers{}, errors.Join(err, ErrProviderInvalidConfig)
 			}
 
-			if err = merge(p, v); err != nil {
+			if err = merge(&p, v); err != nil {
 				return Providers{}, err
 			}
 
@@ -107,7 +117,7 @@ func FromConfiguration(cfg config.Oidc) (Providers, error) {
 	return NewProviders(pp...), nil
 }
 
-func merge(p *provider, cfg config.Provider) error {
+func merge(p *OIDCProvider, cfg config.Provider) error {
 	if cfg.AuthURL != "" {
 		p.authURL = cfg.AuthURL
 	}
@@ -137,16 +147,11 @@ func merge(p *provider, cfg config.Provider) error {
 	return nil
 }
 
-type Provider interface {
-	GetName() string
-	GetAuthURL(state string) string
-	ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error)
-	ValidateToken(ctx context.Context, token *JWT) (Claims, error)
-	RevokeToken(ctx context.Context, token *JWT) error
-	GenerateState() State
+type State struct {
+	ID string `json:"id"`
 }
 
-type provider struct {
+type OIDCProvider struct {
 	client      *http.Client
 	validate    func(ctx context.Context, token *JWT, clientID string) (Claims, error)
 	name        string
@@ -159,17 +164,17 @@ type provider struct {
 	scope       string
 }
 
-func (p *provider) GetName() string {
+func (p OIDCProvider) GetName() string {
 	return p.name
 }
 
-func (p *provider) GetAuthURL(state string) string {
+func (p OIDCProvider) GetAuthURL(state string) string {
 	return fmt.Sprintf("%s?state=%s&client_id=%s&redirect_uri=%s&scope=%s&response_type=code&access_type=offline",
 		p.authURL, url.QueryEscape(state), url.QueryEscape(p.clientID), url.QueryEscape(p.redirectURI),
 		url.QueryEscape(p.scope))
 }
 
-func (p *provider) ValidateToken(ctx context.Context, token *JWT) (Claims, error) {
+func (p OIDCProvider) ValidateToken(ctx context.Context, token *JWT) (Claims, error) {
 	c, err := p.validate(ctx, token, p.clientID)
 	if err != nil {
 		return Claims{}, errors.Join(err, ErrProviderValidateToken)
@@ -178,7 +183,7 @@ func (p *provider) ValidateToken(ctx context.Context, token *JWT) (Claims, error
 	return c, nil
 }
 
-func (p *provider) ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error) {
+func (p OIDCProvider) ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error) {
 	body, err := p.postRequest(ctx, p.tokenURL, url.Values{
 		"code":          {authCode},
 		"client_id":     {p.clientID},
@@ -192,8 +197,8 @@ func (p *provider) ExchangeCode(ctx context.Context, authCode string) (Claims, *
 	defer aio.Close(body)
 
 	var jwtToken JWT
-	if err := json.NewDecoder(body).Decode(&jwtToken); err != nil {
-		return Claims{}, nil, fmt.Errorf("unable to decode response, %w", errors.Join(err, ErrProviderCodeExchange))
+	if dErr := json.NewDecoder(body).Decode(&jwtToken); dErr != nil {
+		return Claims{}, nil, fmt.Errorf("unable to decode response, %w", errors.Join(dErr, ErrProviderCodeExchange))
 	}
 
 	jwtToken.Provider = p.name
@@ -206,7 +211,7 @@ func (p *provider) ExchangeCode(ctx context.Context, authCode string) (Claims, *
 	return claims, &jwtToken, nil
 }
 
-func (p *provider) RevokeToken(ctx context.Context, token *JWT) error {
+func (p OIDCProvider) RevokeToken(ctx context.Context, token *JWT) error {
 	if token == nil {
 		return errors.Join(errEmptyToken, ErrProviderTokenRevoke)
 	}
@@ -221,11 +226,11 @@ func (p *provider) RevokeToken(ctx context.Context, token *JWT) error {
 	return nil
 }
 
-func (p *provider) GenerateState() State {
+func (p OIDCProvider) GenerateState() State {
 	return State{ID: uuid.New().String()}
 }
 
-func (p *provider) postRequest(ctx context.Context, url string, data url.Values,
+func (p OIDCProvider) postRequest(ctx context.Context, url string, data url.Values,
 	expectedStatus int) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(data.Encode()))
 	if err != nil {
@@ -252,8 +257,4 @@ func (p *provider) postRequest(ctx context.Context, url string, data url.Values,
 	}
 
 	return resp.Body, nil
-}
-
-type State struct {
-	ID string `json:"id"`
 }

@@ -11,6 +11,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"maps"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
@@ -120,7 +122,7 @@ func HTMXRequest() RequestOpt {
 	}
 }
 
-func WithJSONBody(t *testing.T, v interface{}) RequestOpt {
+func WithJSONBody(t *testing.T, v any) RequestOpt {
 	raw := ToJSON(t, v)
 
 	return func(req *httpRequest) {
@@ -132,9 +134,7 @@ func WithJSONBody(t *testing.T, v interface{}) RequestOpt {
 
 func WithHeader(header map[string]string) RequestOpt {
 	return func(req *httpRequest) {
-		for k, v := range header {
-			req.header[k] = v
-		}
+		maps.Copy(req.header, header)
 	}
 }
 

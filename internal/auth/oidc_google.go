@@ -15,13 +15,13 @@ var (
 	errValidateGoogle = errors.New("validate google provider")
 )
 
-func googleProvider(client *http.Client) (*provider, error) {
+func googleProvider(client *http.Client) (OIDCProvider, error) {
 	validator, err := idtoken.NewValidator(context.Background(), option.WithHTTPClient(client))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create validator due to %w", err)
+		return OIDCProvider{}, fmt.Errorf("failed to create validator due to %w", err)
 	}
 
-	return &provider{
+	return OIDCProvider{
 		name:      "google",
 		authURL:   "https://accounts.google.com/o/oauth2/auth",
 		tokenURL:  "https://accounts.google.com/o/oauth2/token",

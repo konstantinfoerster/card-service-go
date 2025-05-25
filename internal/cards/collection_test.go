@@ -39,7 +39,7 @@ func TestCollectNoneExistingItem(t *testing.T) {
 	assert.Equal(t, aerrors.ErrInvalidInput, appErr.ErrorType)
 }
 
-func newCollectionService(t *testing.T) cards.CollectionService {
+func newCollectionService(t *testing.T) *cards.CollectionService {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 	repo, err := memory.NewCollectRepository(seed)

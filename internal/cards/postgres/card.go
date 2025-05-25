@@ -13,26 +13,26 @@ import (
 	"github.com/pkg/errors"
 )
 
-type postgresCardRepository struct {
+type PostgresCardRepository struct {
 	db  *DBConnection
 	cfg config.Images
 }
 
-func NewCollectionRepository(connection *DBConnection, cfg config.Images) cards.CollectionRepository {
-	return &postgresCardRepository{
+func NewCollectionRepository(connection *DBConnection, cfg config.Images) *PostgresCardRepository {
+	return &PostgresCardRepository{
 		db:  connection,
 		cfg: cfg,
 	}
 }
 
-func NewCardRepository(connection *DBConnection, cfg config.Images) cards.CardRepository {
-	return &postgresCardRepository{
+func NewCardRepository(connection *DBConnection, cfg config.Images) *PostgresCardRepository {
+	return &PostgresCardRepository{
 		db:  connection,
 		cfg: cfg,
 	}
 }
 
-func (r postgresCardRepository) Find(ctx context.Context, f cards.Filter, page cards.Page) (cards.Cards, error) {
+func (r *PostgresCardRepository) Find(ctx context.Context, f cards.Filter, page cards.Page) (cards.Cards, error) {
 	queryArgs := pgx.NamedArgs{
 		"name":    f.Name,
 		"limit":   page.Size(),
@@ -178,7 +178,7 @@ OFFSET @offset`)
 	return cards.NewCards(result, page), nil
 }
 
-func (r postgresCardRepository) Prints(
+func (r *PostgresCardRepository) Prints(
 	ctx context.Context, name string, collector cards.Collector, page cards.Page) (cards.CardPrints, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -258,7 +258,7 @@ OFFSET @offset`)
 	return cards.NewCardPrints(result, page), nil
 }
 
-func (r postgresCardRepository) Exist(ctx context.Context, id cards.ID) (bool, error) {
+func (r *PostgresCardRepository) Exist(ctx context.Context, id cards.ID) (bool, error) {
 	if id.CardID < 0 {
 		return false, fmt.Errorf("exist failed for card ID %v, %w", id.CardID, cards.ErrInvalidID)
 	}
@@ -286,7 +286,7 @@ WHERE
 	return true, nil
 }
 
-func (r postgresCardRepository) Collect(ctx context.Context, item cards.Collectable, c cards.Collector) error {
+func (r *PostgresCardRepository) Collect(ctx context.Context, item cards.Collectable, c cards.Collector) error {
 	args := pgx.NamedArgs{
 		"cardID": item.ID.CardID,
 		"amount": item.Amount,
@@ -308,7 +308,7 @@ DO UPDATE SET
 	return nil
 }
 
-func (r postgresCardRepository) Remove(ctx context.Context, item cards.Collectable, c cards.Collector) error {
+func (r *PostgresCardRepository) Remove(ctx context.Context, item cards.Collectable, c cards.Collector) error {
 	args := pgx.NamedArgs{
 		"cardID": item.ID.CardID,
 		"userID": c.ID,
