@@ -9,7 +9,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,7 +17,7 @@ import (
 func TestOAuthMiddleware(t *testing.T) {
 	expectedClaims := auth.NewClaims("test-1", "test@localhost")
 	provider := auth.NewFakeProvider(auth.WithClaims(expectedClaims))
-	svc := auth.New(config.Oidc{}, auth.NewProviders(provider))
+	svc := auth.New(auth.Config{}, auth.NewProviders(provider))
 	app := fiber.New()
 	app.Use(auth.NewOAuthMiddleware(svc))
 	app.Get("/test", func(c *fiber.Ctx) error {
@@ -43,7 +42,7 @@ func TestOAuthMiddleware(t *testing.T) {
 
 func TestOAuthMiddlewareWithCustomCookieName(t *testing.T) {
 	validClaims := auth.NewClaims("test-1", "test@localhost")
-	oCfg := config.Oidc{SessionCookieName: "MY_SESSION"}
+	oCfg := auth.Config{SessionCookieName: "MY_SESSION"}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaims))
 	svc := auth.New(oCfg, auth.NewProviders(provider))
 	app := fiber.New()
@@ -69,7 +68,7 @@ func TestOAuthMiddlewareWithCustomCookieName(t *testing.T) {
 }
 
 func TestOAuthMiddlewareError(t *testing.T) {
-	cfg := config.Oidc{SessionCookieName: "SESSION"}
+	cfg := auth.Config{SessionCookieName: "SESSION"}
 	provider := auth.NewFakeProvider()
 	svc := auth.New(cfg, auth.NewProviders(provider))
 	cases := []struct {

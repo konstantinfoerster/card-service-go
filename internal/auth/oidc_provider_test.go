@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFromConfiguration(t *testing.T) {
-	cfg := config.Oidc{
-		Provider: map[string]config.Provider{
+	cfg := auth.Config{
+		Provider: map[string]auth.ProviderCfg{
 			"google": {
 				ClientID: "test-client-id",
 				Secret:   "test-secret-0",
@@ -30,18 +29,18 @@ func TestFromConfiguration(t *testing.T) {
 func TestFromConfigurationMisconfigured(t *testing.T) {
 	cases := []struct {
 		name string
-		cfg  config.Oidc
+		cfg  auth.Config
 	}{
 		{
 			name: "no provider configure",
-			cfg: config.Oidc{
-				Provider: map[string]config.Provider{},
+			cfg: auth.Config{
+				Provider: map[string]auth.ProviderCfg{},
 			},
 		},
 		{
 			name: "no client id",
-			cfg: config.Oidc{
-				Provider: map[string]config.Provider{
+			cfg: auth.Config{
+				Provider: map[string]auth.ProviderCfg{
 					"google": {
 						Secret: "test-secret-0",
 					},
@@ -50,8 +49,8 @@ func TestFromConfigurationMisconfigured(t *testing.T) {
 		},
 		{
 			name: "no secret",
-			cfg: config.Oidc{
-				Provider: map[string]config.Provider{
+			cfg: auth.Config{
+				Provider: map[string]auth.ProviderCfg{
 					"google": {
 						ClientID: "test-client-id",
 					},

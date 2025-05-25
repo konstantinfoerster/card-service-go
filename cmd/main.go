@@ -25,7 +25,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func setup() *config.Config {
+func setup() config.Config {
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).
 		With().
@@ -63,7 +63,7 @@ func main() {
 	}
 }
 
-func run(cfg *config.Config) error {
+func run(cfg config.Config) error {
 	ctx := context.Background()
 	dbCon, err := postgres.Connect(ctx, cfg.Database)
 	if err != nil {

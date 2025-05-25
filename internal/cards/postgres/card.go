@@ -3,29 +3,28 @@ package postgres
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/pkg/errors"
 )
 
 type PostgresCardRepository struct {
 	db  *DBConnection
-	cfg config.Images
+	cfg Images
 }
 
-func NewCollectionRepository(connection *DBConnection, cfg config.Images) *PostgresCardRepository {
+func NewCollectionRepository(connection *DBConnection, cfg Images) *PostgresCardRepository {
 	return &PostgresCardRepository{
 		db:  connection,
 		cfg: cfg,
 	}
 }
 
-func NewCardRepository(connection *DBConnection, cfg config.Images) *PostgresCardRepository {
+func NewCardRepository(connection *DBConnection, cfg Images) *PostgresCardRepository {
 	return &PostgresCardRepository{
 		db:  connection,
 		cfg: cfg,

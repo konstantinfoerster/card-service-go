@@ -11,7 +11,6 @@ import (
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,7 +44,7 @@ func TestUnsupportedProvider(t *testing.T) {
 	for _, tc := range cases {
 		t.Run("Authenticate - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(config.Oidc{}, auth.Providers{})
+			svc := auth.New(auth.Config{}, auth.Providers{})
 
 			_, _, err := svc.Authenticate(ctx, tc.provider, "")
 
@@ -55,7 +54,7 @@ func TestUnsupportedProvider(t *testing.T) {
 		})
 
 		t.Run("AuthURL - "+tc.name, func(t *testing.T) {
-			svc := auth.New(config.Oidc{}, auth.Providers{})
+			svc := auth.New(auth.Config{}, auth.Providers{})
 
 			_, err := svc.AuthURL(tc.provider)
 
@@ -66,7 +65,7 @@ func TestUnsupportedProvider(t *testing.T) {
 
 		t.Run("AuthInfo - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(config.Oidc{}, auth.Providers{})
+			svc := auth.New(auth.Config{}, auth.Providers{})
 
 			_, err := svc.AuthInfo(ctx, tc.provider, nil)
 
@@ -77,7 +76,7 @@ func TestUnsupportedProvider(t *testing.T) {
 
 		t.Run("Logout - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(config.Oidc{}, auth.Providers{})
+			svc := auth.New(auth.Config{}, auth.Providers{})
 
 			err := svc.Logout(ctx, &auth.JWT{Provider: tc.provider})
 
@@ -89,13 +88,13 @@ func TestUnsupportedProvider(t *testing.T) {
 }
 
 func TestAuthURL(t *testing.T) {
-	pCfg := config.Provider{
+	pCfg := auth.ProviderCfg{
 		AuthURL:     "http://localhost/oauth2/auth",
 		RedirectURI: "http://localhost",
 		ClientID:    "client id 0",
 		Scope:       "openid email",
 	}
-	svc := auth.New(config.Oidc{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
 
 	actualURL, err := svc.AuthURL("test")
 	expectedURL := "http://localhost/oauth2/auth?state=" + actualURL.State + "&client_id=client+id+0&redirect_uri=http%3A%2F%2Flocalhost&scope=openid+email&response_type=code&access_type=offline"
@@ -116,13 +115,13 @@ func TestAuthenticate(t *testing.T) {
 	}
 	srv := startProviderServer(t, expectedBody.Encode())
 	defer srv.Close()
-	pCfg := config.Provider{
+	pCfg := auth.ProviderCfg{
 		TokenURL:    srv.URL + "/oauth2/auth",
 		ClientID:    "client id 0",
 		Secret:      "secure",
 		RedirectURI: "http://localhost",
 	}
-	svc := auth.New(config.Oidc{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
 
 	user, token, err := svc.Authenticate(ctx, "test", "code-0")
 
@@ -135,10 +134,10 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 	ctx := context.Background()
 	srv := startProviderServer(t, "")
 	defer srv.Close()
-	pCfg := config.Provider{
+	pCfg := auth.ProviderCfg{
 		TokenURL: srv.URL + "/oauth2/autherror",
 	}
-	svc := auth.New(config.Oidc{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
 
 	_, _, err := svc.Authenticate(ctx, "test", "code-0")
 	require.Error(t, err)
@@ -150,7 +149,7 @@ func TestAuthenticateOidcServerError(t *testing.T) {
 
 func TestAuthInfo(t *testing.T) {
 	ctx := context.Background()
-	svc := auth.New(config.Oidc{}, auth.NewProviders(auth.TestProvider(config.Provider{}, client)))
+	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(auth.ProviderCfg{}, client)))
 
 	user, err := svc.AuthInfo(ctx, "test", &auth.JWT{})
 
@@ -165,10 +164,10 @@ func TestLogout(t *testing.T) {
 	}
 	srv := startProviderServer(t, expectedBody.Encode())
 	defer srv.Close()
-	pCfg := config.Provider{
+	pCfg := auth.ProviderCfg{
 		RevokeURL: srv.URL + "/oauth2/revoke",
 	}
-	svc := auth.New(config.Oidc{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
 
 	err := svc.Logout(ctx, &auth.JWT{AccessToken: "token-0", Provider: "test"})
 

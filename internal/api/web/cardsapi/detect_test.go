@@ -14,7 +14,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,7 +100,7 @@ func TestDetect(t *testing.T) {
 func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	srv := web.NewTestServer()
 
-	cfg := config.Images{Host: "testdata"}
+	cfg := postgres.Images{Host: "testdata"}
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 	dRepo, err := memory.NewDetectRepository(seed, cfg)
@@ -113,7 +113,7 @@ func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	cRepo, err := memory.NewCardRepository(seed, collected)
 	require.NoError(t, err)
 
-	oCfg := config.Oidc{}
+	oCfg := auth.Config{}
 	validClaim := auth.NewClaims("myuser", "myUser")
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
 	authSvc := auth.New(oCfg, auth.NewProviders(provider))

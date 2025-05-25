@@ -6,7 +6,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 var (
@@ -72,7 +71,7 @@ func NewOAuthMiddleware(svc Service, opts ...func(*MiddlewareConfig)) fiber.Hand
 	return newTokenExtractHandler(c)
 }
 
-func WithConfig(cfg config.Oidc) func(*MiddlewareConfig) {
+func WithConfig(cfg Config) func(*MiddlewareConfig) {
 	return func(c *MiddlewareConfig) {
 		c.Key = cfg.SessionCookieName
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -28,14 +27,14 @@ type Service interface {
 }
 
 // Routes All login and user related routes.
-func Routes(app fiber.Router, auth web.AuthMiddleware, cfg config.Oidc, svc Service, tSvc TimeService) {
+func Routes(app fiber.Router, auth web.AuthMiddleware, cfg auth.Config, svc Service, tSvc TimeService) {
 	app.Get("/login/:provider/callback", exchangeCode(cfg, svc, tSvc))
 	app.Get("/login/:provider", login(cfg, svc, tSvc))
 	app.Get("/logout", logout(cfg, svc, tSvc))
 	app.Get("/user", auth.Required(), getCurrentUser())
 }
 
-func login(cfg config.Oidc, svc Service, timeSvc TimeService) fiber.Handler {
+func login(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -56,7 +55,7 @@ func login(cfg config.Oidc, svc Service, timeSvc TimeService) fiber.Handler {
 	}
 }
 
-func exchangeCode(cfg config.Oidc, svc Service, timeSvc TimeService) fiber.Handler {
+func exchangeCode(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -118,7 +117,7 @@ func exchangeCode(cfg config.Oidc, svc Service, timeSvc TimeService) fiber.Handl
 	}
 }
 
-func logout(cfg config.Oidc, svc Service, timeSvc TimeService) fiber.Handler {
+func logout(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		clearCookie(c, stateCookie, timeSvc.Now())
 

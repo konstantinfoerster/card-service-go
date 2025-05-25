@@ -13,6 +13,7 @@ linters:
     - forbidigo # (don't need for a CLI) Forbids identifiers
     - forcetypeassert # (replaced by errcheck) finds missing type assertions
     - godox # detection of FIXME, TODO and other comment keywords
+    - mnd # An analyzer to detect magic numbers.
     - paralleltest # (do not want to force this) detects missing usage of t.Parallel() method in your Go test
     - prealloc # (premature optimization) finds slice declarations that could potentially be preallocated
     - promlinter # (no prometheus here) check Prometheus metrics naming via promlint
@@ -59,7 +60,6 @@ linters:
     - makezero
     - mirror
     - misspell
-    - mnd
     - nakedret
     - nestif
     - nilerr
@@ -96,22 +96,12 @@ linters:
       check-type-assertions: true
     ireturn:
       allow:
-       - anon
-       - error
-       - empty
-       - stdlib
-       - Detectable
-       - Provider
-    mnd:
-      ignored-functions:
-        - os.Chmod
-        - os.Mkdir
-        - os.MkdirAll
-        - os.OpenFile
-        - os.WriteFile
-        - flag.IntVar
-        - time.Sleep
-        - time.Duration
+        - anon
+        - error
+        - empty
+        - stdlib
+        - Detectable
+        - Provider
     perfsprint:
       strconcat: false
     revive:
@@ -135,7 +125,7 @@ linters:
           - forcetypeassert
           - funlen
           - gochecknoglobals
-          - goconst
+          - gocons
           - lll
         path: _test\.go
       - linters:

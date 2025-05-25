@@ -7,15 +7,14 @@ import (
 	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type PostgresDetectRepository struct {
 	db  *DBConnection
-	cfg config.Images
+	cfg Images
 }
 
-func NewDetectRepository(connection *DBConnection, cfg config.Images) *PostgresDetectRepository {
+func NewDetectRepository(connection *DBConnection, cfg Images) *PostgresDetectRepository {
 	return &PostgresDetectRepository{
 		db:  connection,
 		cfg: cfg,

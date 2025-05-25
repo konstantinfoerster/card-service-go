@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type RedirectURL struct {
@@ -50,7 +49,7 @@ func NewClaims(id, email string) Claims {
 	return Claims{ID: id, Email: email}
 }
 
-func New(cfg config.Oidc, providers Providers) *AuthFlowService {
+func New(cfg Config, providers Providers) *AuthFlowService {
 	return &AuthFlowService{
 		provider: providers,
 		cfg:      cfg,
@@ -59,7 +58,7 @@ func New(cfg config.Oidc, providers Providers) *AuthFlowService {
 
 type AuthFlowService struct {
 	provider Providers
-	cfg      config.Oidc
+	cfg      Config
 }
 
 func (s *AuthFlowService) AuthURL(provider string) (RedirectURL, error) {

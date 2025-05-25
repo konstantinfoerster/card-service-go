@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 var (
@@ -68,7 +67,7 @@ func (pp Providers) Find(key string) (Provider, error) {
 	return nil, fmt.Errorf("%s not found, %w", key, ErrProviderUnsupported)
 }
 
-func TestProvider(cfg config.Provider, client *http.Client) OIDCProvider {
+func TestProvider(cfg ProviderCfg, client *http.Client) OIDCProvider {
 	return OIDCProvider{
 		name:        "test",
 		authURL:     cfg.AuthURL,
@@ -85,7 +84,7 @@ func TestProvider(cfg config.Provider, client *http.Client) OIDCProvider {
 	}
 }
 
-func FromConfiguration(cfg config.Oidc) (Providers, error) {
+func FromConfiguration(cfg Config) (Providers, error) {
 	client := &http.Client{
 		Timeout: cfg.ClientTimeout,
 	}
@@ -117,7 +116,7 @@ func FromConfiguration(cfg config.Oidc) (Providers, error) {
 	return NewProviders(pp...), nil
 }
 
-func merge(p *OIDCProvider, cfg config.Provider) error {
+func merge(p *OIDCProvider, cfg ProviderCfg) error {
 	if cfg.AuthURL != "" {
 		p.authURL = cfg.AuthURL
 	}

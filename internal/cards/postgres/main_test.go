@@ -12,7 +12,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -53,7 +52,7 @@ func newRunner() *databaseRunner {
 
 type databaseRunner struct {
 	container testcontainers.Container
-	cfg       config.Database
+	cfg       postgres.Config
 	running   bool
 }
 
@@ -128,7 +127,7 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 	}
 
 	r.running = true
-	r.cfg = config.Database{
+	r.cfg = postgres.Config{
 		Username: username,
 		Password: password,
 		Host:     ip,
@@ -147,7 +146,7 @@ func (r *databaseRunner) Stop(ctx context.Context) error {
 	return r.container.Terminate(ctx)
 }
 
-func (r *databaseRunner) Config() config.Database {
+func (r *databaseRunner) Config() postgres.Config {
 	return r.cfg
 }
 

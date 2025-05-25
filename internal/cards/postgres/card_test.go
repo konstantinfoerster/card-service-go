@@ -6,7 +6,6 @@ import (
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +14,7 @@ func TestFind(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{Host: "http://localhost/"}
+	cfg := postgres.Images{Host: "http://localhost/"}
 	cardRepo := postgres.NewCardRepository(connection, cfg)
 
 	cases := []struct {
@@ -216,7 +215,7 @@ func TestFindWithCollector(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{Host: "http://localhost/"}
+	cfg := postgres.Images{Host: "http://localhost/"}
 	cardRepo := postgres.NewCardRepository(connection, cfg)
 
 	cases := []struct {
@@ -472,7 +471,7 @@ func TestPrints(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{Host: "http://localhost/"}
+	cfg := postgres.Images{Host: "http://localhost/"}
 	cardRepo := postgres.NewCardRepository(connection, cfg)
 
 	cases := []struct {
@@ -571,7 +570,7 @@ func TestFindByID(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{}
+	cfg := postgres.Images{}
 	repo := postgres.NewCollectionRepository(connection, cfg)
 
 	ctx := context.Background()
@@ -585,7 +584,7 @@ func TestFindByNoneExistingID(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{}
+	cfg := postgres.Images{}
 	repo := postgres.NewCollectionRepository(connection, cfg)
 
 	ctx := context.Background()
@@ -599,7 +598,7 @@ func TestAddCards(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{}
+	cfg := postgres.Images{}
 	repo := postgres.NewCollectionRepository(connection, cfg)
 	item, err := cards.NewCollectable(cards.NewID(9), 2)
 	require.NoError(t, err)
@@ -625,7 +624,7 @@ func TestAddNoneExistingCardNoError(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{}
+	cfg := postgres.Images{}
 	repo := postgres.NewCollectionRepository(connection, cfg)
 	noneExistingItem, _ := cards.NewCollectable(cards.NewID(1000), 1)
 
@@ -639,7 +638,7 @@ func TestRemoveCards(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{}
+	cfg := postgres.Images{}
 	repo := postgres.NewCollectionRepository(connection, cfg)
 	item, err := cards.NewCollectable(cards.NewID(10), 0)
 	require.NoError(t, err)
@@ -663,7 +662,7 @@ func TestRemoveUncollectedCardNoError(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	cfg := config.Images{}
+	cfg := postgres.Images{}
 	repo := postgres.NewCollectionRepository(connection, cfg)
 	noneExistingItem, _ := cards.NewCollectable(cards.NewID(2000), 0)
 

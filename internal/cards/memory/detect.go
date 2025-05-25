@@ -10,15 +10,15 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 )
 
 type InMemDetectRepository struct {
 	cards []cards.Card
-	cfg   config.Images
+	cfg   postgres.Images
 }
 
-func NewDetectRepository(data []cards.Card, cfg config.Images) (*InMemDetectRepository, error) {
+func NewDetectRepository(data []cards.Card, cfg postgres.Images) (*InMemDetectRepository, error) {
 	return &InMemDetectRepository{
 		cards: data,
 		cfg:   cfg,

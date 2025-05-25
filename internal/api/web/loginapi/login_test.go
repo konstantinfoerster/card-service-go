@@ -14,7 +14,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -419,7 +418,7 @@ func expiresIn(d time.Duration) time.Time {
 }
 
 func loginServer(timeSvc loginapi.TimeService, provider auth.Provider) *web.Server {
-	oCfg := config.Oidc{
+	oCfg := auth.Config{
 		StateCookieAge:    5 * time.Second,
 		SessionCookieName: "SESSION",
 	}
