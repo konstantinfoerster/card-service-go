@@ -1,12 +1,11 @@
 package cards
 
 import (
+	"log/slog"
 	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 func TimeTracker(start time.Time, name string) {
 	elapsed := time.Since(start)
-	log.Info().Msgf("%s took %s", name, elapsed)
+	slog.Info("time tracker", slog.String("name", name), slog.Duration("time", elapsed))
 }

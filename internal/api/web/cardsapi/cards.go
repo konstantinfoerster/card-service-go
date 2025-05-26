@@ -2,12 +2,12 @@ package cardsapi
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -21,18 +21,19 @@ type CardService interface {
 }
 
 func SearchRoutes(r fiber.Router, auth web.AuthMiddleware, searchSvc CardService) {
-	r.Get("/cards", auth.Relaxed(), searchCards(searchSvc))
-	r.Get("/cards/:id", auth.Relaxed(), details(searchSvc, detailsTmpl))
-	r.Get("/cards/:id/prints", auth.Relaxed(), details(searchSvc, printsTmpl))
+	log := slog.Default()
+	r.Get("/cards", auth.Relaxed(), searchCards(searchSvc, log))
+	r.Get("/cards/:id", auth.Relaxed(), details(searchSvc, detailsTmpl, log))
+	r.Get("/cards/:id/prints", auth.Relaxed(), details(searchSvc, printsTmpl, log))
 }
 
-func searchCards(svc CardService) fiber.Handler {
+func searchCards(svc CardService, log *slog.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, _ := web.UserFromCtx(c)
 
 		searchTerm := c.Query("name")
 		page := newPage(c)
-		log.Debug().Any("page", page).Msgf("search for card with name %s", searchTerm)
+		log.Debug("search for card", slog.String("name", searchTerm), slog.Any("page", page))
 		result, err := svc.Search(c.Context(), searchTerm, asCollector(user), page)
 		if err != nil {
 			return err
@@ -57,14 +58,17 @@ func searchCards(svc CardService) fiber.Handler {
 			return web.RenderPage(c, "search", data)
 		}
 
-		log.Debug().Msgf("render json page %v, more = %v, size = %d",
-			pagedResult.Page, pagedResult.HasMore, len(pagedResult.Data))
+		log.Debug("render json page",
+			slog.Any("page", pagedResult.Page),
+			slog.Bool("more", pagedResult.HasMore),
+			slog.Int("size", len(pagedResult.Data)),
+		)
 
 		return web.RenderJSON(c, pagedResult)
 	}
 }
 
-func details(svc CardService, tmplName string) fiber.Handler {
+func details(svc CardService, tmplName string, log *slog.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		if !web.IsHTMX(c) {
 			return aerrors.NewInvalidInputMsg("invalid-accept-header", "only htmlx supported")
@@ -82,8 +86,13 @@ func details(svc CardService, tmplName string) fiber.Handler {
 			return err
 		}
 
-		log.Debug().Any("page", page).
-			Msgf("detail for card %v name %s with %d prints", id, detail.Card.Name, detail.Prints.Size)
+		log.Debug("detail for card",
+			slog.Group("card",
+				slog.String("id", id.String()),
+				slog.String("name", detail.Card.Name),
+			),
+			slog.Any("page", page),
+		)
 		data := fiber.Map{
 			"Card":   newCard(detail.Card),
 			"Prints": newPagedResponse(detail.Prints.PagedResult),

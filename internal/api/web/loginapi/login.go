@@ -3,6 +3,7 @@ package loginapi
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/rs/zerolog/log"
 )
 
 const stateCookie = "TOKEN_STATE"
@@ -28,17 +28,19 @@ type Service interface {
 
 // Routes All login and user related routes.
 func Routes(app fiber.Router, auth web.AuthMiddleware, cfg auth.Config, svc Service, tSvc TimeService) {
+	log := slog.Default()
+
 	app.Get("/login/:provider/callback", exchangeCode(cfg, svc, tSvc))
-	app.Get("/login/:provider", login(cfg, svc, tSvc))
+	app.Get("/login/:provider", login(cfg, svc, tSvc, log))
 	app.Get("/logout", logout(cfg, svc, tSvc))
 	app.Get("/user", auth.Required(), getCurrentUser())
 }
 
-func login(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
+func login(cfg auth.Config, svc Service, timeSvc TimeService, log *slog.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
-			log.Error().Err(err).Msg("provider must not be empty")
+			log.Error("provider must not be empty", slog.Any("error", err))
 
 			return err
 		}
@@ -59,8 +61,6 @@ func exchangeCode(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handl
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
-			log.Error().Err(err).Send()
-
 			return err
 		}
 
@@ -78,15 +78,11 @@ func exchangeCode(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handl
 
 		rawState, err := requiredQuery(c, "state")
 		if err != nil {
-			log.Error().Err(err).Msg("state must not be empty")
-
 			return err
 		}
 
 		code, err := requiredQuery(c, "code")
 		if err != nil {
-			log.Error().Err(err).Msg("code must not be empty")
-
 			return err
 		}
 
@@ -108,8 +104,6 @@ func exchangeCode(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handl
 		setCookie(c, cfg.SessionCookieName, token64, expires)
 
 		if web.AcceptsHTML(c) {
-			log.Debug().Msgf("render finish_login site")
-
 			return c.Render("finish_login", nil)
 		}
 
@@ -137,7 +131,6 @@ func logout(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
 			return err
 		}
 
-		log.Debug().Msgf("logout: accept header is %s", c.Get(fiber.HeaderAccept))
 		if web.AcceptsHTML(c) {
 			return c.Redirect("/")
 		}

@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os/signal"
 	"path"
@@ -19,13 +20,13 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
 type Server struct {
 	app     *fiber.App
 	Cfg     Config
+	log     *slog.Logger
 	running atomic.Bool
 }
 
@@ -66,6 +67,7 @@ func NewProbeServer(cfg Config,
 	return &Server{
 		app: app,
 		Cfg: cfg,
+		log: slog.Default(),
 	}
 }
 
@@ -108,6 +110,7 @@ func NewServer(cfg Config) *Server {
 	return &Server{
 		app: app,
 		Cfg: cfg,
+		log: slog.Default(),
 	}
 }
 
@@ -146,7 +149,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 
 		s.app.Hooks().OnListen(func(ld fiber.ListenData) error {
-			log.Info().Msgf("starting server at %s", addr)
+			s.log.Info("started listening", slog.String("addr", addr))
 
 			s.running.Store(true)
 
@@ -167,7 +170,7 @@ func (s *Server) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to start server at %s, %w", addr, err)
 		}
 
-		log.Info().Msgf("stopped listening at %s", addr)
+		s.log.Info("stopped listening", slog.String("addr", addr))
 
 		return nil
 	})
@@ -181,19 +184,19 @@ func (s *Server) IsRunning() bool {
 
 func (s *Server) shutdown(ctx context.Context) error {
 	addr := s.Cfg.Addr()
-	log.Info().Msgf("shutdown server at %s, waiting to close open connections ...", addr)
+	s.log.Info("shutdown server waiting to close open connections ...", slog.String("addr", addr))
 
 	timeout := time.Second * time.Duration(15)
 	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, timeout)
 	defer shutdownCancel()
 
 	if err := s.app.ShutdownWithContext(shutdownCtx); err != nil {
-		log.Error().Msgf("shutdown server at %s failed, %v", addr, err)
+		s.log.Error("shutdown server failed", slog.String("addr", addr), slog.Any("error", err))
 
 		return err
 	}
 
-	log.Info().Msgf("shutdown server at %s successfully", addr)
+	s.log.Info("shutdown server successfully", slog.String("addr", addr))
 
 	return nil
 }

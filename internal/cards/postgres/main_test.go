@@ -3,16 +3,15 @@ package postgres_test
 import (
 	"context"
 	"flag"
-	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
-	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	"github.com/rs/zerolog/log"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -46,14 +45,20 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func newRunner() *databaseRunner {
-	return &databaseRunner{}
+type logConsumer struct{}
+
+func (lc *logConsumer) Accept(l testcontainers.Log) {
+	slog.Debug(string(l.Content))
 }
 
 type databaseRunner struct {
 	container testcontainers.Container
 	cfg       postgres.Config
 	running   bool
+}
+
+func newRunner() *databaseRunner {
+	return &databaseRunner{}
 }
 
 func (r *databaseRunner) Start(ctx context.Context) error {
@@ -102,6 +107,12 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 		},
 		AlwaysPullImage: true,
 		WaitingFor:      wait.ForLog("[1] LOG:  database system is ready to accept connections"),
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Opts: []testcontainers.LogProductionOption{
+				testcontainers.WithLogProductionTimeout(10 * time.Second),
+			},
+			Consumers: []testcontainers.LogConsumer{&logConsumer{}},
+		},
 	}
 
 	r.container, err = testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -109,10 +120,6 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 		Started:          true,
 	})
 	if err != nil {
-		return err
-	}
-
-	if err = r.enableDebugIfRequired(ctx); err != nil {
 		return err
 	}
 
@@ -148,23 +155,4 @@ func (r *databaseRunner) Stop(ctx context.Context) error {
 
 func (r *databaseRunner) Config() postgres.Config {
 	return r.cfg
-}
-
-func (r *databaseRunner) enableDebugIfRequired(ctx context.Context) error {
-	if e := log.Debug(); e.Enabled() {
-		logs, err := r.container.Logs(ctx)
-		if err != nil {
-			return err
-		}
-		defer aio.Close(logs)
-
-		b, err := io.ReadAll(logs)
-		if err != nil {
-			return err
-		}
-
-		e.Msg(string(b))
-	}
-
-	return nil
 }
