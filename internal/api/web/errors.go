@@ -2,11 +2,11 @@ package web
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -67,7 +67,11 @@ func sendError(c *fiber.Ctx, code int, key, title string, err error) error {
 	if title == "" {
 		title = http.StatusText(code)
 	}
-	log.Error().Err(err).Int("code", code).Str("key", key).Str("title", title).Send()
+	slog.Error("server error", slog.Any("error", err),
+		slog.Group("err",
+			slog.Int("code", code), slog.String("key", key), slog.String("title", title),
+		),
+	)
 
 	return c.Status(code).
 		JSON(NewProblemJSON(title, key, code), ContentType)

@@ -4,10 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
@@ -19,19 +19,33 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/rs/zerolog/pkgerrors"
 	"golang.org/x/sync/errgroup"
 )
 
 func setup() config.Config {
-	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).
-		With().
-		Stack().
-		Caller().
-		Logger()
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	wd += "/"
+
+	var logLevel = new(slog.LevelVar)
+	opts := &slog.HandlerOptions{
+		Level:     logLevel,
+		AddSource: true,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.SourceKey {
+				if source, ok := a.Value.Any().(*slog.Source); ok {
+					source.File = strings.TrimPrefix(source.File, wd)
+				}
+			}
+
+			return a
+		},
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, opts)).
+		With("service", "card-service")
+	slog.SetDefault(logger)
 
 	var configPath string
 	flag.StringVar(&configPath, "c", "./configs/application.yaml", "path to the configuration file")
@@ -42,15 +56,17 @@ func setup() config.Config {
 	if err != nil {
 		panic(err)
 	}
-	level, err := zerolog.ParseLevel(strings.ToLower(cfg.Logging.Level))
-	if err != nil {
+
+	if err := logLevel.UnmarshalText([]byte(cfg.Logging.Level)); err != nil {
 		panic(err)
 	}
-	zerolog.SetGlobalLevel(level)
 
-	log.Info().Msgf("OS\t\t %s", runtime.GOOS)
-	log.Info().Msgf("ARCH\t\t %s", runtime.GOARCH)
-	log.Info().Msgf("CPUs\t\t %d", runtime.NumCPU())
+	slog.Info("logging", slog.String("value", logLevel.Level().Level().String()))
+	slog.Info("server", slog.Group("system",
+		slog.String("os", runtime.GOOS),
+		slog.String("arch", runtime.GOARCH),
+		slog.Int("cpu", runtime.NumCPU()),
+	))
 
 	return cfg
 }
@@ -59,7 +75,8 @@ func main() {
 	cfg := setup()
 
 	if err := run(cfg); err != nil {
-		log.Fatal().Err(err).Send()
+		slog.Error("run error", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
 

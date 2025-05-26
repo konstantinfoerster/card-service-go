@@ -76,6 +76,7 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
+    - sloglint
     - tagliatelle
     - testableexamples
     - testifylint

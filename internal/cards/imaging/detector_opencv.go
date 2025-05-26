@@ -10,11 +10,11 @@ import (
 	"image/jpeg"
 	_ "image/jpeg"
 	"io"
+	"log/slog"
 	"math"
 	"sort"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/rs/zerolog/log"
 	"gocv.io/x/gocv"
 	"golang.org/x/image/draw"
 )
@@ -23,13 +23,16 @@ var ErrNoContours = errors.New("no contours found")
 var ErrNoCardContours = errors.Join(errors.New("after restrictions"), ErrNoContours)
 
 func NewDetector() *BoxDetector {
-	return &BoxDetector{}
+	return &BoxDetector{
+		log: slog.Default(),
+	}
 }
 
 type BoxDetector struct {
+	log *slog.Logger
 }
 
-func (d BoxDetector) Detect(in io.Reader) ([]cards.Detectable, error) {
+func (d *BoxDetector) Detect(in io.Reader) ([]cards.Detectable, error) {
 	if in == nil {
 		return nil, ErrInvalidInput
 	}
@@ -40,7 +43,7 @@ func (d BoxDetector) Detect(in io.Reader) ([]cards.Detectable, error) {
 	}
 
 	resized := new(bytes.Buffer)
-	resize(buf, resized, 1024)
+	d.resize(buf, resized, 1024)
 	buf = nil
 
 	orig, err := gocv.IMDecode(resized.Bytes(), gocv.IMReadColor)
@@ -49,10 +52,10 @@ func (d BoxDetector) Detect(in io.Reader) ([]cards.Detectable, error) {
 	}
 	defer orig.Close()
 
-	normalized := normalizeColors(orig)
+	normalized := d.normalizeColors(orig)
 	defer normalized.Close()
 
-	candidates, err := findCandidates(orig, normalized)
+	candidates, err := d.findCandidates(orig, normalized)
 	if err != nil {
 		if errors.Is(err, ErrNoContours) {
 			return make([]cards.Detectable, 0), nil
@@ -61,12 +64,12 @@ func (d BoxDetector) Detect(in io.Reader) ([]cards.Detectable, error) {
 		return nil, err
 	}
 
-	log.Debug().Msgf("found %d candidates", len(candidates))
+	d.log.Debug("found candidates", slog.Int("value", len(candidates)))
 
 	return candidates, nil
 }
 
-func resize(in io.Reader, out io.Writer, height int) error {
+func (d *BoxDetector) resize(in io.Reader, out io.Writer, height int) error {
 	srcImg, err := jpeg.Decode(in)
 	if err != nil {
 		return err
@@ -95,7 +98,7 @@ func resize(in io.Reader, out io.Writer, height int) error {
 	return nil
 }
 
-func normalizeColors(orig gocv.Mat) gocv.Mat {
+func (d *BoxDetector) normalizeColors(orig gocv.Mat) gocv.Mat {
 	// convert to lab color space
 	labImg := gocv.NewMat()
 	defer labImg.Close()
@@ -121,8 +124,8 @@ func normalizeColors(orig gocv.Mat) gocv.Mat {
 	return normalized
 }
 
-func findCandidates(orig gocv.Mat, normalized gocv.Mat) ([]cards.Detectable, error) {
-	contours, err := findContours(orig)
+func (d *BoxDetector) findCandidates(orig gocv.Mat, normalized gocv.Mat) ([]cards.Detectable, error) {
+	contours, err := d.findContours(orig)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +190,7 @@ func singleCandidate(orig gocv.Mat, pv gocv.PointVector, i int) (image.Image, er
 	return pImg, nil
 }
 
-func findContours(orig gocv.Mat) (gocv.PointsVector, error) {
+func (d *BoxDetector) findContours(orig gocv.Mat) (gocv.PointsVector, error) {
 	blur := gocv.NewMat()
 	defer blur.Close()
 	gocv.GaussianBlur(orig, &blur, image.Point{7, 7}, 0, 0, gocv.BorderDefault)
@@ -221,7 +224,7 @@ func findContours(orig gocv.Mat) (gocv.PointsVector, error) {
 		return gocv.PointsVector{}, ErrNoContours
 	}
 
-	log.Debug().Msgf("found %d contours", contours.Size())
+	d.log.Debug("found %d contours", contours.Size())
 
 	// sort by area size, biggest first
 	areas := make(map[float64]int, 0)
