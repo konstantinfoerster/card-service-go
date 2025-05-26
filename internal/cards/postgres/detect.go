@@ -7,23 +7,21 @@ import (
 	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/image"
 )
 
-type postgresDetectRepository struct {
+type PostgresDetectRepository struct {
 	db  *DBConnection
-	cfg config.Images
+	cfg Images
 }
 
-func NewDetectRepository(connection *DBConnection, cfg config.Images) cards.DetectRepository {
-	return &postgresDetectRepository{
+func NewDetectRepository(connection *DBConnection, cfg Images) *PostgresDetectRepository {
+	return &PostgresDetectRepository{
 		db:  connection,
 		cfg: cfg,
 	}
 }
 
-func (r *postgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (cards.Scores, error) {
+func (r *PostgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...cards.Hash) (cards.Scores, error) {
 	defer cards.TimeTracker(time.Now(), "Top5MatchesByHash")
 	if len(hashes) == 0 {
 		return cards.Scores{}, nil

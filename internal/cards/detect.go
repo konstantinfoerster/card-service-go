@@ -2,15 +2,10 @@ package cards
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
-	"github.com/konstantinfoerster/card-service-go/internal/image"
-)
-
-var (
-	ErrMatchNotFound = errors.New("no match found")
 )
 
 type Score struct {
@@ -58,55 +53,79 @@ func EmptyMatches(p Page) Matches {
 	}
 }
 
+type Hash struct {
+	Value []uint64
+	Bits  int
+}
+
+func (h Hash) AsBase2() []string {
+	base2 := make([]string, 0, len(h.Value))
+	for _, v := range h.Value {
+		base2 = append(base2, fmt.Sprintf("%064b", v))
+	}
+
+	return base2
+}
+
 type DetectRepository interface {
-	Top5MatchesByHash(ctx context.Context, hashes ...image.Hash) (Scores, error)
+	Top5MatchesByHash(ctx context.Context, hashes ...Hash) (Scores, error)
 }
 
-type DetectService interface {
-	Detect(ctx context.Context, collector Collector, in io.Reader) (Matches, error)
+type Detector interface {
+	Detect(img io.Reader) ([]Detectable, error)
 }
 
-type detectService struct {
+type DetectService struct {
 	cRepo    CardRepository
 	dRepo    DetectRepository
-	detector image.Detector
-	hasher   image.Hasher
+	detector Detector
 }
 
-func NewDetectService(cRepo CardRepository, dRepo DetectRepository, detector image.Detector,
-	hasher image.Hasher) DetectService {
-	return &detectService{
+func NewDetectService(cRepo CardRepository, dRepo DetectRepository, detector Detector) *DetectService {
+	return &DetectService{
 		cRepo:    cRepo,
 		dRepo:    dRepo,
 		detector: detector,
-		hasher:   hasher,
 	}
 }
 
-func (s *detectService) Detect(ctx context.Context, c Collector, in io.Reader) (Matches, error) {
-	result, err := s.detector.Detect(in)
-	if err != nil {
-		return EmptyMatches(DefaultPage()), aerrors.NewUnknownError(err, "detection-failed")
+type Degree int
+
+const (
+	None Degree = iota
+	Degree90
+	Degree180
+)
+
+type Detectable interface {
+	Rotate(angle Degree) Detectable
+	Hash() (Hash, error)
+}
+
+func (s *DetectService) Detect(ctx context.Context, c Collector, in io.Reader) (Matches, error) {
+	result, dErr := s.detector.Detect(in)
+	if dErr != nil {
+		return Matches{}, aerrors.NewUnknownError(dErr, "detection-failed")
 	}
 
-	hashes := make([]image.Hash, 0)
+	hashes := make([]Hash, 0)
 	for _, r := range result {
-		hash, err := s.hasher.Hash(r)
+		hash, err := r.Hash()
 		if err != nil {
-			return EmptyMatches(DefaultPage()), aerrors.NewUnknownError(err, "hashing-failed")
+			return Matches{}, aerrors.NewUnknownError(err, "hashing-failed")
 		}
 		hashes = append(hashes, hash)
 
-		rhash, err := s.hasher.Hash(r.Rotate(image.Degree180))
+		rhash, err := r.Rotate(Degree180).Hash()
 		if err != nil {
-			return EmptyMatches(DefaultPage()), aerrors.NewUnknownError(err, "rotated-hashing-failed")
+			return Matches{}, aerrors.NewUnknownError(err, "rotated-hashing-failed")
 		}
 		hashes = append(hashes, rhash)
 	}
 
 	scores, err := s.dRepo.Top5MatchesByHash(ctx, hashes...)
 	if err != nil {
-		return EmptyMatches(DefaultPage()), aerrors.NewUnknownError(err, "unable-to-execute-hash-search")
+		return Matches{}, aerrors.NewUnknownError(err, "unable-to-execute-hash-search")
 	}
 
 	if len(scores) == 0 {
@@ -121,7 +140,7 @@ func (s *detectService) Detect(ctx context.Context, c Collector, in io.Reader) (
 	page := NewPage(1, limit)
 	cards, err := s.cRepo.Find(ctx, filter, page)
 	if err != nil {
-		return EmptyMatches(DefaultPage()), aerrors.NewUnknownError(err, "unable-to-execute-card-search-by-id")
+		return Matches{}, aerrors.NewUnknownError(err, "unable-to-execute-card-search-by-id")
 	}
 
 	matches := NewMatches(cards, scores, page)

@@ -1,6 +1,7 @@
 package loginapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,21 +11,30 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 )
 
 const stateCookie = "TOKEN_STATE"
 
+type TimeService interface {
+	Now() time.Time
+}
+
+type Service interface {
+	AuthURL(provider string) (auth.RedirectURL, error)
+	Authenticate(ctx context.Context, provider string, code string) (auth.Claims, *auth.JWT, error)
+	Logout(ctx context.Context, token *auth.JWT) error
+}
+
 // Routes All login and user related routes.
-func Routes(app fiber.Router, auth web.AuthMiddleware, cfg config.Oidc, svc auth.Service, tSvc auth.TimeService) {
+func Routes(app fiber.Router, auth web.AuthMiddleware, cfg auth.Config, svc Service, tSvc TimeService) {
 	app.Get("/login/:provider/callback", exchangeCode(cfg, svc, tSvc))
 	app.Get("/login/:provider", login(cfg, svc, tSvc))
 	app.Get("/logout", logout(cfg, svc, tSvc))
 	app.Get("/user", auth.Required(), getCurrentUser())
 }
 
-func login(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Handler {
+func login(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -45,7 +55,7 @@ func login(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Ha
 	}
 }
 
-func exchangeCode(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Handler {
+func exchangeCode(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		provider, err := requiredParam(c, "provider")
 		if err != nil {
@@ -107,7 +117,7 @@ func exchangeCode(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) f
 	}
 }
 
-func logout(cfg config.Oidc, svc auth.Service, timeSvc auth.TimeService) fiber.Handler {
+func logout(cfg auth.Config, svc Service, timeSvc TimeService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		clearCookie(c, stateCookie, timeSvc.Now())
 

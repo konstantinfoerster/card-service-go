@@ -39,22 +39,17 @@ type CollectionRepository interface {
 	Remove(ctx context.Context, item Collectable, c Collector) error
 }
 
-type CollectionService interface {
-	Search(ctx context.Context, name string, c Collector, p Page) (Cards, error)
-	Collect(ctx context.Context, item Collectable, c Collector) (Collectable, error)
-}
-
-type collectionService struct {
+type CollectionService struct {
 	repo CollectionRepository
 }
 
-func NewCollectionService(cRepo CollectionRepository) CollectionService {
-	return &collectionService{
+func NewCollectionService(cRepo CollectionRepository) *CollectionService {
+	return &CollectionService{
 		repo: cRepo,
 	}
 }
 
-func (s *collectionService) Search(ctx context.Context, name string, c Collector, page Page) (Cards, error) {
+func (s *CollectionService) Search(ctx context.Context, name string, c Collector, page Page) (Cards, error) {
 	filter := NewFilter().
 		WithName(name).
 		WithCollector(c).
@@ -68,7 +63,7 @@ func (s *collectionService) Search(ctx context.Context, name string, c Collector
 	return r, nil
 }
 
-func (s *collectionService) Collect(ctx context.Context, item Collectable, c Collector) (Collectable, error) {
+func (s *CollectionService) Collect(ctx context.Context, item Collectable, c Collector) (Collectable, error) {
 	exist, err := s.repo.Exist(ctx, item.ID)
 	if err != nil {
 		return Collectable{}, aerrors.NewUnknownError(err, "unable-to-find-item")

@@ -16,16 +16,16 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
-	"github.com/konstantinfoerster/card-service-go/internal/image"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
 	"golang.org/x/sync/errgroup"
 )
 
-func setup() *config.Config {
+func setup() config.Config {
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).
 		With().
@@ -63,7 +63,7 @@ func main() {
 	}
 }
 
-func run(cfg *config.Config) error {
+func run(cfg config.Config) error {
 	ctx := context.Background()
 	dbCon, err := postgres.Connect(ctx, cfg.Database)
 	if err != nil {
@@ -78,8 +78,7 @@ func run(cfg *config.Config) error {
 
 	timeSvc := auth.NewTimeService()
 	authSvc := auth.New(cfg.Oidc, oidcProvider)
-	detector := image.NewDetector()
-	hasher := image.NewPHasher()
+	detector := imaging.NewDetector()
 
 	cardRepo := postgres.NewCardRepository(dbCon, cfg.Images)
 	cardSvc := cards.NewCardService(cardRepo)
@@ -88,7 +87,7 @@ func run(cfg *config.Config) error {
 	collectSvc := cards.NewCollectionService(collectRepo)
 
 	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
-	detectSvc := cards.NewDetectService(cardRepo, detectRep, detector, hasher)
+	detectSvc := cards.NewDetectService(cardRepo, detectRep, detector)
 
 	authMiddleware := web.NewAuthMiddleware(cfg.Oidc, authSvc)
 

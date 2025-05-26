@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ToJSON(t *testing.T, v interface{}) []byte {
+func ToJSON(t *testing.T, v any) []byte {
 	t.Helper()
 
 	b, err := json.Marshal(v)

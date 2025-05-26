@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type DBConnection struct {
@@ -16,7 +15,7 @@ type DBConnection struct {
 	pgxCon *pgxpool.Pool
 }
 
-func Connect(ctx context.Context, config config.Database) (*DBConnection, error) {
+func Connect(ctx context.Context, config Config) (*DBConnection, error) {
 	c, err := pgxpool.ParseConfig(config.ConnectionURL())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config from URL %w", err)
@@ -70,6 +69,6 @@ func (d *DBConnection) WithTransaction(ctx context.Context, f func(conn *DBConne
 // DBConn implemented by pgx.Conn and pgx.Tx.
 type DBConn interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
+	Query(ctx context.Context, sql string, optionsAndArgs ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, optionsAndArgs ...any) pgx.Row
 }

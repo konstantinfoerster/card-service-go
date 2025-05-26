@@ -5,7 +5,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 var (
@@ -41,7 +40,7 @@ type AuthMiddleware struct {
 }
 
 // NewAuthMiddleware provides fiber.Handler that can be used to ensure an authentciated access.
-func NewAuthMiddleware(cfg config.Oidc, svc auth.Service) AuthMiddleware {
+func NewAuthMiddleware(cfg auth.Config, svc auth.Service) AuthMiddleware {
 	authFn := func(ctx *fiber.Ctx, claims auth.Claims) {
 		u := NewUser(claims.ID, claims.Email)
 		ctx.Locals(UserContextKey, u)

@@ -12,7 +12,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -342,7 +341,7 @@ func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11706), Amount: 3}, collector)
 	require.NoError(t, err)
 
-	oCfg := config.Oidc{}
+	oCfg := auth.Config{}
 	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
 	authSvc := auth.New(oCfg, auth.NewProviders(provider))
 	srv := web.NewTestServer()

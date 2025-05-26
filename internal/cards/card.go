@@ -194,22 +194,17 @@ type CardRepository interface {
 	Prints(ctx context.Context, name string, collector Collector, page Page) (CardPrints, error)
 }
 
-type CardService interface {
-	Search(ctx context.Context, name string, collector Collector, page Page) (Cards, error)
-	Detail(ctx context.Context, id ID, collector Collector, page Page) (CardDetail, error)
-}
-
-type searchService struct {
+type SearchService struct {
 	repo CardRepository
 }
 
-func NewCardService(repo CardRepository) CardService {
-	return &searchService{
+func NewCardService(repo CardRepository) *SearchService {
+	return &SearchService{
 		repo: repo,
 	}
 }
 
-func (s *searchService) Search(ctx context.Context, name string, c Collector, page Page) (Cards, error) {
+func (s *SearchService) Search(ctx context.Context, name string, c Collector, page Page) (Cards, error) {
 	filter := NewFilter().
 		WithName(name).
 		WithLanguage(DefaultLang).
@@ -222,7 +217,7 @@ func (s *searchService) Search(ctx context.Context, name string, c Collector, pa
 	return r, nil
 }
 
-func (s searchService) Detail(ctx context.Context, id ID, collector Collector, page Page) (CardDetail, error) {
+func (s *SearchService) Detail(ctx context.Context, id ID, collector Collector, page Page) (CardDetail, error) {
 	filter := NewFilter().
 		WithLanguage(DefaultLang).
 		WithID(id).
@@ -234,15 +229,15 @@ func (s searchService) Detail(ctx context.Context, id ID, collector Collector, p
 	}
 
 	if r.Size == 0 {
-		err := fmt.Errorf("card with id %v not found, %w", id, ErrCardNotFound)
+		sErr := fmt.Errorf("card with id %v not found, %w", id, ErrCardNotFound)
 
-		return CardDetail{}, aerrors.NewNotFoundError(err, "card-detail-not-found")
+		return CardDetail{}, aerrors.NewNotFoundError(sErr, "card-detail-not-found")
 	}
 
 	if r.Size > 1 {
-		err := fmt.Errorf("expected one card with id %v but found %d, %w", id, r.Size, ErrResultMismatch)
+		sErr := fmt.Errorf("expected one card with id %v but found %d, %w", id, r.Size, ErrResultMismatch)
 
-		return CardDetail{}, aerrors.NewUnknownError(err, "unexpected-detail-result")
+		return CardDetail{}, aerrors.NewUnknownError(sErr, "unexpected-detail-result")
 	}
 
 	match := r.Result[0]

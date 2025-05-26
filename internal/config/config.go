@@ -2,13 +2,14 @@ package config
 
 import (
 	"errors"
-	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/konstantinfoerster/card-service-go/internal/api/web"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"gopkg.in/yaml.v3"
 )
 
@@ -18,81 +19,24 @@ var (
 )
 
 type Config struct {
-	Database Database `yaml:"database"`
-	Logging  Logging  `yaml:"logging"`
-	Images   Images   `yaml:"images"`
-	Server   Server   `yaml:"server"`
-	Probes   Server   `yaml:"probes"`
-	Oidc     Oidc     `yaml:"oidc"`
-}
-
-type Database struct {
-	Host     string `yaml:"host"`
-	Port     string `yaml:"port"`
-	Database string `yaml:"database"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	MaxConns int32  `yaml:"max_conns"`
-}
-
-func (d Database) ConnectionURL() string {
-	return fmt.Sprintf("postgres://%s:%s@%s/%s", d.Username, d.Password, net.JoinHostPort(d.Host, d.Port), d.Database)
+	Database postgres.Config `yaml:"database"`
+	Logging  Logging         `yaml:"logging"`
+	Images   postgres.Images `yaml:"images"`
+	Server   web.Config      `yaml:"server"`
+	Probes   web.Config      `yaml:"probes"`
+	Oidc     auth.Config     `yaml:"oidc"`
 }
 
 type Logging struct {
 	Level string `yaml:"level"`
 }
 
-type Images struct {
-	Host string `yaml:"host"`
-}
-
-type Server struct {
-	Host        string `yaml:"host"`
-	Cookie      Cookie `yaml:"cookie"`
-	TemplateDir string `yaml:"template_path"`
-	TLS         TLS    `yaml:"tls"`
-	Port        int    `yaml:"port"`
-}
-
-type TLS struct {
-	CertFile string `yaml:"cert_file"`
-	KeyFile  string `yaml:"key_file"`
-	Enabled  bool   `yaml:"enabled"`
-}
-
-func (s Server) Addr() string {
-	return fmt.Sprintf("%s:%d", s.Host, s.Port)
-}
-
-type Cookie struct {
-	// EncryptionKey a 32 character string
-	EncryptionKey string `yaml:"encryption_key"`
-}
-
-type Oidc struct {
-	Provider          map[string]Provider `yaml:"provider"`
-	SessionCookieName string              `yaml:"session_cookie_name"`
-	StateCookieAge    time.Duration       `yaml:"state_cookie_age"`
-	ClientTimeout     time.Duration       `yaml:"client_timeout"`
-}
-
-type Provider struct {
-	AuthURL     string `yaml:"auth_url"`
-	TokenURL    string `yaml:"token_url"`
-	RevokeURL   string `yaml:"revoke_url"`
-	RedirectURI string `yaml:"redirect_uri"`
-	ClientID    string `yaml:"client_id"`
-	Secret      string `yaml:"secret"`
-	Scope       string `yaml:"scope"`
-}
-
-func NewConfig(path string) (*Config, error) {
+func NewConfig(path string) (Config, error) {
 	p := filepath.Clean(path)
 
 	data, err := os.ReadFile(p)
 	if err != nil {
-		return nil, errors.Join(err, ErrReadFile)
+		return Config{}, errors.Join(err, ErrReadFile)
 	}
 
 	defaultTimeoutSec := 5
@@ -100,10 +44,14 @@ func NewConfig(path string) (*Config, error) {
 		Logging: Logging{
 			Level: "info",
 		},
-		Server: Server{
+		Server: web.Config{
 			TemplateDir: "./views",
+			Port:        3000,
 		},
-		Oidc: Oidc{
+		Probes: web.Config{
+			Port: 3001,
+		},
+		Oidc: auth.Config{
 			SessionCookieName: "SESSION",
 			StateCookieAge:    time.Minute,
 			ClientTimeout:     time.Duration(defaultTimeoutSec) * time.Second,
@@ -112,7 +60,7 @@ func NewConfig(path string) (*Config, error) {
 
 	err = yaml.Unmarshal(data, &defaultConfig)
 	if err != nil {
-		return nil, errors.Join(err, ErrInvalidContent)
+		return Config{}, errors.Join(err, ErrInvalidContent)
 	}
 
 	// TODO: validate config content
@@ -121,5 +69,5 @@ func NewConfig(path string) (*Config, error) {
 		defaultConfig.Images.Host += "/"
 	}
 
-	return &defaultConfig, nil
+	return defaultConfig, nil
 }

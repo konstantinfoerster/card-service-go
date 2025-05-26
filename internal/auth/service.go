@@ -4,19 +4,11 @@ import (
 	"context"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 )
 
 type RedirectURL struct {
 	URL   string
 	State string
-}
-
-func NewRedirectURL(p Provider, state string) (RedirectURL, error) {
-	return RedirectURL{
-		URL:   p.GetAuthURL(state),
-		State: state,
-	}, nil
 }
 
 // DecodeSession decode given base64 url encoded JSONWebToken.
@@ -57,26 +49,19 @@ func NewClaims(id, email string) Claims {
 	return Claims{ID: id, Email: email}
 }
 
-type Service interface {
-	AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error)
-	AuthURL(provider string) (RedirectURL, error)
-	Authenticate(ctx context.Context, provider string, code string) (Claims, *JWT, error)
-	Logout(ctx context.Context, token *JWT) error
-}
-
-func New(cfg config.Oidc, providers Providers) Service {
-	return &authFlowService{
+func New(cfg Config, providers Providers) *AuthFlowService {
+	return &AuthFlowService{
 		provider: providers,
 		cfg:      cfg,
 	}
 }
 
-type authFlowService struct {
+type AuthFlowService struct {
 	provider Providers
-	cfg      config.Oidc
+	cfg      Config
 }
 
-func (s *authFlowService) AuthURL(provider string) (RedirectURL, error) {
+func (s *AuthFlowService) AuthURL(provider string) (RedirectURL, error) {
 	p, err := s.provider.Find(provider)
 	if err != nil {
 		return RedirectURL{}, aerrors.NewInvalidInputError(err, "auth-url-provider-not-found", "provider not found")
@@ -87,10 +72,13 @@ func (s *authFlowService) AuthURL(provider string) (RedirectURL, error) {
 		return RedirectURL{}, aerrors.NewInvalidInputError(err, "invalid-state", "invalid state value")
 	}
 
-	return NewRedirectURL(p, encodedState)
+	return RedirectURL{
+		URL:   p.GetAuthURL(encodedState),
+		State: encodedState,
+	}, nil
 }
 
-func (s *authFlowService) Authenticate(ctx context.Context, provider string, authCode string) (Claims, *JWT, error) {
+func (s *AuthFlowService) Authenticate(ctx context.Context, provider string, authCode string) (Claims, *JWT, error) {
 	p, err := s.provider.Find(provider)
 	if err != nil {
 		return Claims{}, nil, aerrors.NewInvalidInputError(err, "authenticate-provider-not-found", "provider not found")
@@ -104,7 +92,7 @@ func (s *authFlowService) Authenticate(ctx context.Context, provider string, aut
 	return claims, jwtToken, nil
 }
 
-func (s *authFlowService) AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error) {
+func (s *AuthFlowService) AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error) {
 	p, err := s.provider.Find(provider)
 	if err != nil {
 		return Claims{}, aerrors.NewInvalidInputError(err, "auth-info-provider-not-found", "provider not found")
@@ -118,7 +106,7 @@ func (s *authFlowService) AuthInfo(ctx context.Context, provider string, token *
 	return claims, nil
 }
 
-func (s *authFlowService) Logout(ctx context.Context, token *JWT) error {
+func (s *AuthFlowService) Logout(ctx context.Context, token *JWT) error {
 	p, err := s.provider.Find(token.Provider)
 	if err != nil {
 		return aerrors.NewInvalidInputError(err, "revoke-token-provider-not-found", "provider not found")

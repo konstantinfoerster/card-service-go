@@ -19,14 +19,13 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 )
 
 type Server struct {
 	app     *fiber.App
-	Cfg     config.Server
+	Cfg     Config
 	running atomic.Bool
 }
 
@@ -37,8 +36,8 @@ func NewTestServer() *Server {
 	}
 	currentDir := path.Join(path.Dir(cf))
 
-	cfg := config.Server{
-		Cookie: config.Cookie{
+	cfg := Config{
+		Cookie: Cookie{
 			EncryptionKey: "01234567890123456789012345678901",
 		},
 		TemplateDir: path.Join(currentDir, "../../../views"),
@@ -47,7 +46,7 @@ func NewTestServer() *Server {
 	return NewServer(cfg)
 }
 
-func NewProbeServer(cfg config.Server,
+func NewProbeServer(cfg Config,
 	livenessProbe healthcheck.HealthChecker,
 	readinessProbe healthcheck.HealthChecker,
 ) *Server {
@@ -70,9 +69,9 @@ func NewProbeServer(cfg config.Server,
 	}
 }
 
-func NewServer(cfg config.Server) *Server {
+func NewServer(cfg Config) *Server {
 	engine := html.New(cfg.TemplateDir, ".gohtml")
-	engine.AddFuncMap(map[string]interface{}{
+	engine.AddFuncMap(map[string]any{
 		"isLastIndex": func(index, length int) bool {
 			return index+1 == length
 		},

@@ -1,6 +1,9 @@
 package cardsapi
 
 import (
+	"context"
+	"io"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
@@ -8,11 +11,15 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
-func DetectRoutes(r fiber.Router, auth web.AuthMiddleware, detectSvc cards.DetectService) {
+type DetectService interface {
+	Detect(ctx context.Context, collector cards.Collector, in io.Reader) (cards.Matches, error)
+}
+
+func DetectRoutes(r fiber.Router, auth web.AuthMiddleware, detectSvc DetectService) {
 	r.Post("/detect", auth.Relaxed(), Detect(detectSvc))
 }
 
-func Detect(svc cards.DetectService) fiber.Handler {
+func Detect(svc DetectService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// when user is not set, the user specific collection data won't be loaded
 		user, _ := web.UserFromCtx(c)
