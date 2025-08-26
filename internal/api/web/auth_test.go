@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/api/web"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,9 +14,9 @@ import (
 func TestUserFromCtx(t *testing.T) {
 	app := fiber.New()
 	app.Get("/test", func(c *fiber.Ctx) error {
-		c.Locals(web.UserContextKey, web.User{ID: "myuser"})
+		c.Locals(auth.UserContextKey, auth.NewUser("myuser"))
 
-		user, err := web.UserFromCtx(c)
+		user, err := auth.UserFromCtx(c)
 
 		require.NoError(t, err)
 		assert.NotNil(t, user)
@@ -41,7 +41,7 @@ func TestUserFromCtxInvalidInput(t *testing.T) {
 		{
 			name: "nil user",
 			setUser: func(c *fiber.Ctx) {
-				c.Locals(web.UserContextKey, nil)
+				c.Locals(auth.UserContextKey, nil)
 			},
 		},
 		{
@@ -52,7 +52,7 @@ func TestUserFromCtxInvalidInput(t *testing.T) {
 		{
 			name: "wrong type",
 			setUser: func(c *fiber.Ctx) {
-				c.Locals(web.UserContextKey, "wrongType")
+				c.Locals(auth.UserContextKey, "wrongType")
 			},
 		},
 	}
@@ -63,10 +63,10 @@ func TestUserFromCtxInvalidInput(t *testing.T) {
 			app.Get("/test", func(c *fiber.Ctx) error {
 				tc.setUser(c)
 
-				user, err := web.UserFromCtx(c)
+				user, err := auth.UserFromCtx(c)
 
-				assert.Equal(t, web.User{}, user)
-				require.ErrorIs(t, err, web.ErrNoUserInContext)
+				assert.Equal(t, auth.User{}, user)
+				require.ErrorIs(t, err, auth.ErrNoUserInContext)
 
 				return nil
 			})

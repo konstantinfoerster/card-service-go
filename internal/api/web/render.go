@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
 )
 
 func RenderPage(c *fiber.Ctx, tmplName string, data fiber.Map) error {
@@ -9,7 +10,7 @@ func RenderPage(c *fiber.Ctx, tmplName string, data fiber.Map) error {
 		data = fiber.Map{}
 	}
 
-	user, _ := UserFromCtx(c)
+	user, _ := auth.UserFromCtx(c)
 
 	data["User"] = NewClientUser(user)
 	data["activePage"] = tmplName
@@ -23,7 +24,7 @@ func RenderPartial(c *fiber.Ctx, tmplName string, data any) error {
 	}
 
 	if mData, ok := data.(fiber.Map); ok {
-		user, _ := UserFromCtx(c)
+		user, _ := auth.UserFromCtx(c)
 		mData["User"] = NewClientUser(user)
 		mData["activePage"] = tmplName
 		mData["partial"] = true

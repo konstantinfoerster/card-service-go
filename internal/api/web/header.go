@@ -17,6 +17,7 @@ const StatusBadRequest = http.StatusBadRequest
 const StatusInternalServerError = http.StatusInternalServerError
 
 const HeaderHTMXRequest = "HX-Request"
+const HeaderHTMXRefresh = "HX-Redirect"
 
 // IsHTMX true if the request is a HTMX request, false otherwise.
 func IsHTMX(c *fiber.Ctx) bool {
@@ -26,4 +27,9 @@ func IsHTMX(c *fiber.Ctx) bool {
 // AcceptsHTML true if the request expectects HTML as response, false otherwise.
 func AcceptsHTML(c *fiber.Ctx) bool {
 	return strings.Contains(c.Get(fiber.HeaderAccept), fiber.MIMETextHTML)
+}
+
+// AcceptsJSON true if the request expectects JSON as response, false otherwise.
+func AcceptsJSON(c *fiber.Ctx) bool {
+	return strings.Contains(c.Get(fiber.HeaderAccept), fiber.MIMEApplicationJSON)
 }

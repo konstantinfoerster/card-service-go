@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
@@ -29,7 +30,7 @@ func SearchRoutes(r fiber.Router, auth web.AuthMiddleware, searchSvc CardService
 
 func searchCards(svc CardService, log *slog.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		user, _ := web.UserFromCtx(c)
+		user, _ := auth.UserFromCtx(c)
 
 		searchTerm := c.Query("name")
 		page := newPage(c)
@@ -74,7 +75,7 @@ func details(svc CardService, tmplName string, log *slog.Logger) fiber.Handler {
 			return aerrors.NewInvalidInputMsg("invalid-accept-header", "only htmlx supported")
 		}
 
-		user, _ := web.UserFromCtx(c)
+		user, _ := auth.UserFromCtx(c)
 		id, err := toID(c.Params("id"))
 		if err != nil {
 			return aerrors.NewInvalidInputError(err, "invalid-id", "invalid id")

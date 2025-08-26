@@ -24,7 +24,7 @@ type Config struct {
 	Images   postgres.Images `yaml:"images"`
 	Server   web.Config      `yaml:"server"`
 	Probes   web.Config      `yaml:"probes"`
-	Oidc     auth.Config     `yaml:"oidc"`
+	Auth     auth.Config     `yaml:"auth"`
 }
 
 type Logging struct {
@@ -51,10 +51,18 @@ func NewConfig(path string) (Config, error) {
 		Probes: web.Config{
 			Port: 3001,
 		},
-		Oidc: auth.Config{
-			SessionCookieName: "SESSION",
-			StateCookieAge:    time.Minute,
-			ClientTimeout:     time.Duration(defaultTimeoutSec) * time.Second,
+		Auth: auth.Config{
+			Session: auth.Cookie{
+				Name:      "SESSION",
+				ExpiresIn: 24 * time.Hour,
+				SameSite:  "strict",
+			},
+			State: auth.Cookie{
+				Name:      "STATE",
+				ExpiresIn: time.Minute,
+				SameSite:  "lax",
+			},
+			ClientTimeout: time.Duration(defaultTimeoutSec) * time.Second,
 		},
 	}
 

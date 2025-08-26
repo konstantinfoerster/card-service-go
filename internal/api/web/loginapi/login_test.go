@@ -1,16 +1,19 @@
 package loginapi_test
 
 import (
+	"encoding/base64"
+	"encoding/gob"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	fibermemory "github.com/gofiber/storage/memory/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
@@ -19,26 +22,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var staticTimeSvc = auth.NewFakeTimeService(time.Now())
-
-var cookieEncryptionKey = ""
+var staticGenerator = auth.StaticGenerator{Value: "randVal"}
+var authCfg = auth.Config{
+	Session: auth.Cookie{
+		Name:      "SESSION",
+		ExpiresIn: 1 * time.Hour,
+		SameSite:  fiber.CookieSameSiteStrictMode,
+	},
+	State: auth.Cookie{
+		Name:      "STATE",
+		ExpiresIn: 1 * time.Hour,
+		SameSite:  fiber.CookieSameSiteLaxMode,
+	},
+}
 
 func TestLogin(t *testing.T) {
-	user := auth.NewClaims("myuser", "myUser")
 	provider := auth.NewFakeProvider(
-		auth.WithClaims(user),
-		auth.WithStateID("state-0"),
+		auth.WithClaims(auth.NewClaim("myuser", "myUser")),
 	)
-	srv := loginServer(staticTimeSvc, provider)
+	srv := loginServer(provider)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodGet),
 		test.WithURL("http://localhost/login/testProvider"),
 	)
-	expectedState := test.Base64Encoded(t, provider.GenerateState())
-	expectedCookie := &http.Cookie{
-		Name:     "TOKEN_STATE",
+	genVal := staticGenerator.MustGenerateBase64Encoded()
+	expectedState := encodedState(t)
+	expectedStateCookie := &http.Cookie{
+		Name:     authCfg.State.Name,
 		Value:    expectedState,
-		Expires:  expiresIn(5 * time.Second),
+		MaxAge:   int(authCfg.State.ExpiresIn.Seconds()),
 		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 		Path:     "/",
@@ -47,21 +59,23 @@ func TestLogin(t *testing.T) {
 
 	resp, err := srv.Test(req)
 	defer test.Close(t, resp)
+	require.NoError(t, err)
 
 	location := resp.Header.Get("Location")
-	require.NoError(t, err)
 	require.Equal(t, web.StatusFound, resp.StatusCode)
 	assert.Truef(t, strings.HasPrefix(location, "http://localhost/auth"), "location header want http://localhost/auth, got %s", location)
-	assert.Contains(t, location, "state="+url.QueryEscape(expectedState))
+	assert.Contains(t, location, "state="+url.QueryEscape(genVal))
+	assert.Contains(t, location, "code_challenge_method=S256")
+	assert.Contains(t, location, "code_challenge="+url.QueryEscape(genVal))
 	assert.Contains(t, location, "client_id=client-id")
 	assert.Contains(t, location, "scope=openid")
 	assert.Contains(t, location, "response_type=code")
 	assert.Contains(t, location, "redirect_uri=http%3A%2F%2Flocalhost%2Fhome")
-	assertEqualCookie(t, expectedCookie, resp.Cookies()[0])
+	assertEqualDecryptedCookie(t, expectedStateCookie, resp.Cookies()[0])
 }
 
-func TestLoginUnknownProvider(t *testing.T) {
-	srv := loginServer(staticTimeSvc, nil)
+func TestLogin_UnknownProvider(t *testing.T) {
+	srv := loginServer(nil)
 	req := test.NewRequest(
 		test.WithMethod(http.MethodGet),
 		test.WithURL("http://localhost/login/unknownProvider"),
@@ -75,27 +89,26 @@ func TestLoginUnknownProvider(t *testing.T) {
 }
 
 func TestExchangeCode(t *testing.T) {
-	sessionExpires := staticTimeSvc.Now().Unix()
-	user := auth.NewClaims("myuser", "myUser")
+	user := auth.NewClaim("myuser", "myUser")
 	provider := auth.NewFakeProvider(
 		auth.WithClaims(user),
-		auth.WithExpire(sessionExpires),
 	)
-	srv := loginServer(staticTimeSvc, provider)
+	srv := loginServer(provider)
 	expectedSessionCookie := &http.Cookie{
 		Name:     "SESSION",
-		Value:    test.Base64Encoded(t, provider.Token("myuser")),
-		Expires:  expiresIn(time.Duration(sessionExpires) * time.Second),
+		Value:    staticGenerator.Value,
+		MaxAge:   int(authCfg.Session.ExpiresIn.Seconds()),
 		SameSite: http.SameSiteStrictMode,
 		HttpOnly: true,
 		Path:     "/",
 		Secure:   true,
 	}
-	expectedTokenCookie := &http.Cookie{
-		Name:     "TOKEN_STATE",
-		Value:    "invalid",
-		Expires:  expiresIn(-7 * 24 * time.Hour),
-		SameSite: http.SameSiteStrictMode,
+	expectedStateCookie := &http.Cookie{
+		Name:     "STATE",
+		Value:    "",
+		MaxAge:   0,
+		Expires:  time.Unix(0, 0).UTC(),
+		SameSite: http.SameSiteLaxMode,
 		HttpOnly: true,
 		Path:     "/",
 		Secure:   true,
@@ -125,11 +138,11 @@ func TestExchangeCode(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			rawState := test.Base64Encoded(t, provider.GenerateState())
+			rawState := staticGenerator.MustGenerateBase64Encoded()
 			req := test.NewRequest(
 				test.WithMethod(http.MethodGet),
-				test.WithURL(fmt.Sprintf("http://localhost/login/testProvider/callback?code=%s&state=%s", user.ID, rawState)),
-				test.WithCookie("TOKEN_STATE", encryptCookieValue(t, rawState)),
+				test.WithURL(fmt.Sprintf("http://localhost/login/testProvider/callback?code=%s&state=%s", user.UserID, rawState)),
+				test.WithEncryptedCookie(t, "STATE", encodedState(t)),
 			)
 			if tc.acceptHeader != "" {
 				req.Header.Set(fiber.HeaderAccept, tc.acceptHeader)
@@ -140,17 +153,17 @@ func TestExchangeCode(t *testing.T) {
 			body := test.ToString(t, resp.Body)
 
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedStatus, resp.StatusCode)
+			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 			assert.Equal(t, tc.expectedContentType, resp.Header.Get(fiber.HeaderContentType))
 			assert.Contains(t, body, string(tc.expectedBodyPart))
 			require.Len(t, resp.Cookies(), 2)
-			assertEqualCookie(t, expectedTokenCookie, resp.Cookies()[0])
+			assertEqualDecryptedCookie(t, expectedStateCookie, resp.Cookies()[0])
 			assertEqualCookie(t, expectedSessionCookie, resp.Cookies()[1])
 		})
 	}
 }
 
-func TestExchangeInvalidInput(t *testing.T) {
+func TestExchange_InvalidInput(t *testing.T) {
 	cases := []struct {
 		name        string
 		queryParams string
@@ -165,20 +178,20 @@ func TestExchangeInvalidInput(t *testing.T) {
 		},
 		{
 			name:        "No state cookie",
-			queryParams: fmt.Sprintf("?code=myUser&state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
+			queryParams: fmt.Sprintf("?code=myUser&state=%s", staticGenerator.MustGenerateBase64Encoded()),
 			provider:    nil,
 			statusCode:  http.StatusBadRequest,
 		},
 		{
 			name:        "No auth code",
-			queryParams: fmt.Sprintf("?state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
+			queryParams: fmt.Sprintf("?state=%s", staticGenerator.MustGenerateBase64Encoded()),
 			provider:    auth.NewFakeProvider(),
 			statusCode:  http.StatusBadRequest,
 		},
 		{
 			name:        "No auth state",
 			queryParams: "?code=myuser",
-			provider:    auth.NewFakeProvider(auth.WithClaims(auth.NewClaims("myuser", "myUser"))),
+			provider:    auth.NewFakeProvider(auth.WithClaims(auth.NewClaim("myuser", "myUser"))),
 			statusCode:  http.StatusBadRequest,
 		},
 		{
@@ -188,13 +201,13 @@ func TestExchangeInvalidInput(t *testing.T) {
 		},
 		{
 			name:        "State mismatch",
-			queryParams: fmt.Sprintf("?code=myuser&state=%s", test.Base64Encoded(t, auth.State{ID: "state-1"})),
+			queryParams: fmt.Sprintf("?code=myuser&state=%s", base64.URLEncoding.EncodeToString([]byte("state-1"))),
 			provider:    auth.NewFakeProvider(),
 			statusCode:  http.StatusBadRequest,
 		},
 		{
-			name:        "Failed authentication",
-			queryParams: fmt.Sprintf("?code=myAuthCode&state=%s", test.Base64Encoded(t, auth.State{ID: "state-0"})),
+			name:        "Authentication error",
+			queryParams: fmt.Sprintf("?code=myAuthCode&state=%s", staticGenerator.MustGenerateBase64Encoded()),
 			provider:    auth.NewFakeProvider(),
 			statusCode:  http.StatusInternalServerError,
 		},
@@ -202,18 +215,17 @@ func TestExchangeInvalidInput(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := loginServer(staticTimeSvc, tc.provider)
-			req := test.NewRequest(
+			srv := loginServer(tc.provider)
+			opts := []test.RequestOpt{
 				test.WithMethod(http.MethodGet),
-				test.WithURL("http://localhost/login/testProvider/callback"+tc.queryParams),
-			)
-			if tc.provider != nil {
-				state := test.Base64Encoded(t, tc.provider.GenerateState())
-				req.AddCookie(&http.Cookie{
-					Name:  "TOKEN_STATE",
-					Value: encryptCookieValue(t, state),
-				})
+				test.WithURL("http://localhost/login/testProvider/callback" + tc.queryParams),
 			}
+			if tc.provider != nil {
+				opts = append(opts,
+					test.WithEncryptedCookie(t, "STATE", encodedState(t)),
+				)
+			}
+			req := test.NewRequest(opts...)
 
 			resp, err := srv.Test(req)
 			defer test.Close(t, resp)
@@ -225,14 +237,25 @@ func TestExchangeInvalidInput(t *testing.T) {
 }
 
 func TestGetCurrentUser(t *testing.T) {
-	user := auth.NewClaims("myuser", "myUser")
-	provider := auth.NewFakeProvider(auth.WithClaims(user))
-	srv := loginServer(staticTimeSvc, provider)
-	token := provider.Token("myuser")
+	claims := auth.NewClaim("myuser", "myUser")
+	provider := auth.NewFakeProvider(auth.WithClaims(claims))
+	srv := loginServer(provider)
+
+	// finish login first
+	rawState := staticGenerator.MustGenerateBase64Encoded()
+	exchangeReq := test.NewRequest(
+		test.WithMethod(http.MethodGet),
+		test.WithURL(fmt.Sprintf("http://localhost/login/testProvider/callback?code=%s&state=%s", claims.UserID, rawState)),
+		test.WithEncryptedCookie(t, "STATE", encodedState(t)),
+	)
+	exchangeResp, err := srv.Test(exchangeReq)
+	require.NoError(t, err)
+	test.Close(t, exchangeResp)
+
 	req := test.NewRequest(
 		test.WithMethod(http.MethodGet),
 		test.WithURL("http://localhost/user"),
-		test.WithCookie("SESSION", encryptCookieValue(t, test.Base64Encoded(t, token))),
+		test.WithSession(staticGenerator.Value),
 	)
 
 	resp, err := srv.Test(req)
@@ -244,9 +267,29 @@ func TestGetCurrentUser(t *testing.T) {
 	assert.Equal(t, &web.ClientUser{Username: "myUser", Initials: "my"}, test.FromJSON[web.ClientUser](t, resp.Body))
 }
 
-func TestAuthInfoNotLoggedIn(t *testing.T) {
-	srv := loginServer(staticTimeSvc, nil)
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/user", nil)
+func TestGetCurrentUser_UnencryptedSession(t *testing.T) {
+	user := auth.NewClaim("myuser", "myUser")
+	provider := auth.NewFakeProvider(auth.WithClaims(user))
+	srv := loginServer(provider)
+	req := test.NewRequest(
+		test.WithMethod(http.MethodGet),
+		test.WithURL("http://localhost/user"),
+		test.WithSession(staticGenerator.Value),
+	)
+
+	resp, err := srv.Test(req)
+	defer test.Close(t, resp)
+
+	require.NoError(t, err)
+	assertErrorResponse(t, resp, http.StatusUnauthorized)
+}
+
+func TestGetCurrentUser_NotLoggedIn(t *testing.T) {
+	srv := loginServer(nil)
+	req := test.NewRequest(
+		test.WithMethod(http.MethodGet),
+		test.WithURL("http://localhost/user"),
+	)
 
 	resp, err := srv.Test(req)
 	defer test.Close(t, resp)
@@ -258,50 +301,110 @@ func TestAuthInfoNotLoggedIn(t *testing.T) {
 func TestLogout(t *testing.T) {
 	cases := []struct {
 		name             string
-		acceptHeader     string
+		opts             []test.RequestOpt
+		login            bool
 		expectedStatus   int
 		expectedLocation string
+		containsHeader   map[string]string
 	}{
 		{
-			name:             "json response",
-			acceptHeader:     fiber.MIMEApplicationJSONCharsetUTF8,
+			name: "json request with session",
+			opts: []test.RequestOpt{
+				test.WithAccept(fiber.MIMEApplicationJSONCharsetUTF8),
+			},
+			login:            true,
 			expectedStatus:   http.StatusOK,
 			expectedLocation: "",
 		},
 		{
-			name:             "html response",
-			acceptHeader:     fiber.MIMETextHTMLCharsetUTF8,
+			name: "html request with session",
+			opts: []test.RequestOpt{
+				test.WithAccept(fiber.MIMETextHTMLCharsetUTF8),
+			},
+			login:            true,
 			expectedStatus:   http.StatusFound,
 			expectedLocation: "/",
+		},
+		{
+			name: "htmx request with session",
+			opts: []test.RequestOpt{
+				test.WithAccept(fiber.MIMETextHTMLCharsetUTF8),
+				test.HTMXRequest(),
+			},
+			login:            true,
+			expectedStatus:   http.StatusOK,
+			expectedLocation: "",
+			containsHeader: map[string]string{
+				web.HeaderHTMXRefresh: "/",
+			},
+		},
+		{
+			name: "json request no session",
+			opts: []test.RequestOpt{
+				test.WithAccept(fiber.MIMEApplicationJSONCharsetUTF8),
+			},
+			login:            false,
+			expectedStatus:   http.StatusOK,
+			expectedLocation: "",
+		},
+		{
+			name: "html request no session",
+			opts: []test.RequestOpt{
+				test.WithAccept(fiber.MIMETextHTMLCharsetUTF8),
+			},
+			login:            false,
+			expectedStatus:   http.StatusFound,
+			expectedLocation: "/",
+		},
+		{
+			name: "htmx request no session",
+			opts: []test.RequestOpt{
+				test.WithAccept(fiber.MIMETextHTMLCharsetUTF8),
+				test.HTMXRequest(),
+			},
+			login:            false,
+			expectedStatus:   http.StatusOK,
+			expectedLocation: "",
+			containsHeader: map[string]string{
+				web.HeaderHTMXRefresh: "/",
+			},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			user := auth.NewClaims("myuser", "myUser")
-			provider := auth.NewFakeProvider(auth.WithClaims(user))
+			var srv *web.Server
+			if tc.login {
+				claims := auth.NewClaim("myuser", "myUser")
+				provider := auth.NewFakeProvider(auth.WithClaims(claims))
+				srv = loginServer(provider)
+				// finish login first
+				rawState := staticGenerator.MustGenerateBase64Encoded()
+				exchangeReq := test.NewRequest(
+					test.WithMethod(http.MethodGet),
+					test.WithURL(fmt.Sprintf("http://localhost/login/testProvider/callback?code=%s&state=%s", claims.UserID, rawState)),
+					test.WithEncryptedCookie(t, "STATE", encodedState(t)),
+				)
+				exchangeResp, err := srv.Test(exchangeReq)
+				require.NoError(t, err)
+				test.Close(t, exchangeResp)
+				// session + state cookie
+				require.Len(t, exchangeResp.Cookies(), 2)
+			} else {
+				srv = loginServer(nil)
+			}
 
-			srv := loginServer(staticTimeSvc, provider)
-			rawState := test.Base64Encoded(t, provider.GenerateState())
-			reqLogin := test.NewRequest(
-				test.WithMethod(http.MethodGet),
-				test.WithURL(fmt.Sprintf("http://localhost/login/testProvider/callback?code=%s&state=%s", user.ID, rawState)),
-				test.WithCookie("TOKEN_STATE", encryptCookieValue(t, rawState)),
-			)
-			respLogin, err := srv.Test(reqLogin)
-			require.NoError(t, err)
-			defer test.Close(t, respLogin)
-
-			token := provider.Token("myuser")
-			req := test.NewRequest(
-				test.WithMethod(http.MethodGet),
+			// logout
+			opts := slices.Clone(tc.opts)
+			opts = append(opts,
+				test.WithMethod(http.MethodPost),
 				test.WithURL("http://localhost/logout"),
-				test.WithCookie("SESSION", encryptCookieValue(t, test.Base64Encoded(t, token))),
-				test.WithAccept(tc.acceptHeader),
+				test.WithSession(staticGenerator.Value),
 			)
+			req := test.NewRequest(opts...)
 			expectedSessionCookie := &http.Cookie{
 				Name:     "SESSION",
-				Value:    "invalid",
-				Expires:  expiresIn(-7 * 24 * time.Hour),
+				Value:    "",
+				MaxAge:   -1,
 				SameSite: http.SameSiteStrictMode,
 				HttpOnly: true,
 				Path:     "/",
@@ -314,64 +417,12 @@ func TestLogout(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedStatus, resp.StatusCode)
 			assert.Equal(t, tc.expectedLocation, resp.Header.Get(fiber.HeaderLocation))
-			assert.Len(t, resp.Cookies(), 1)
+			// expired session cookie
+			require.Len(t, resp.Cookies(), 1)
 			assertEqualCookie(t, expectedSessionCookie, resp.Cookies()[0])
-		})
-	}
-}
-
-func TestLogoutNoSession(t *testing.T) {
-	srv := loginServer(staticTimeSvc, nil)
-	req := httptest.NewRequest(http.MethodGet, "http://localhost/logout", nil)
-
-	resp, err := srv.Test(req)
-	defer test.Close(t, resp)
-
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-}
-
-func TestLogoutError(t *testing.T) {
-	cases := []struct {
-		name                 string
-		sessionCookieValueFn func(t *testing.T) string
-		statusCode           int
-	}{
-		{
-			name: "Invalid session value",
-			sessionCookieValueFn: func(t *testing.T) string {
-				return "123"
-			},
-			statusCode: http.StatusBadRequest,
-		},
-		{
-			name: "Failed logout",
-			sessionCookieValueFn: func(t *testing.T) string {
-				invalidToken := &auth.JWT{Provider: "unknownProvider"}
-
-				return test.Base64Encoded(t, invalidToken)
-			},
-			statusCode: http.StatusBadRequest,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			user := auth.NewClaims("myuser", "myUser")
-			provider := auth.NewFakeProvider(auth.WithClaims(user))
-			srv := loginServer(staticTimeSvc, provider)
-			req := httptest.NewRequest(http.MethodGet, "http://localhost/logout", nil)
-			value := tc.sessionCookieValueFn(t)
-			req.AddCookie(&http.Cookie{
-				Name:  "SESSION",
-				Value: encryptCookieValue(t, value),
-			})
-
-			resp, err := srv.Test(req)
-			defer test.Close(t, resp)
-
-			require.NoError(t, err)
-			assertErrorResponse(t, resp, tc.statusCode)
+			for k, v := range tc.containsHeader {
+				assert.Equal(t, resp.Header.Get(k), v)
+			}
 		})
 	}
 }
@@ -386,47 +437,60 @@ func assertErrorResponse(t *testing.T, resp *http.Response, expectedStatus int) 
 	assert.Equal(t, expectedStatus, result.Status)
 }
 
-func assertEqualCookie(t *testing.T, expected *http.Cookie, actual *http.Cookie) {
+func assertEqualDecryptedCookie(t *testing.T, expected *http.Cookie, actual *http.Cookie) {
 	t.Helper()
 
-	actual.Value = decryptCookieValue(t, actual.Value)
+	actual.Value = test.DecryptCookieValue(t, actual.Value)
 	actual.Raw = ""
 	actual.RawExpires = ""
+
 	assert.Equal(t, expected, actual)
 }
 
-func decryptCookieValue(t *testing.T, value string) string {
+func assertEqualCookie(t *testing.T, expected *http.Cookie, actual *http.Cookie) {
 	t.Helper()
 
-	v, err := encryptcookie.DecryptCookie(value, cookieEncryptionKey)
-	require.NoError(t, err)
+	actual.Raw = ""
+	actual.RawExpires = ""
 
-	return v
+	assert.Equal(t, expected, actual)
 }
 
-func encryptCookieValue(t *testing.T, value string) string {
+func encodedState(t *testing.T) string {
 	t.Helper()
 
-	v, err := encryptcookie.EncryptCookie(value, cookieEncryptionKey)
-	require.NoError(t, err)
-
-	return v
+	return test.Base64Encoded(t, auth.State{
+		Value:    staticGenerator.MustGenerateBase64Encoded(),
+		Verifier: staticGenerator.MustGenerateBase64Encoded(),
+	})
 }
 
-func expiresIn(d time.Duration) time.Time {
-	return staticTimeSvc.Now().Add(d).Truncate(time.Second).UTC()
-}
-
-func loginServer(timeSvc loginapi.TimeService, provider auth.Provider) *web.Server {
-	oCfg := auth.Config{
-		StateCookieAge:    5 * time.Second,
-		SessionCookieName: "SESSION",
-	}
-	svc := auth.New(oCfg, auth.NewProviders(provider))
+func loginServer(provider auth.Provider) *web.Server {
+	svc := auth.New(staticGenerator, auth.NewProviders(provider))
 	srv := web.NewTestServer()
-	cookieEncryptionKey = srv.Cfg.Cookie.EncryptionKey
+
+	gob.Register(auth.User{})
+	sCfg := session.Config{
+		KeyLookup:         "cookie:" + authCfg.Session.Name,
+		Expiration:        authCfg.Session.ExpiresIn,
+		CookieSecure:      true,
+		CookieHTTPOnly:    true,
+		CookieSessionOnly: false,
+		CookieSameSite:    authCfg.Session.SameSite,
+		Storage:           fibermemory.New(),
+		KeyGenerator: func() string {
+			return staticGenerator.Value
+		},
+	}
+	store := session.New(sCfg)
 	srv.RegisterRoutes(func(r fiber.Router) {
-		loginapi.Routes(r.Group("/"), web.NewAuthMiddleware(oCfg, svc), oCfg, svc, timeSvc)
+		loginapi.Routes(
+			r.Group("/"),
+			store,
+			web.NewAuthMiddleware(store),
+			authCfg,
+			svc,
+		)
 	})
 
 	return srv

@@ -1,11 +1,14 @@
 package cardsapi_test
 
 import (
+	"encoding/gob"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	fibermemory "github.com/gofiber/storage/memory/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
@@ -17,7 +20,7 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	srv, _ := searchServer(t)
+	srv := searchServer(t)
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -172,7 +175,7 @@ func TestSearch(t *testing.T) {
 }
 
 func TestSearchWithUser(t *testing.T) {
-	srv, provider := searchServer(t)
+	srv := searchServer(t)
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -255,11 +258,10 @@ func TestSearchWithUser(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/cards?name=Demonic"),
-				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
+				test.WithSession("validSessionID"),
 				test.WithHeader(tc.header),
 			)
 
@@ -274,28 +276,31 @@ func TestSearchWithUser(t *testing.T) {
 	}
 }
 
-func TestSearchWithInvalidUser(t *testing.T) {
-	srv, provider := searchServer(t)
-	token := &auth.JWT{
-		Provider:    provider.GetName(),
-		AccessToken: "invalidToken",
-	}
+func TestSearch_UnknownSession_NoCollectActions(t *testing.T) {
+	srv := searchServer(t)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodGet),
-		test.WithURL("http://localhost/cards?name=Demonic&size=5&page=1"),
-		test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
+		test.WithURL("http://localhost/cards?name=Demonic"),
+		test.WithSession("unknown"),
+		test.WithHeader(map[string]string{
+			web.HeaderHTMXRequest: "true",
+		}),
 	)
 
 	resp, err := srv.Test(req)
 	defer test.Close(t, resp)
 
 	require.NoError(t, err)
-	assert.Equal(t, web.StatusUnauthorized, resp.StatusCode)
+	assert.Equal(t, web.StatusOK, resp.StatusCode)
+	body := test.ToString(t, resp.Body)
+	test.AssertContainsPartialHTML(t, body)
+	assert.Contains(t, body, "data-testid=\"search-result-txt\"")
+	assert.NotContains(t, body, "data-testid=\"add-card-btn")
+	assert.NotContains(t, body, "data-testid=\"remove-card-btn")
 }
 
 func TestDetail(t *testing.T) {
-	srv, provider := searchServer(t)
-	token := provider.Token("myuser")
+	srv := searchServer(t)
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -344,7 +349,7 @@ func TestDetail(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+				return test.WithSession("validSessionID")
 			},
 			cardID:              "Y2FyZD01ODImZmFjZT01ODI=", // 582
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -369,7 +374,7 @@ func TestDetail(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+				return test.WithSession("validSessionID")
 			},
 			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -390,16 +395,16 @@ func TestDetail(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			user := tc.user
-			if user == nil {
-				user = func() test.RequestOpt { return nil }
+			sessionOpt := tc.user
+			if sessionOpt == nil {
+				sessionOpt = func() test.RequestOpt { return nil }
 			}
 
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURLf("http://localhost/cards/%s", tc.cardID),
 				test.WithHeader(tc.header),
-				user(),
+				sessionOpt(),
 			)
 
 			resp, err := srv.Test(req)
@@ -414,8 +419,7 @@ func TestDetail(t *testing.T) {
 }
 
 func TestPrints(t *testing.T) {
-	srv, provider := searchServer(t)
-	token := provider.Token("myuser")
+	srv := searchServer(t)
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -506,7 +510,7 @@ func TestPrints(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+				return test.WithSession("validSessionID")
 			},
 			cardID:              "Y2FyZD01ODImZmFjZT01ODI=", // 582
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -527,7 +531,7 @@ func TestPrints(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token))
+				return test.WithSession("validSessionID")
 			},
 			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -566,13 +570,12 @@ func TestPrints(t *testing.T) {
 		})
 	}
 }
-func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
+func searchServer(t *testing.T) *web.Server {
 	srv := web.NewTestServer()
 
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 
-	validClaim := auth.NewClaims("myuser", "myUser")
 	item1, err := cards.NewCollectable(cards.NewID(514), 5)
 	require.NoError(t, err)
 	item2, err := cards.NewCollectable(cards.NewID(706), 3)
@@ -581,20 +584,29 @@ func searchServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	require.NoError(t, err)
 	item5, err := cards.NewCollectable(cards.NewID(582), 3)
 	require.NoError(t, err)
+
+	loggedInUser := auth.NewUser("myuser")
 	collected := map[string][]cards.Collectable{
-		validClaim.ID: {item1, item2, item4, item5},
+		loggedInUser.ID: {item1, item2, item4, item5},
 	}
 
 	repo, err := memory.NewCardRepository(seed, collected)
 	require.NoError(t, err)
 
-	oCfg := auth.Config{}
-	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
-	authSvc := auth.New(oCfg, auth.NewProviders(provider))
 	searchSvc := cards.NewCardService(repo)
+
+	gob.Register(auth.User{})
+	cfg := session.Config{
+		KeyLookup: "cookie:SESSION",
+		Storage:   fibermemory.New(),
+	}
+	err = cfg.Storage.Set("validSessionID", test.AsSessionData(t, auth.UserContextKey, loggedInUser), 0)
+	require.NoError(t, err)
+
+	store := session.New(cfg)
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.SearchRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), searchSvc)
+		cardsapi.SearchRoutes(r.Group("/"), web.NewAuthMiddleware(store), searchSvc)
 	})
 
-	return srv, provider
+	return srv
 }

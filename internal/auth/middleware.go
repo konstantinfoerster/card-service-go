@@ -1,128 +1,107 @@
 package auth
 
 import (
-	"context"
 	"errors"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
 
 var (
-	ErrNoClaimsInContext = errors.New("no claims in context")
-	ErrUnauthorized      = errors.New("unauthorized")
-	ErrInvalidSession    = errors.New("invalid or expired session")
+	ErrNoUserInContext = errors.New("no user in context")
+	ErrInvalidate      = errors.New("invalidation failed")
+	ErrUnauthorized    = errors.New("unauthorized")
+	ErrInvalidSession  = errors.New("invalid or expired session")
 )
 
-type Service interface {
-	AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error)
-}
+const UserContextKey = "session_user"
 
-const ClaimsContextKey = "claims"
-
-func ClaimsFromCtx(ctx *fiber.Ctx) (Claims, error) {
-	u, ok := ctx.Locals(ClaimsContextKey).(Claims)
-	if ok && u.ID != "" {
+// UserFromCtx returns an authenticated User or an ErrNoUserInContext if there is no user.
+func UserFromCtx(ctx *fiber.Ctx) (User, error) {
+	u, ok := ctx.Locals(UserContextKey).(User)
+	if ok && u.Valid() {
 		return u, nil
 	}
 
-	return Claims{}, ErrNoClaimsInContext
+	return User{}, ErrNoUserInContext
 }
 
 type MiddlewareConfig struct {
-	// Extractor defines how the token claims are extracted from the request
-	Extractor func(*fiber.Ctx, string) (Claims, error)
-	// Authorized runs after valid claims are found
-	Authorized func(*fiber.Ctx, Claims)
-	// Key name of the session cookie
-	Key string
+	// extractor defines how the session is extracted from the request
+	extractor func(*fiber.Ctx) (User, error)
 	// AllowEmptyCookie allows unauthenticated access if true
 	AllowEmptyCookie bool
 }
 
-func NewOAuthMiddleware(svc Service, opts ...func(*MiddlewareConfig)) fiber.Handler {
+type MiddlewareOpt func(*MiddlewareConfig)
+
+func NewMiddleware(store *session.Store, opts ...MiddlewareOpt) fiber.Handler {
 	c := MiddlewareConfig{
-		Extractor: func(c *fiber.Ctx, cookie string) (Claims, error) {
-			if cookie == "" {
-				return Claims{}, ErrUnauthorized
-			}
-
-			jwtToken, err := DecodeSession(cookie)
+		extractor: func(c *fiber.Ctx) (User, error) {
+			sess, err := store.Get(c)
 			if err != nil {
-				return Claims{}, err
+				slog.Error("failed to get session from store", slog.Any("error", err))
+
+				return User{}, errors.Join(ErrInvalidSession, err)
 			}
 
-			claims, err := svc.AuthInfo(c.Context(), jwtToken.Provider, jwtToken)
-			if err != nil {
-				return Claims{}, err
+			if sess.Fresh() {
+				return User{}, ErrInvalidSession
 			}
 
-			return claims, nil
-		},
-		Authorized: func(ctx *fiber.Ctx, claims Claims) {
-			ctx.Locals(ClaimsContextKey, claims)
+			user, ok := sess.Get(UserContextKey).(User)
+			if !ok {
+				return User{}, ErrNoUserInContext
+			}
+
+			if !user.Valid() {
+				return User{}, ErrInvalidSession
+			}
+
+			return user, nil
 		},
 	}
 
 	for _, optFn := range opts {
+		if optFn == nil {
+			continue
+		}
+
 		optFn(&c)
 	}
 
-	return newTokenExtractHandler(c)
+	return newExtractHandler(c)
 }
 
-func WithConfig(cfg Config) func(*MiddlewareConfig) {
-	return func(c *MiddlewareConfig) {
-		c.Key = cfg.SessionCookieName
-	}
-}
-
-func WithAuthorized(fn func(*fiber.Ctx, Claims)) func(*MiddlewareConfig) {
-	return func(c *MiddlewareConfig) {
-		c.Authorized = fn
-	}
-}
-func AllowUnauthorized() func(*MiddlewareConfig) {
+func AllowUnauthorized() MiddlewareOpt {
 	return func(c *MiddlewareConfig) {
 		c.AllowEmptyCookie = true
 	}
 }
 
-func newTokenExtractHandler(config ...MiddlewareConfig) fiber.Handler {
-	// Init config
+func newExtractHandler(config ...MiddlewareConfig) fiber.Handler {
 	var cfg MiddlewareConfig
 	if len(config) > 0 {
 		cfg = config[0]
 	}
 
-	if cfg.Key == "" {
-		cfg.Key = "SESSION"
-	}
-	if cfg.Extractor == nil {
-		panic("OAuth handler requires an extractor function")
+	if cfg.extractor == nil {
+		panic("auth middleware requires an extractor function")
 	}
 
 	return func(c *fiber.Ctx) error {
-		// Extract and verify key
-		cookieValue := c.Cookies(cfg.Key)
-		if cookieValue == "" {
+		user, err := cfg.extractor(c)
+		if err != nil {
 			if cfg.AllowEmptyCookie {
 				return c.Next()
 			}
 
-			return aerrors.NewAuthorizationError(ErrUnauthorized, "unauthorized")
-		}
-
-		value, err := cfg.Extractor(c, cookieValue)
-		if err != nil {
 			return aerrors.NewAuthorizationError(err, "unauthorized")
 		}
 
-		if value.ID == "" {
-			return aerrors.NewAuthorizationError(ErrInvalidSession, "unauthorized")
-		}
-
-		cfg.Authorized(c, value)
+		c.Locals(UserContextKey, user)
 
 		return c.Next()
 	}

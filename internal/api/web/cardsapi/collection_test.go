@@ -2,11 +2,14 @@ package cardsapi_test
 
 import (
 	"context"
+	"encoding/gob"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	fibermemory "github.com/gofiber/storage/memory/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
@@ -18,7 +21,7 @@ import (
 )
 
 func TestSearchCollected(t *testing.T) {
-	srv, provider := testServer(t)
+	srv := collectionServer(t)
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -159,11 +162,10 @@ func TestSearchCollected(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/mycards?name=Domonic&"+tc.page),
-				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
+				test.WithSession("validSessionID"),
 				test.WithHeader(tc.header),
 			)
 
@@ -179,7 +181,7 @@ func TestSearchCollected(t *testing.T) {
 }
 
 func TestSearchCollectedNoSession(t *testing.T) {
-	srv, _ := testServer(t)
+	srv := collectionServer(t)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodGet),
 		test.WithURL("http://localhost/mycards?name=Demonic"),
@@ -193,7 +195,7 @@ func TestSearchCollectedNoSession(t *testing.T) {
 }
 
 func TestCollectItemAdd(t *testing.T) {
-	srv, provider := testServer(t)
+	srv := collectionServer(t)
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -230,11 +232,10 @@ func TestCollectItemAdd(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := provider.Token("myuser")
 			req := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
+				test.WithSession("validSessionID"),
 				test.WithHeader(tc.header),
 				test.WithJSONBody(t, cardsapi.NewItem(cards.NewID(12406), tc.amount)),
 			)
@@ -251,7 +252,7 @@ func TestCollectItemAdd(t *testing.T) {
 }
 
 func TestCollectItemRemove(t *testing.T) {
-	srv, provider := testServer(t)
+	srv := collectionServer(t)
 	cases := []struct {
 		name                string
 		header              map[string]string
@@ -278,12 +279,11 @@ func TestCollectItemRemove(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			token := provider.Token("myuser")
 			// collect item
 			reqAdd := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
+				test.WithSession("validSessionID"),
 				test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0xMjQwNg==", Amount: 1}),
 			)
 			respAdd, _ := srv.Test(reqAdd)
@@ -292,7 +292,7 @@ func TestCollectItemRemove(t *testing.T) {
 			reqRemove := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithEncryptedCookie(t, "SESSION", test.Base64Encoded(t, token)),
+				test.WithSession("validSessionID"),
 				test.WithHeader(tc.header),
 				test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0xMjQwNg==", Amount: 0}),
 			)
@@ -309,7 +309,7 @@ func TestCollectItemRemove(t *testing.T) {
 }
 
 func TestCollectItemNoSession(t *testing.T) {
-	srv, _ := testServer(t)
+	srv := collectionServer(t)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodPost),
 		test.WithURL("http://localhost/mycards"),
@@ -323,7 +323,7 @@ func TestCollectItemNoSession(t *testing.T) {
 	assert.Equal(t, web.StatusUnauthorized, resp.StatusCode)
 }
 
-func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
+func collectionServer(t *testing.T) *web.Server {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 	repo, err := memory.NewCollectRepository(seed)
@@ -331,8 +331,8 @@ func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 
 	collectSvc := cards.NewCollectionService(repo)
 
-	validClaim := auth.NewClaims("myuser", "myUser")
-	collector := cards.NewCollector(validClaim.ID)
+	loggedInUser := auth.NewUser("myuser")
+	collector := cards.NewCollector(loggedInUser.ID)
 	ctx := context.Background()
 	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11434), Amount: 1}, collector)
 	require.NoError(t, err)
@@ -341,13 +341,19 @@ func testServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11706), Amount: 3}, collector)
 	require.NoError(t, err)
 
-	oCfg := auth.Config{}
-	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
-	authSvc := auth.New(oCfg, auth.NewProviders(provider))
+	gob.Register(auth.User{})
+	cfg := session.Config{
+		KeyLookup: "cookie:SESSION",
+		Storage:   fibermemory.New(),
+	}
+	err = cfg.Storage.Set("validSessionID", test.AsSessionData(t, auth.UserContextKey, loggedInUser), 0)
+	require.NoError(t, err)
+
+	store := session.New(cfg)
 	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.CollectionRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), collectSvc)
+		cardsapi.CollectionRoutes(r.Group("/"), web.NewAuthMiddleware(store), collectSvc)
 	})
 
-	return srv, provider
+	return srv
 }

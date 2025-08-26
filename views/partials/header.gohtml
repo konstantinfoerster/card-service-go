@@ -56,7 +56,10 @@
             <li>
               <div class="pb-2">Logged in as {{ .User.Username}}</div>
             </li>
-            <li><a class="btn btn-secondary w-100" href="/api/v1/logout">Logout</a></li>
+            <li><a class="btn btn-secondary w-100" 
+                   hx-post="/api/v1/logout"
+                >Logout</a>
+            </li>
           </ul>
         </div>
       {{- else -}}

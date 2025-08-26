@@ -1,38 +1,10 @@
 package web
 
 import (
-	"errors"
-
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/konstantinfoerster/card-service-go/internal/auth"
 )
-
-var (
-	ErrNoUserInContext = errors.New("no user in context")
-)
-
-const UserContextKey = "userid"
-
-// User represents an authenticated user in the system.
-type User struct {
-	ID       string
-	Username string
-}
-
-// NewUser creates a new User.
-func NewUser(id, username string) User {
-	return User{ID: id, Username: username}
-}
-
-// UserFromCtx returns an authenticated User or an ErrNoUserInContext if there is no user.
-func UserFromCtx(ctx *fiber.Ctx) (User, error) {
-	u, ok := ctx.Locals(UserContextKey).(User)
-	if ok && u.ID != "" {
-		return u, nil
-	}
-
-	return User{}, ErrNoUserInContext
-}
 
 type AuthMiddleware struct {
 	relaxed  fiber.Handler
@@ -40,14 +12,9 @@ type AuthMiddleware struct {
 }
 
 // NewAuthMiddleware provides fiber.Handler that can be used to ensure an authentciated access.
-func NewAuthMiddleware(cfg auth.Config, svc auth.Service) AuthMiddleware {
-	authFn := func(ctx *fiber.Ctx, claims auth.Claims) {
-		u := NewUser(claims.ID, claims.Email)
-		ctx.Locals(UserContextKey, u)
-	}
-
-	relaxed := auth.NewOAuthMiddleware(svc, auth.WithAuthorized(authFn), auth.WithConfig(cfg), auth.AllowUnauthorized())
-	required := auth.NewOAuthMiddleware(svc, auth.WithAuthorized(authFn), auth.WithConfig(cfg))
+func NewAuthMiddleware(store *session.Store) AuthMiddleware {
+	relaxed := auth.NewMiddleware(store, auth.AllowUnauthorized())
+	required := auth.NewMiddleware(store)
 
 	return AuthMiddleware{
 		relaxed:  relaxed,
@@ -71,12 +38,12 @@ type ClientUser struct {
 	Initials string `json:"initials"`
 }
 
-func NewClientUser(u User) *ClientUser {
+func NewClientUser(u auth.User) *ClientUser {
 	if u.ID == "" {
 		return nil
 	}
 
-	username := u.Username
+	username := u.Email
 	if username == "" {
 		username = "Unknown"
 	}

@@ -1,12 +1,15 @@
 package cardsapi_test
 
 import (
+	"encoding/gob"
 	"os"
 	"path"
 	"runtime"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	fibermemory "github.com/gofiber/storage/memory/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
@@ -21,7 +24,7 @@ import (
 )
 
 func TestDetect(t *testing.T) {
-	srv, provider := detectTestServer(t)
+	srv := detectTestServer(t)
 	four := 4
 	cases := []struct {
 		name       string
@@ -47,11 +50,9 @@ func TestDetect(t *testing.T) {
 			},
 		},
 		{
-			name: "match with user",
-			img:  "cardImageModified.jpg",
-			userCookie: test.WithEncryptedCookie(
-				t, "SESSION", test.Base64Encoded(t, provider.Token("myuser")),
-			),
+			name:       "match with user",
+			img:        "cardImageModified.jpg",
+			userCookie: test.WithSession("validSessionID"),
 			expected: []cardsapi.Card{
 				{
 					ID:     "Y2FyZD0xJmZhY2U9MQ==",
@@ -97,7 +98,7 @@ func TestDetect(t *testing.T) {
 	}
 }
 
-func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
+func detectTestServer(t *testing.T) *web.Server {
 	srv := web.NewTestServer()
 
 	cfg := postgres.Images{Host: "testdata"}
@@ -107,23 +108,30 @@ func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	require.NoError(t, err)
 	item, err := cards.NewCollectable(cards.NewID(1), 1)
 	require.NoError(t, err)
+	loggedInUser := auth.NewUser("myuser")
 	collected := map[string][]cards.Collectable{
-		"myuser": {item},
+		loggedInUser.ID: {item},
 	}
 	cRepo, err := memory.NewCardRepository(seed, collected)
 	require.NoError(t, err)
 
-	oCfg := auth.Config{}
-	validClaim := auth.NewClaims("myuser", "myUser")
-	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
-	authSvc := auth.New(oCfg, auth.NewProviders(provider))
 	detector := imaging.NewFakeDetector()
 	svc := cards.NewDetectService(cRepo, dRepo, detector)
+
+	gob.Register(auth.User{})
+	sCfg := session.Config{
+		KeyLookup: "cookie:SESSION",
+		Storage:   fibermemory.New(),
+	}
+	err = sCfg.Storage.Set("validSessionID", test.AsSessionData(t, auth.UserContextKey, loggedInUser), 0)
+	require.NoError(t, err)
+
+	store := session.New(sCfg)
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.DetectRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), svc)
+		cardsapi.DetectRoutes(r.Group("/"), web.NewAuthMiddleware(store), svc)
 	})
 
-	return srv, provider
+	return srv
 }
 
 func currentDir() string {

@@ -20,6 +20,7 @@ linters:
     - thelper # (useful, but needs some configuration) detects golang test helpers without t.Helper() call and checks the consistency of test helpers
     - wrapcheck # (many detects, really useful?) checks that errors returned from external packages are wrapped
     - wsl # (too strict) forces you to use empty lines
+    - zerologlint # zerolog is not used
   enable:
     - asasalint
     - asciicheck
@@ -88,7 +89,6 @@ linters:
     - usestdlibvars
     - wastedassign
     - whitespace
-    - zerologlint
   settings:
     cyclop:
       max-complexity: 15

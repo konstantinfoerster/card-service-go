@@ -17,8 +17,14 @@ func TestNewConfig_Defaults(t *testing.T) {
 	assert.NotEmpty(t, cfg.Server.TemplateDir)
 	assert.NotEmpty(t, cfg.Probes.Port)
 	assert.NotEmpty(t, cfg.Logging.Level)
-	assert.NotEmpty(t, cfg.Oidc.SessionCookieName)
-	assert.Greater(t, cfg.Oidc.StateCookieAge, time.Second)
+
+	assert.NotEmpty(t, cfg.Auth.Session.Name)
+	assert.NotEmpty(t, cfg.Auth.Session.SameSite)
+	assert.Greater(t, cfg.Auth.Session.ExpiresIn, time.Second)
+
+	assert.NotEmpty(t, cfg.Auth.State.Name)
+	assert.NotEmpty(t, cfg.Auth.State.SameSite)
+	assert.Greater(t, cfg.Auth.State.ExpiresIn, time.Second)
 }
 
 func TestNewConfig_OverwriteDefaults(t *testing.T) {
@@ -26,8 +32,14 @@ func TestNewConfig_OverwriteDefaults(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "trace", cfg.Logging.Level)
-	assert.Equal(t, "SESSION_TEST", cfg.Oidc.SessionCookieName)
-	assert.Equal(t, time.Hour*2, cfg.Oidc.StateCookieAge)
+
+	assert.Equal(t, "SESSION_TEST", cfg.Auth.Session.Name)
+	assert.Equal(t, "none", cfg.Auth.Session.SameSite)
+	assert.Equal(t, 2*time.Hour, cfg.Auth.Session.ExpiresIn)
+
+	assert.Equal(t, "STATE_TEST", cfg.Auth.State.Name)
+	assert.Equal(t, "none", cfg.Auth.State.SameSite)
+	assert.Equal(t, 2*time.Minute, cfg.Auth.State.ExpiresIn)
 }
 
 func TestNewConfig_NotAFile(t *testing.T) {

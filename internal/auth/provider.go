@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +12,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 )
 
@@ -28,11 +29,10 @@ var (
 
 type Provider interface {
 	GetName() string
-	GetAuthURL(state string) string
-	ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error)
-	ValidateToken(ctx context.Context, token *JWT) (Claims, error)
+	GetAuthURL(state, verifier string) string
+	ExchangeCode(ctx context.Context, authCode, verifier string) (*JWT, error)
+	ValidateToken(ctx context.Context, token *JWT) (Claim, error)
 	RevokeToken(ctx context.Context, token *JWT) error
-	GenerateState() State
 }
 
 type Providers struct {
@@ -65,23 +65,6 @@ func (pp Providers) Find(key string) (Provider, error) {
 	}
 
 	return nil, fmt.Errorf("%s not found, %w", key, ErrProviderUnsupported)
-}
-
-func TestProvider(cfg ProviderCfg, client *http.Client) OIDCProvider {
-	return OIDCProvider{
-		name:        "test",
-		authURL:     cfg.AuthURL,
-		tokenURL:    cfg.TokenURL,
-		revokeURL:   cfg.RevokeURL,
-		redirectURI: cfg.RedirectURI,
-		client:      client,
-		clientID:    cfg.ClientID,
-		secret:      cfg.Secret,
-		scope:       cfg.Scope,
-		validate: func(ctx context.Context, token *JWT, clientID string) (Claims, error) {
-			return NewClaims("1", "test@localhost"), nil
-		},
-	}
 }
 
 func FromConfiguration(cfg Config) (Providers, error) {
@@ -118,115 +101,120 @@ func FromConfiguration(cfg Config) (Providers, error) {
 
 func merge(p *OIDCProvider, cfg ProviderCfg) error {
 	if cfg.AuthURL != "" {
-		p.authURL = cfg.AuthURL
+		p.AuthURL = cfg.AuthURL
 	}
 	if cfg.TokenURL != "" {
-		p.tokenURL = cfg.TokenURL
+		p.TokenURL = cfg.TokenURL
 	}
 	if cfg.RevokeURL != "" {
-		p.revokeURL = cfg.RevokeURL
+		p.RevokeURL = cfg.RevokeURL
 	}
 	if cfg.RedirectURI != "" {
-		p.redirectURI = cfg.RedirectURI
+		p.RedirectURI = cfg.RedirectURI
 	}
-	if cfg.Scope != "" {
-		p.scope = cfg.Scope
+	if len(cfg.Scopes) > 0 {
+		p.Scopes = cfg.Scopes
 	}
 
 	if cfg.ClientID == "" {
-		return fmt.Errorf("provider %s, client id must not be empty, %w", p.name, ErrProviderInvalidConfig)
+		return fmt.Errorf("provider %s, client id must not be empty, %w", p.Name, ErrProviderInvalidConfig)
 	}
-	p.clientID = cfg.ClientID
+	p.ClientID = cfg.ClientID
 
 	if cfg.Secret == "" {
-		return fmt.Errorf("provider %s, secret must not be empty, %w", p.name, ErrProviderInvalidConfig)
+		return fmt.Errorf("provider %s, secret must not be empty, %w", p.Name, ErrProviderInvalidConfig)
 	}
-	p.secret = cfg.Secret
+	p.Secret = cfg.Secret
 
 	return nil
 }
 
 type State struct {
-	ID string `json:"id"`
+	Value    string `json:"value"`
+	Verifier string `json:"verifier"`
 }
 
 type OIDCProvider struct {
-	client      *http.Client
-	validate    func(ctx context.Context, token *JWT, clientID string) (Claims, error)
-	name        string
-	authURL     string
-	tokenURL    string
-	revokeURL   string
-	redirectURI string
-	clientID    string
-	secret      string
-	scope       string
+	Client      *http.Client
+	Validate    func(ctx context.Context, token *JWT, clientID string) (Claim, error)
+	Name        string
+	AuthURL     string
+	TokenURL    string
+	RevokeURL   string
+	RedirectURI string
+	ClientID    string
+	Secret      string
+	Scopes      []string
 }
 
 func (p OIDCProvider) GetName() string {
-	return p.name
+	return p.Name
 }
 
-func (p OIDCProvider) GetAuthURL(state string) string {
-	return fmt.Sprintf("%s?state=%s&client_id=%s&redirect_uri=%s&scope=%s&response_type=code&access_type=offline",
-		p.authURL, url.QueryEscape(state), url.QueryEscape(p.clientID), url.QueryEscape(p.redirectURI),
-		url.QueryEscape(p.scope))
+func (p OIDCProvider) GetAuthURL(state, verifier string) string {
+	sha := sha256.Sum256([]byte(verifier))
+	cc := base64.RawURLEncoding.EncodeToString(sha[:])
+
+	v := url.Values{
+		"state":                 {state},
+		"code_challenge_method": {"S256"},
+		"code_challenge":        {cc},
+		"client_id":             {p.ClientID},
+		"redirect_uri":          {p.RedirectURI},
+		"scope":                 {strings.Join(p.Scopes, " ")},
+		"response_type":         {"code"},
+		"access_type":           {"online"},
+	}
+
+	return p.AuthURL + "?" + v.Encode()
 }
 
-func (p OIDCProvider) ValidateToken(ctx context.Context, token *JWT) (Claims, error) {
-	c, err := p.validate(ctx, token, p.clientID)
+func (p OIDCProvider) ValidateToken(ctx context.Context, token *JWT) (Claim, error) {
+	c, err := p.Validate(ctx, token, p.ClientID)
 	if err != nil {
-		return Claims{}, errors.Join(err, ErrProviderValidateToken)
+		return Claim{}, errors.Join(err, ErrProviderValidateToken)
 	}
 
 	return c, nil
 }
 
-func (p OIDCProvider) ExchangeCode(ctx context.Context, authCode string) (Claims, *JWT, error) {
-	body, err := p.postRequest(ctx, p.tokenURL, url.Values{
+func (p OIDCProvider) ExchangeCode(ctx context.Context, authCode, verifier string) (*JWT, error) {
+	body, err := p.postRequest(ctx, p.TokenURL, url.Values{
 		"code":          {authCode},
-		"client_id":     {p.clientID},
-		"client_secret": {p.secret},
-		"redirect_uri":  {p.redirectURI},
+		"code_verifier": {verifier},
+		"client_id":     {p.ClientID},
+		"client_secret": {p.Secret},
+		"redirect_uri":  {p.RedirectURI},
 		"grant_type":    {"authorization_code"},
 	}, http.StatusOK)
-	if err != nil {
-		return Claims{}, nil, fmt.Errorf("post failed duo to %w", errors.Join(err, ErrProviderCodeExchange))
-	}
 	defer aio.Close(body)
+	if err != nil {
+		return nil, fmt.Errorf("post failed duo to %w", errors.Join(err, ErrProviderCodeExchange))
+	}
 
 	var jwtToken JWT
 	if dErr := json.NewDecoder(body).Decode(&jwtToken); dErr != nil {
-		return Claims{}, nil, fmt.Errorf("unable to decode response, %w", errors.Join(dErr, ErrProviderCodeExchange))
+		return nil, fmt.Errorf("unable to decode response, %w", errors.Join(dErr, ErrProviderCodeExchange))
 	}
 
-	jwtToken.Provider = p.name
+	jwtToken.Provider = p.Name
 
-	claims, err := p.ValidateToken(ctx, &jwtToken)
-	if err != nil {
-		return Claims{}, nil, err
-	}
-
-	return claims, &jwtToken, nil
+	return &jwtToken, nil
 }
 
 func (p OIDCProvider) RevokeToken(ctx context.Context, token *JWT) error {
 	if token == nil {
 		return errors.Join(errEmptyToken, ErrProviderTokenRevoke)
 	}
-	body, err := p.postRequest(ctx, p.revokeURL, url.Values{
+	body, err := p.postRequest(ctx, p.RevokeURL, url.Values{
 		"token": {token.AccessToken},
 	}, http.StatusOK)
+	defer aio.Close(body)
 	if err != nil {
 		return fmt.Errorf("post failed duo to %w", errors.Join(err, ErrProviderTokenRevoke))
 	}
-	defer aio.Close(body)
 
 	return nil
-}
-
-func (p OIDCProvider) GenerateState() State {
-	return State{ID: uuid.New().String()}
 }
 
 func (p OIDCProvider) postRequest(ctx context.Context, url string, data url.Values,
@@ -237,7 +225,7 @@ func (p OIDCProvider) postRequest(ctx context.Context, url string, data url.Valu
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := p.client.Do(req)
+	resp, err := p.Client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed with, %w", err)
 	}

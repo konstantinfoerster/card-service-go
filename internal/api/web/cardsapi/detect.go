@@ -8,6 +8,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
@@ -22,7 +23,7 @@ func DetectRoutes(r fiber.Router, auth web.AuthMiddleware, detectSvc DetectServi
 func Detect(svc DetectService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// when user is not set, the user specific collection data won't be loaded
-		user, _ := web.UserFromCtx(c)
+		user, _ := auth.UserFromCtx(c)
 
 		fHeader, err := c.FormFile("file")
 		if err != nil {

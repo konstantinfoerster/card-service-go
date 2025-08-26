@@ -2,6 +2,8 @@ package auth_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +19,7 @@ import (
 )
 
 var client = &http.Client{}
+var staticGenerator = auth.StaticGenerator{Value: "randVal"}
 
 func TestUnsupportedProvider(t *testing.T) {
 	cases := []struct {
@@ -44,9 +47,9 @@ func TestUnsupportedProvider(t *testing.T) {
 	for _, tc := range cases {
 		t.Run("Authenticate - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(auth.Config{}, auth.Providers{})
+			svc := auth.New(nil, auth.Providers{})
 
-			_, _, err := svc.Authenticate(ctx, tc.provider, "")
+			_, _, err := svc.Authenticate(ctx, tc.provider, "", "")
 
 			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
@@ -54,31 +57,19 @@ func TestUnsupportedProvider(t *testing.T) {
 		})
 
 		t.Run("AuthURL - "+tc.name, func(t *testing.T) {
-			svc := auth.New(auth.Config{}, auth.Providers{})
+			svc := auth.New(nil, auth.Providers{})
 
-			_, err := svc.AuthURL(tc.provider)
-
-			var appErr aerrors.AppError
-			require.ErrorAs(t, err, &appErr)
-			assert.Equal(t, tc.errType, appErr.ErrorType)
-		})
-
-		t.Run("AuthInfo - "+tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			svc := auth.New(auth.Config{}, auth.Providers{})
-
-			_, err := svc.AuthInfo(ctx, tc.provider, nil)
+			_, _, err := svc.AuthURL(tc.provider)
 
 			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
 			assert.Equal(t, tc.errType, appErr.ErrorType)
 		})
-
-		t.Run("Logout - "+tc.name, func(t *testing.T) {
+		t.Run("Revoke - "+tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			svc := auth.New(auth.Config{}, auth.Providers{})
+			svc := auth.New(nil, auth.Providers{})
 
-			err := svc.Logout(ctx, &auth.JWT{Provider: tc.provider})
+			err := svc.Revoke(ctx, &auth.JWT{Provider: tc.provider})
 
 			var appErr aerrors.AppError
 			require.ErrorAs(t, err, &appErr)
@@ -88,113 +79,174 @@ func TestUnsupportedProvider(t *testing.T) {
 }
 
 func TestAuthURL(t *testing.T) {
-	pCfg := auth.ProviderCfg{
+	cfg := auth.ProviderCfg{
 		AuthURL:     "http://localhost/oauth2/auth",
 		RedirectURI: "http://localhost",
 		ClientID:    "client id 0",
-		Scope:       "openid email",
+		Scopes:      []string{"openid", "email"},
 	}
-	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	randVal := staticGenerator.MustGenerateBase64Encoded()
+	codeChallenge := sha256.Sum256([]byte(randVal))
+	expectedURL := "http://localhost/oauth2/auth?" + url.Values{
+		"state":                 {randVal},
+		"code_challenge_method": {"S256"},
+		"code_challenge":        {base64.RawURLEncoding.EncodeToString(codeChallenge[:])},
+		"client_id":             {"client id 0"},
+		"redirect_uri":          {"http://localhost"},
+		"scope":                 {"openid email"},
+		"response_type":         {"code"},
+		"access_type":           {"online"},
+	}.Encode()
+	expectedState := auth.State{
+		Value:    randVal,
+		Verifier: randVal,
+	}
+	providers := auth.NewProviders(NewTestProvider(cfg, client))
+	svc := auth.New(staticGenerator, providers)
 
-	actualURL, err := svc.AuthURL("test")
-	expectedURL := "http://localhost/oauth2/auth?state=" + actualURL.State + "&client_id=client+id+0&redirect_uri=http%3A%2F%2Flocalhost&scope=openid+email&response_type=code&access_type=offline"
+	actualURL, state, err := svc.AuthURL("test")
 
 	require.NoError(t, err)
-	assert.NotEmpty(t, strings.TrimSpace(actualURL.State))
-	assert.Equal(t, expectedURL, actualURL.URL)
+	assert.Equal(t, expectedState, state)
+	assert.Equal(t, expectedURL, actualURL)
 }
 
 func TestAuthenticate(t *testing.T) {
-	ctx := context.Background()
-	expectedBody := url.Values{
-		"code":          {"code-0"},
-		"client_id":     {"client id 0"},
-		"client_secret": {"secure"},
-		"redirect_uri":  {"http://localhost"},
-		"grant_type":    {"authorization_code"},
+	reqAssert := func(uri, body string) {
+		expectedBody := url.Values{
+			"code":          {"code-0"},
+			"code_verifier": {"someVerifier"},
+			"client_id":     {"client id 0"},
+			"client_secret": {"secure"},
+			"redirect_uri":  {"http://localhost"},
+			"grant_type":    {"authorization_code"},
+		}
+		if strings.HasSuffix(uri, "/auth") {
+			assert.Equal(t, expectedBody.Encode(), body)
+		}
 	}
-	srv := startProviderServer(t, expectedBody.Encode())
+	srv := startProviderServer(t, reqAssert)
 	defer srv.Close()
-	pCfg := auth.ProviderCfg{
+	cfg := auth.ProviderCfg{
 		TokenURL:    srv.URL + "/oauth2/auth",
 		ClientID:    "client id 0",
 		Secret:      "secure",
 		RedirectURI: "http://localhost",
 	}
-	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	providers := auth.NewProviders(NewTestProvider(cfg, client))
+	svc := auth.New(staticGenerator, providers)
+	expected := auth.User{
+		ID:    "1",
+		Email: "test@localhost",
+	}
 
-	user, token, err := svc.Authenticate(ctx, "test", "code-0")
+	token, user, err := svc.Authenticate(context.Background(), "test", "code-0", "someVerifier")
 
 	require.NoError(t, err)
-	assert.Equal(t, "test", token.Provider)
-	assert.Equal(t, auth.NewClaims("1", "test@localhost"), user)
+	assert.NotNil(t, token)
+	assert.Equal(t, expected, user)
 }
 
-func TestAuthenticateOidcServerError(t *testing.T) {
-	ctx := context.Background()
-	srv := startProviderServer(t, "")
+func TestAuthenticate_ExchangeError(t *testing.T) {
+	srv := startProviderServer(t, nil)
 	defer srv.Close()
-	pCfg := auth.ProviderCfg{
+	cfg := auth.ProviderCfg{
 		TokenURL: srv.URL + "/oauth2/autherror",
 	}
-	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	providers := auth.NewProviders(NewTestProvider(cfg, client))
+	svc := auth.New(staticGenerator, providers)
 
-	_, _, err := svc.Authenticate(ctx, "test", "code-0")
+	_, _, err := svc.Authenticate(context.Background(), "test", "", "")
+
 	require.Error(t, err)
-
 	var appErr aerrors.AppError
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, aerrors.ErrUnknown, appErr.ErrorType)
+	assert.Equal(t, "exchange-code-failed", appErr.Key)
 }
 
-func TestAuthInfo(t *testing.T) {
+func TesRevoke(t *testing.T) {
 	ctx := context.Background()
-	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(auth.ProviderCfg{}, client)))
-
-	user, err := svc.AuthInfo(ctx, "test", &auth.JWT{})
-
-	require.NoError(t, err)
-	assert.Equal(t, auth.NewClaims("1", "test@localhost"), user)
-}
-
-func TestLogout(t *testing.T) {
-	ctx := context.Background()
-	expectedBody := url.Values{
-		"token": {"token-0"},
-	}
-	srv := startProviderServer(t, expectedBody.Encode())
+	srv := startProviderServer(t, func(uri, body string) {
+		expectedBody := url.Values{
+			"token": {"token-0"},
+		}
+		if strings.HasSuffix(uri, "/revoke") {
+			assert.Equal(t, expectedBody.Encode(), body)
+		}
+	})
 	defer srv.Close()
-	pCfg := auth.ProviderCfg{
+	cfg := auth.ProviderCfg{
 		RevokeURL: srv.URL + "/oauth2/revoke",
 	}
-	svc := auth.New(auth.Config{}, auth.NewProviders(auth.TestProvider(pCfg, client)))
+	providers := auth.NewProviders(NewTestProvider(cfg, client))
+	svc := auth.New(nil, providers)
 
-	err := svc.Logout(ctx, &auth.JWT{AccessToken: "token-0", Provider: "test"})
+	err := svc.Revoke(ctx, &auth.JWT{AccessToken: "token-0", Provider: "test"})
 
 	require.NoError(t, err)
 }
 
-func startProviderServer(t *testing.T, expectedBody string) *httptest.Server {
+func TestRevoke_Error(t *testing.T) {
+	ctx := context.Background()
+	srv := startProviderServer(t, nil)
+	defer srv.Close()
+	cfg := auth.ProviderCfg{
+		RevokeURL: srv.URL + "/oauth2/revokeerr",
+	}
+	providers := auth.NewProviders(NewTestProvider(cfg, client))
+	svc := auth.New(nil, providers)
+
+	err := svc.Revoke(ctx, &auth.JWT{AccessToken: "token-0", Provider: "test"})
+
+	require.Error(t, err)
+	var appErr aerrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, aerrors.ErrUnknown, appErr.ErrorType)
+	assert.Equal(t, "revoke-token-failed", appErr.Key)
+}
+
+func startProviderServer(t *testing.T, bodyAssert func(url, body string)) *httptest.Server {
+	t.Helper()
+
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		status := 500
+		if bodyAssert != nil {
+			body, err := io.ReadAll(r.Body)
+			assert.NoError(t, err)
+
+			bodyAssert(r.RequestURI, string(body))
+		}
 
 		if r.Method == http.MethodPost && strings.HasSuffix(r.RequestURI, "/auth") {
 			_, err := w.Write(test.ToJSON(t, auth.JWT{}))
 			assert.NoError(t, err)
 
-			status = 200
+			return
 		}
 
 		if r.Method == http.MethodPost && strings.HasSuffix(r.RequestURI, "/revoke") {
-			status = 200
+			w.WriteHeader(http.StatusOK)
+
+			return
 		}
 
-		if expectedBody != "" {
-			body, err := io.ReadAll(r.Body)
-			assert.NoError(t, err)
-			assert.Equal(t, expectedBody, string(body))
-		}
-
-		w.WriteHeader(status)
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
+}
+
+func NewTestProvider(cfg auth.ProviderCfg, client *http.Client) auth.OIDCProvider {
+	return auth.OIDCProvider{
+		Name:        "test",
+		AuthURL:     cfg.AuthURL,
+		TokenURL:    cfg.TokenURL,
+		RevokeURL:   cfg.RevokeURL,
+		RedirectURI: cfg.RedirectURI,
+		Client:      client,
+		ClientID:    cfg.ClientID,
+		Secret:      cfg.Secret,
+		Scopes:      cfg.Scopes,
+		Validate: func(ctx context.Context, token *auth.JWT, clientID string) (auth.Claim, error) {
+			return auth.NewClaim("1", "test@localhost"), nil
+		},
+	}
 }

@@ -2,111 +2,99 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
+	"log/slog"
+	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
 
-type RedirectURL struct {
-	URL   string
-	State string
-}
-
-// DecodeSession decode given base64 url encoded JSONWebToken.
-func DecodeSession(value string) (*JWT, error) {
-	jwt, err := decodeBase64[JWT](value)
-	if err != nil {
-		return nil, aerrors.NewInvalidInputError(err, "invalid-session", "invalid session value")
-	}
-
-	return jwt, nil
-}
-
-type JWT struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	IDToken      string `json:"id_token"`
-	Scope        string `json:"scope"`
-	Type         string `json:"token_type"`
-	Provider     string `json:"provider"`
-	ExpiresIn    int64  `json:"expires_in"`
-}
-
-func (t *JWT) Encode() (string, error) {
-	s, err := encodeBase64(t)
-	if err != nil {
-		return "", aerrors.NewUnknownError(err, "unable-to-encode-token")
-	}
-
-	return s, nil
-}
-
-type Claims struct {
+// User represents an authenticated user.
+type User struct {
 	ID    string
 	Email string
 }
 
-func NewClaims(id, email string) Claims {
-	return Claims{ID: id, Email: email}
+// NewUser creates a new User.
+func NewUser(id string) User {
+	return User{ID: id}
 }
 
-func New(cfg Config, providers Providers) *AuthFlowService {
-	return &AuthFlowService{
-		provider: providers,
-		cfg:      cfg,
-	}
+func (u User) WithEmail(email string) User {
+	u.Email = email
+
+	return u
+}
+
+func (u User) Valid() bool {
+	return strings.TrimSpace(u.ID) != ""
+}
+
+type Generator interface {
+	Generate() ([]byte, error)
 }
 
 type AuthFlowService struct {
 	provider Providers
-	cfg      Config
+	gen      Generator
+	log      *slog.Logger
 }
 
-func (s *AuthFlowService) AuthURL(provider string) (RedirectURL, error) {
-	p, err := s.provider.Find(provider)
-	if err != nil {
-		return RedirectURL{}, aerrors.NewInvalidInputError(err, "auth-url-provider-not-found", "provider not found")
+func New(gen Generator, providers Providers) *AuthFlowService {
+	return &AuthFlowService{
+		provider: providers,
+		gen:      gen,
+		log:      slog.Default(),
 	}
-
-	encodedState, err := encodeBase64(p.GenerateState())
-	if err != nil {
-		return RedirectURL{}, aerrors.NewInvalidInputError(err, "invalid-state", "invalid state value")
-	}
-
-	return RedirectURL{
-		URL:   p.GetAuthURL(encodedState),
-		State: encodedState,
-	}, nil
 }
 
-func (s *AuthFlowService) Authenticate(ctx context.Context, provider string, authCode string) (Claims, *JWT, error) {
+func (s *AuthFlowService) AuthURL(provider string) (string, State, error) {
 	p, err := s.provider.Find(provider)
 	if err != nil {
-		return Claims{}, nil, aerrors.NewInvalidInputError(err, "authenticate-provider-not-found", "provider not found")
+		return "", State{}, aerrors.NewInvalidInputError(err, "auth-url-provider-not-found", "provider not found")
 	}
 
-	claims, jwtToken, err := p.ExchangeCode(ctx, authCode)
+	rawState, err := s.gen.Generate()
 	if err != nil {
-		return Claims{}, nil, aerrors.NewUnknownError(err, "exchange-code-failed")
+		return "", State{}, aerrors.NewUnknownError(err, "auth-url-state")
 	}
 
-	return claims, jwtToken, nil
+	rawVerifier, err := s.gen.Generate()
+	if err != nil {
+		return "", State{}, aerrors.NewUnknownError(err, "auth-url-verifier")
+	}
+
+	state := State{
+		Value:    base64.RawURLEncoding.EncodeToString(rawState),
+		Verifier: base64.RawURLEncoding.EncodeToString(rawVerifier),
+	}
+
+	return p.GetAuthURL(state.Value, state.Verifier), state, nil
 }
 
-func (s *AuthFlowService) AuthInfo(ctx context.Context, provider string, token *JWT) (Claims, error) {
+func (s *AuthFlowService) Authenticate(ctx context.Context, provider, authCode, verifier string) (*JWT, User, error) {
 	p, err := s.provider.Find(provider)
 	if err != nil {
-		return Claims{}, aerrors.NewInvalidInputError(err, "auth-info-provider-not-found", "provider not found")
+		return nil, User{}, aerrors.NewInvalidInputError(err, "authenticate-provider-not-found", "provider not found")
+	}
+
+	token, err := p.ExchangeCode(ctx, authCode, verifier)
+	if err != nil {
+		return nil, User{}, aerrors.NewUnknownError(err, "exchange-code-failed")
 	}
 
 	claims, err := p.ValidateToken(ctx, token)
 	if err != nil {
-		return Claims{}, aerrors.NewUnknownError(err, "validate-token-failed")
+		return nil, User{}, aerrors.NewUnknownError(err, "validate-token-failed")
 	}
 
-	return claims, nil
+	return token, User{
+		ID:    claims.UserID,
+		Email: claims.Email,
+	}, nil
 }
 
-func (s *AuthFlowService) Logout(ctx context.Context, token *JWT) error {
+func (s *AuthFlowService) Revoke(ctx context.Context, token *JWT) error {
 	p, err := s.provider.Find(token.Provider)
 	if err != nil {
 		return aerrors.NewInvalidInputError(err, "revoke-token-provider-not-found", "provider not found")

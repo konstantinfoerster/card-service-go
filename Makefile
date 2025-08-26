@@ -13,8 +13,10 @@ build:
 .PHONY: docker
 docker-build:
 	docker build --build-arg RELEASE="$(VERSION)" -t card-service:$(VERSION) -f build/opencv.Dockerfile .
+.PHONY: docker-run
 docker-run: docker
 	docker run -it --rm -v ./configs:/config card-service:$(VERSION)
+.PHONY: test-unit
 test-unit:
 	go test --short --count=1 ./...
 .PHONY: test
@@ -24,6 +26,7 @@ test:
 update:
 	go get -u ./...
 	go mod tidy
+.PHONY: lint
 lint:
 	docker run --pull always --rm -v $(CURRENT_DIR)\:/app -w /app golangci/golangci-lint\:latest golangci-lint run -v
 	docker run --pull always --rm -i hadolint/hadolint < build/Dockerfile

@@ -22,28 +22,28 @@ func googleProvider(client *http.Client) (OIDCProvider, error) {
 	}
 
 	return OIDCProvider{
-		name:      "google",
-		authURL:   "https://accounts.google.com/o/oauth2/auth",
-		tokenURL:  "https://accounts.google.com/o/oauth2/token",
-		revokeURL: "https://oauth2.googleapis.com/revoke",
-		client:    client,
-		clientID:  "",
-		secret:    "",
-		scope:     "openid email",
-		validate: func(ctx context.Context, token *JWT, clientID string) (Claims, error) {
+		Name:      "google",
+		AuthURL:   "https://accounts.google.com/o/oauth2/auth",
+		TokenURL:  "https://accounts.google.com/o/oauth2/token",
+		RevokeURL: "https://oauth2.googleapis.com/revoke",
+		Client:    client,
+		ClientID:  "",
+		Secret:    "",
+		Scopes:    []string{"openid", "email"},
+		Validate: func(ctx context.Context, token *JWT, clientID string) (Claim, error) {
 			if token == nil {
-				return Claims{}, errEmptyToken
+				return Claim{}, errEmptyToken
 			}
 			payload, err := validator.Validate(ctx, token.IDToken, clientID)
 			if err != nil {
-				return Claims{}, fmt.Errorf("id token validation failed with %w", err)
+				return Claim{}, fmt.Errorf("id token validation failed with %w", err)
 			}
 			cEmail := payload.Claims["email"]
 			cSub := payload.Claims["sub"]
 
 			id, ok := cSub.(string)
 			if !ok {
-				return Claims{}, fmt.Errorf("claims.sub is not a string but %T, %w", cSub, errValidateGoogle)
+				return Claim{}, fmt.Errorf("claims.sub is not a string but %T, %w", cSub, errValidateGoogle)
 			}
 
 			email := ""
@@ -51,11 +51,11 @@ func googleProvider(client *http.Client) (OIDCProvider, error) {
 				var ok bool
 				email, ok = cEmail.(string)
 				if !ok {
-					return Claims{}, fmt.Errorf("claims.email is not a string but %T, %w", cEmail, errValidateGoogle)
+					return Claim{}, fmt.Errorf("claims.email is not a string but %T, %w", cEmail, errValidateGoogle)
 				}
 			}
 
-			return NewClaims(id, email), nil
+			return NewClaim(id, email), nil
 		},
 	}, nil
 }

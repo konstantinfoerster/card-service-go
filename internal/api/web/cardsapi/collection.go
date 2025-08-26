@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
+	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
@@ -21,7 +22,7 @@ func CollectionRoutes(r fiber.Router, auth web.AuthMiddleware, cSvc CollectionSe
 
 func searchInPersonalCollection(svc CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		user, err := web.UserFromCtx(c)
+		user, err := auth.UserFromCtx(c)
 		if err != nil {
 			return aerrors.NewAuthorizationError(err, "unauthorized")
 		}
@@ -58,7 +59,7 @@ func searchInPersonalCollection(svc CollectionService) fiber.Handler {
 
 func collect(svc CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		user, err := web.UserFromCtx(c)
+		user, err := auth.UserFromCtx(c)
 		if err != nil {
 			return aerrors.NewAuthorizationError(err, "unauthorized")
 		}

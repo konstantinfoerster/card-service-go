@@ -1,7 +1,5 @@
 package aerrors
 
-import "github.com/pkg/errors"
-
 type ErrorType struct {
 	t string
 }
@@ -22,7 +20,7 @@ type AppError struct {
 
 func NewAuthorizationError(err error, key string) AppError {
 	return AppError{
-		Cause:     errors.WithStack(err),
+		Cause:     err,
 		Key:       key,
 		ErrorType: ErrAuthorization,
 	}
@@ -30,7 +28,7 @@ func NewAuthorizationError(err error, key string) AppError {
 
 func NewInvalidInputError(err error, key string, msg string) AppError {
 	return AppError{
-		Cause:     errors.WithStack(err),
+		Cause:     err,
 		Key:       key,
 		Msg:       msg,
 		ErrorType: ErrInvalidInput,
@@ -38,12 +36,12 @@ func NewInvalidInputError(err error, key string, msg string) AppError {
 }
 
 func NewInvalidInputMsg(key string, msg string) AppError {
-	return NewInvalidInputError(errors.New(msg), key, msg)
+	return NewInvalidInputError(nil, key, msg)
 }
 
 func NewNotFoundError(err error, key string) AppError {
 	return AppError{
-		Cause:     errors.WithStack(err),
+		Cause:     err,
 		Key:       key,
 		ErrorType: ErrNotFound,
 	}
@@ -51,7 +49,7 @@ func NewNotFoundError(err error, key string) AppError {
 
 func NewUnknownError(err error, key string) AppError {
 	return AppError{
-		Cause:     errors.WithStack(err),
+		Cause:     err,
 		Key:       key,
 		ErrorType: ErrUnknown,
 	}
