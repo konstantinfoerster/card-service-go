@@ -8,7 +8,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
@@ -16,14 +15,16 @@ type DetectService interface {
 	Detect(ctx context.Context, collector cards.Collector, in io.Reader) (cards.Matches, error)
 }
 
-func DetectRoutes(r fiber.Router, auth web.AuthMiddleware, detectSvc DetectService) {
-	r.Post("/detect", auth.Relaxed(), Detect(detectSvc))
+func DetectRoutes(r fiber.Router, cfg web.Auth, detectSvc DetectService) {
+	authHandler := web.NewMiddleware(cfg, web.AllowUnauthorized())
+
+	r.Post("/detect", authHandler, Detect(detectSvc))
 }
 
 func Detect(svc DetectService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// when user is not set, the user specific collection data won't be loaded
-		user, _ := auth.UserFromCtx(c)
+		user, _ := web.UserFromCtx(c)
 
 		fHeader, err := c.FormFile("file")
 		if err != nil {
@@ -36,7 +37,7 @@ func Detect(svc DetectService) fiber.Handler {
 		}
 		defer aio.Close(file)
 
-		result, err := svc.Detect(c.Context(), asCollector(user), file)
+		result, err := svc.Detect(c.Context(), asCollector(user.ID), file)
 		if err != nil {
 			return err
 		}

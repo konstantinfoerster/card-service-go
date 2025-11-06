@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
@@ -202,6 +201,6 @@ func (a Amount) Print() string {
 	return fmt.Sprintf("%02d", a.Value())
 }
 
-func asCollector(u auth.User) cards.Collector {
-	return cards.NewCollector(u.ID)
+func asCollector(userID string) cards.Collector {
+	return cards.NewCollector(userID)
 }

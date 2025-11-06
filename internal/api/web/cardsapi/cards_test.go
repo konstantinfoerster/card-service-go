@@ -1,17 +1,13 @@
 package cardsapi_test
 
 import (
-	"encoding/gob"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/session"
-	fibermemory "github.com/gofiber/storage/memory/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
@@ -261,7 +257,7 @@ func TestSearchWithUser(t *testing.T) {
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/cards?name=Demonic"),
-				test.WithSession("validSessionID"),
+				test.WithUser("myuser"),
 				test.WithHeader(tc.header),
 			)
 
@@ -276,12 +272,11 @@ func TestSearchWithUser(t *testing.T) {
 	}
 }
 
-func TestSearch_UnknownSession_NoCollectActions(t *testing.T) {
+func TestSearch_UserNotLoggedIn_NoCollectActions(t *testing.T) {
 	srv := searchServer(t)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodGet),
 		test.WithURL("http://localhost/cards?name=Demonic"),
-		test.WithSession("unknown"),
 		test.WithHeader(map[string]string{
 			web.HeaderHTMXRequest: "true",
 		}),
@@ -349,7 +344,7 @@ func TestDetail(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithSession("validSessionID")
+				return test.WithUser("myuser")
 			},
 			cardID:              "Y2FyZD01ODImZmFjZT01ODI=", // 582
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -374,7 +369,7 @@ func TestDetail(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithSession("validSessionID")
+				return test.WithUser("myuser")
 			},
 			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -510,7 +505,7 @@ func TestPrints(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithSession("validSessionID")
+				return test.WithUser("myuser")
 			},
 			cardID:              "Y2FyZD01ODImZmFjZT01ODI=", // 582
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -531,7 +526,7 @@ func TestPrints(t *testing.T) {
 				web.HeaderHTMXRequest: "true",
 			},
 			user: func() test.RequestOpt {
-				return test.WithSession("validSessionID")
+				return test.WithUser("myuser")
 			},
 			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
 			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
@@ -571,8 +566,6 @@ func TestPrints(t *testing.T) {
 	}
 }
 func searchServer(t *testing.T) *web.Server {
-	srv := web.NewTestServer()
-
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 
@@ -585,7 +578,7 @@ func searchServer(t *testing.T) *web.Server {
 	item5, err := cards.NewCollectable(cards.NewID(582), 3)
 	require.NoError(t, err)
 
-	loggedInUser := auth.NewUser("myuser")
+	loggedInUser := web.NewUser("myuser")
 	collected := map[string][]cards.Collectable{
 		loggedInUser.ID: {item1, item2, item4, item5},
 	}
@@ -595,17 +588,9 @@ func searchServer(t *testing.T) *web.Server {
 
 	searchSvc := cards.NewCardService(repo)
 
-	gob.Register(auth.User{})
-	cfg := session.Config{
-		KeyLookup: "cookie:SESSION",
-		Storage:   fibermemory.New(),
-	}
-	err = cfg.Storage.Set("validSessionID", test.AsSessionData(t, auth.UserContextKey, loggedInUser), 0)
-	require.NoError(t, err)
-
-	store := session.New(cfg)
+	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.SearchRoutes(r.Group("/"), web.NewAuthMiddleware(store), searchSvc)
+		cardsapi.SearchRoutes(r.Group("/"), srv.Cfg.Auth, searchSvc)
 	})
 
 	return srv

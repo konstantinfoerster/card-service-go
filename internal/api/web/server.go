@@ -14,13 +14,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -39,11 +37,11 @@ func NewTestServer() *Server {
 	currentDir := path.Join(path.Dir(cf))
 
 	cfg := Config{
-		Cookie: Cookie{
-			EncryptionKey: test.CookieEncryptionKey,
-			Except:        []string{"SESSION"},
-		},
 		TemplateDir: path.Join(currentDir, "../../../views"),
+		Auth: Auth{
+			HeaderUserID:    "X-Auth-Request-User",
+			HeaderUserEmail: "X-Auth-Request-Email",
+		},
 	}
 
 	return NewServer(cfg)
@@ -90,10 +88,6 @@ func NewServer(cfg Config) *Server {
 
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: false,
-	}))
-	app.Use(encryptcookie.New(encryptcookie.Config{
-		Key:    cfg.Cookie.EncryptionKey,
-		Except: cfg.Cookie.Except,
 	}))
 	// FIXME: can be removed after switching to htmx
 	app.Use(cors.New(cors.Config{

@@ -1,11 +1,10 @@
-package auth
+package web
 
 import (
 	"errors"
-	"log/slog"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
 
@@ -18,6 +17,27 @@ var (
 
 const UserContextKey = "session_user"
 
+// User represents an authenticated user.
+type User struct {
+	ID    string
+	Email string
+}
+
+// NewUser creates a new User.
+func NewUser(id string) User {
+	return User{ID: id}
+}
+
+func (u User) WithEmail(email string) User {
+	u.Email = email
+
+	return u
+}
+
+func (u User) Valid() bool {
+	return strings.TrimSpace(u.ID) != ""
+}
+
 // UserFromCtx returns an authenticated User or an ErrNoUserInContext if there is no user.
 func UserFromCtx(ctx *fiber.Ctx) (User, error) {
 	u, ok := ctx.Locals(UserContextKey).(User)
@@ -29,31 +49,22 @@ func UserFromCtx(ctx *fiber.Ctx) (User, error) {
 }
 
 type MiddlewareConfig struct {
-	// extractor defines how the session is extracted from the request
+	// extractor defines how the user data is extracted from the request
 	extractor func(*fiber.Ctx) (User, error)
-	// AllowEmptyCookie allows unauthenticated access if true
-	AllowEmptyCookie bool
+	// AllowUnauthorized allows unauthenticated access if true
+	AllowUnauthorized bool
 }
 
 type MiddlewareOpt func(*MiddlewareConfig)
 
-func NewMiddleware(store *session.Store, opts ...MiddlewareOpt) fiber.Handler {
+func NewMiddleware(cfg Auth, opts ...MiddlewareOpt) fiber.Handler {
 	c := MiddlewareConfig{
 		extractor: func(c *fiber.Ctx) (User, error) {
-			sess, err := store.Get(c)
-			if err != nil {
-				slog.Error("failed to get session from store", slog.Any("error", err))
+			user := NewUser(c.Get(cfg.HeaderUserID)).
+				WithEmail(c.Get(cfg.HeaderUserEmail))
 
-				return User{}, errors.Join(ErrInvalidSession, err)
-			}
-
-			if sess.Fresh() {
-				return User{}, ErrInvalidSession
-			}
-
-			user, ok := sess.Get(UserContextKey).(User)
-			if !ok {
-				return User{}, ErrNoUserInContext
+			if cfg.TestMode {
+				user = NewUser(cfg.UserID).WithEmail(cfg.UserEmail)
 			}
 
 			if !user.Valid() {
@@ -77,7 +88,7 @@ func NewMiddleware(store *session.Store, opts ...MiddlewareOpt) fiber.Handler {
 
 func AllowUnauthorized() MiddlewareOpt {
 	return func(c *MiddlewareConfig) {
-		c.AllowEmptyCookie = true
+		c.AllowUnauthorized = true
 	}
 }
 
@@ -94,7 +105,7 @@ func newExtractHandler(config ...MiddlewareConfig) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, err := cfg.extractor(c)
 		if err != nil {
-			if cfg.AllowEmptyCookie {
+			if cfg.AllowUnauthorized {
 				return c.Next()
 			}
 

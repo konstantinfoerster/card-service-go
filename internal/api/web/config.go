@@ -4,10 +4,10 @@ import "fmt"
 
 type Config struct {
 	Host        string `yaml:"host"`
-	Cookie      Cookie `yaml:"cookie"`
-	TemplateDir string `yaml:"template_path"`
-	TLS         TLS    `yaml:"tls"`
 	Port        int    `yaml:"port"`
+	TLS         TLS    `yaml:"tls"`
+	Auth        Auth   `yaml:"auth"`
+	TemplateDir string `yaml:"template_path"`
 }
 
 func (c Config) Addr() string {
@@ -30,4 +30,14 @@ type Cookie struct {
 	EncryptionKey string `yaml:"encryption_key"`
 	// Except cookies that should not be encrypted
 	Except []string `yaml:"except"`
+}
+
+type Auth struct {
+	LoginURL        string `yaml:"login_url"`
+	LogoutURL       string `yaml:"logout_url"`
+	HeaderUserID    string `yaml:"header_user_id"`
+	HeaderUserEmail string `yaml:"header_user_email"`
+	TestMode        bool   `yaml:"test_mode"`
+	UserID          string `yaml:"user_id"`
+	UserEmail       string `yaml:"user_email"`
 }

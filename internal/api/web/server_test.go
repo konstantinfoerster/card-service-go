@@ -62,27 +62,6 @@ func TestNewServerErrorHandler(t *testing.T) {
 	}
 }
 
-func TestNewServerCookieEncryption(t *testing.T) {
-	srv := web.NewTestServer()
-	srv.RegisterRoutes(func(app fiber.Router) {
-		app.Get("/", func(c *fiber.Ctx) error {
-			c.Cookie(&fiber.Cookie{
-				Name:  "TEST",
-				Value: "myValue",
-			})
-
-			return nil
-		})
-	})
-	req := httptest.NewRequest(web.MethodGet, "https://localhost/", nil)
-
-	resp, err := srv.Test(req)
-	defer test.Close(t, resp)
-
-	require.NoError(t, err)
-	assert.NotEqual(t, "myValue", resp.Cookies()[0].Value)
-}
-
 func TestNewServerShutdownOnInteruptSignal(t *testing.T) {
 	srv := web.NewTestServer()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -6,7 +6,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
@@ -15,14 +14,16 @@ type CollectionService interface {
 	Collect(ctx context.Context, item cards.Collectable, c cards.Collector) (cards.Collectable, error)
 }
 
-func CollectionRoutes(r fiber.Router, auth web.AuthMiddleware, cSvc CollectionService) {
-	r.Get("/mycards", auth.Required(), searchInPersonalCollection(cSvc))
-	r.Post("/mycards", auth.Required(), collect(cSvc))
+func CollectionRoutes(r fiber.Router, cfg web.Auth, cSvc CollectionService) {
+	authHandler := web.NewMiddleware(cfg)
+
+	r.Get("/mycards", authHandler, searchInPersonalCollection(cfg, cSvc))
+	r.Post("/mycards", authHandler, collect(cSvc))
 }
 
-func searchInPersonalCollection(svc CollectionService) fiber.Handler {
+func searchInPersonalCollection(cfg web.Auth, svc CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		user, err := auth.UserFromCtx(c)
+		user, err := web.UserFromCtx(c)
 		if err != nil {
 			return aerrors.NewAuthorizationError(err, "unauthorized")
 		}
@@ -50,7 +51,7 @@ func searchInPersonalCollection(svc CollectionService) fiber.Handler {
 				return web.RenderPartial(c, "card_list", data)
 			}
 
-			return web.RenderPage(c, "mycards", data)
+			return web.RenderPage(c, cfg, "mycards", data)
 		}
 
 		return web.RenderJSON(c, pagedResult)
@@ -59,7 +60,7 @@ func searchInPersonalCollection(svc CollectionService) fiber.Handler {
 
 func collect(svc CollectionService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		user, err := auth.UserFromCtx(c)
+		user, err := web.UserFromCtx(c)
 		if err != nil {
 			return aerrors.NewAuthorizationError(err, "unauthorized")
 		}

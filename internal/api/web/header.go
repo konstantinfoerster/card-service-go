@@ -18,6 +18,8 @@ const StatusInternalServerError = http.StatusInternalServerError
 
 const HeaderHTMXRequest = "HX-Request"
 const HeaderHTMXRefresh = "HX-Redirect"
+const HeaderUserID = "X-Auth-Request-User"
+const HeaderUserEmail = "X-Auth-Request-Email"
 
 // IsHTMX true if the request is a HTMX request, false otherwise.
 func IsHTMX(c *fiber.Ctx) bool {

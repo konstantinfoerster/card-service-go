@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/gob"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -12,13 +10,9 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/session"
-	"github.com/gofiber/storage/memory/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
-	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
@@ -92,13 +86,6 @@ func run(cfg config.Config) error {
 	}
 	defer aio.Close(dbCon)
 
-	oidcProvider, err := auth.FromConfiguration(cfg.Auth)
-	if err != nil {
-		return fmt.Errorf("failed to load oidc provider, %w", err)
-	}
-
-	randSvc := auth.NewRandomGenerator()
-	authSvc := auth.New(randSvc, oidcProvider)
 	detector := imaging.NewDetector()
 
 	cardRepo := postgres.NewCardRepository(dbCon, cfg.Images)
@@ -110,41 +97,13 @@ func run(cfg config.Config) error {
 	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
 	detectSvc := cards.NewDetectService(cardRepo, detectRep, detector)
 
-	store := memory.New()
-	sessConfig := session.Config{
-		Expiration:        cfg.Auth.Session.ExpiresIn,
-		KeyLookup:         "cookie:" + cfg.Auth.Session.Name,
-		CookieSecure:      true,
-		CookieHTTPOnly:    true,
-		CookieSessionOnly: false,
-		CookieSameSite:    fiber.CookieSameSiteStrictMode,
-		CookiePath:        cfg.Auth.Session.Path,
-		CookieDomain:      cfg.Auth.Session.Domain,
-		Storage:           store,
-		KeyGenerator: func() string {
-			v, err := randSvc.Generate()
-			if err != nil {
-				panic(fmt.Sprintf("random generation failed due to %v", err))
-			}
-
-			return hex.EncodeToString(v)
-		},
-	}
-	// custom type stored in session store
-	gob.Register(auth.User{})
-	sessionStore := session.New(sessConfig)
-	authMiddleware := web.NewAuthMiddleware(sessionStore)
 	srv := web.NewServer(cfg.Server).RegisterRoutes(func(r fiber.Router) {
 		r.Static("/public", "./public")
 
-		cardsapi.DashboardRoutes(r, authMiddleware)
-		cardsapi.SearchRoutes(r, authMiddleware, cardSvc)
-		cardsapi.CollectionRoutes(r, authMiddleware, collectSvc)
-		cardsapi.DetectRoutes(r, authMiddleware, detectSvc)
-
-		apiV1 := r.Group("/api").Group("/v1")
-
-		loginapi.Routes(apiV1, sessionStore, authMiddleware, cfg.Auth, authSvc)
+		cardsapi.DashboardRoutes(r, cfg.Server.Auth)
+		cardsapi.SearchRoutes(r, cfg.Server.Auth, cardSvc)
+		cardsapi.CollectionRoutes(r, cfg.Server.Auth, collectSvc)
+		cardsapi.DetectRoutes(r, cfg.Server.Auth, detectSvc)
 	})
 
 	errg, ctx := errgroup.WithContext(context.Background())

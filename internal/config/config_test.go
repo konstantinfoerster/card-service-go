@@ -2,7 +2,6 @@ package config_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"github.com/stretchr/testify/assert"
@@ -15,16 +14,13 @@ func TestNewConfig_Defaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, cfg.Server.Port)
 	assert.NotEmpty(t, cfg.Server.TemplateDir)
+	assert.NotEmpty(t, cfg.Server.Auth.HeaderUserID)
+	assert.NotEmpty(t, cfg.Server.Auth.HeaderUserEmail)
+	assert.NotEmpty(t, cfg.Server.Auth.LoginURL)
+	assert.NotEmpty(t, cfg.Server.Auth.LogoutURL)
+	assert.False(t, cfg.Server.Auth.TestMode)
 	assert.NotEmpty(t, cfg.Probes.Port)
 	assert.NotEmpty(t, cfg.Logging.Level)
-
-	assert.NotEmpty(t, cfg.Auth.Session.Name)
-	assert.NotEmpty(t, cfg.Auth.Session.SameSite)
-	assert.Greater(t, cfg.Auth.Session.ExpiresIn, time.Second)
-
-	assert.NotEmpty(t, cfg.Auth.State.Name)
-	assert.NotEmpty(t, cfg.Auth.State.SameSite)
-	assert.Greater(t, cfg.Auth.State.ExpiresIn, time.Second)
 }
 
 func TestNewConfig_OverwriteDefaults(t *testing.T) {
@@ -33,13 +29,10 @@ func TestNewConfig_OverwriteDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "trace", cfg.Logging.Level)
 
-	assert.Equal(t, "SESSION_TEST", cfg.Auth.Session.Name)
-	assert.Equal(t, "none", cfg.Auth.Session.SameSite)
-	assert.Equal(t, 2*time.Hour, cfg.Auth.Session.ExpiresIn)
-
-	assert.Equal(t, "STATE_TEST", cfg.Auth.State.Name)
-	assert.Equal(t, "none", cfg.Auth.State.SameSite)
-	assert.Equal(t, 2*time.Minute, cfg.Auth.State.ExpiresIn)
+	assert.Equal(t, "X-my-userid", cfg.Server.Auth.HeaderUserID)
+	assert.Equal(t, "X-my-useremail", cfg.Server.Auth.HeaderUserEmail)
+	assert.Equal(t, "https://localhost/oidc/login", cfg.Server.Auth.LoginURL)
+	assert.Equal(t, "https://localhost/oidc/logout", cfg.Server.Auth.LogoutURL)
 }
 
 func TestNewConfig_NotAFile(t *testing.T) {

@@ -2,12 +2,10 @@
 logging:
   level: trace
 
-auth:
-  session:
-    name: SESSION_TEST
-    same_site: none
-    expires_in: 120m
-  state:
-    name: STATE_TEST
-    same_site: none
-    expires_in: 2m
+server:
+  auth:
+    header_user_id: "X-my-userid"
+    header_user_email: "X-my-useremail"
+    test_mode: true
+    login_url: "https://localhost/oidc/login"
+    logout_url: "https://localhost/oidc/logout"

@@ -16,6 +16,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
+	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,13 +139,10 @@ func WithHeader(header map[string]string) RequestOpt {
 	}
 }
 
-func WithSession(value string) RequestOpt {
-	return func(req *httpRequest) {
-		req.cookies = append(req.cookies, &http.Cookie{
-			Name:  "SESSION",
-			Value: value,
-		})
-	}
+func WithUser(value string) RequestOpt {
+	return WithHeader(map[string]string{
+		web.HeaderUserID: value,
+	})
 }
 
 func WithEncryptedCookie(t *testing.T, name, value string) RequestOpt {

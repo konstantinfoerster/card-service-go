@@ -2,17 +2,13 @@ package cardsapi_test
 
 import (
 	"context"
-	"encoding/gob"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/session"
-	fibermemory "github.com/gofiber/storage/memory/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
@@ -165,7 +161,7 @@ func TestSearchCollected(t *testing.T) {
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/mycards?name=Domonic&"+tc.page),
-				test.WithSession("validSessionID"),
+				test.WithUser("myuser"),
 				test.WithHeader(tc.header),
 			)
 
@@ -235,7 +231,7 @@ func TestCollectItemAdd(t *testing.T) {
 			req := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithSession("validSessionID"),
+				test.WithUser("myuser"),
 				test.WithHeader(tc.header),
 				test.WithJSONBody(t, cardsapi.NewItem(cards.NewID(12406), tc.amount)),
 			)
@@ -283,7 +279,7 @@ func TestCollectItemRemove(t *testing.T) {
 			reqAdd := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithSession("validSessionID"),
+				test.WithUser("myuser"),
 				test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0xMjQwNg==", Amount: 1}),
 			)
 			respAdd, _ := srv.Test(reqAdd)
@@ -292,7 +288,7 @@ func TestCollectItemRemove(t *testing.T) {
 			reqRemove := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
-				test.WithSession("validSessionID"),
+				test.WithUser("myuser"),
 				test.WithHeader(tc.header),
 				test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0xMjQwNg==", Amount: 0}),
 			)
@@ -331,7 +327,7 @@ func collectionServer(t *testing.T) *web.Server {
 
 	collectSvc := cards.NewCollectionService(repo)
 
-	loggedInUser := auth.NewUser("myuser")
+	loggedInUser := web.NewUser("myuser")
 	collector := cards.NewCollector(loggedInUser.ID)
 	ctx := context.Background()
 	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11434), Amount: 1}, collector)
@@ -341,18 +337,9 @@ func collectionServer(t *testing.T) *web.Server {
 	_, err = collectSvc.Collect(ctx, cards.Collectable{ID: cards.NewID(11706), Amount: 3}, collector)
 	require.NoError(t, err)
 
-	gob.Register(auth.User{})
-	cfg := session.Config{
-		KeyLookup: "cookie:SESSION",
-		Storage:   fibermemory.New(),
-	}
-	err = cfg.Storage.Set("validSessionID", test.AsSessionData(t, auth.UserContextKey, loggedInUser), 0)
-	require.NoError(t, err)
-
-	store := session.New(cfg)
 	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.CollectionRoutes(r.Group("/"), web.NewAuthMiddleware(store), collectSvc)
+		cardsapi.CollectionRoutes(r.Group("/"), srv.Cfg.Auth, collectSvc)
 	})
 
 	return srv
