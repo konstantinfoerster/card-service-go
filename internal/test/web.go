@@ -2,9 +2,6 @@ package test
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -15,7 +12,6 @@ import (
 	"maps"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/stretchr/testify/require"
 )
@@ -145,53 +141,6 @@ func WithUser(value string) RequestOpt {
 	})
 }
 
-func WithEncryptedCookie(t *testing.T, name, value string) RequestOpt {
-	return func(req *httpRequest) {
-		v, err := encryptcookie.EncryptCookie(value, CookieEncryptionKey)
-		require.NoError(t, err)
-
-		req.cookies = append(req.cookies, &http.Cookie{
-			Name:  name,
-			Value: v,
-		})
-	}
-}
-
-func DecryptCookieValue(t *testing.T, value string) string {
-	t.Helper()
-
-	v, err := encryptcookie.DecryptCookie(value, CookieEncryptionKey)
-	require.NoError(t, err)
-
-	return v
-}
-
-func Base64Encoded(t *testing.T, value any) string {
-	t.Helper()
-
-	rawValue, err := json.Marshal(&value)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return base64.URLEncoding.EncodeToString(rawValue)
-}
-
-func AsSessionData(t *testing.T, id string, u any) []byte {
-	t.Helper()
-
-	data := map[string]any{id: u}
-	var bBuffer bytes.Buffer
-	if err := gob.NewEncoder(&bBuffer).Encode(&data); err != nil {
-		t.Fatal(err)
-	}
-
-	encodedBytes := make([]byte, bBuffer.Len())
-	copy(encodedBytes, bBuffer.Bytes())
-
-	return encodedBytes
-}
-
 func Close(t *testing.T, resp *http.Response) {
 	t.Helper()
 
@@ -225,10 +174,4 @@ func AssertContainsProfile(t *testing.T, val string) {
 	t.Helper()
 
 	require.Contains(t, val, "data-testid=\"user-profile-btn\"")
-}
-
-func AssertContainsLogin(t *testing.T, val string) {
-	t.Helper()
-
-	require.Contains(t, val, "data-testid=\"user-login-btn\"")
 }

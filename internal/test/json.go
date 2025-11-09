@@ -35,12 +35,3 @@ func ToString(t *testing.T, r io.Reader) string {
 
 	return string(body)
 }
-
-func ToBytes(t *testing.T, r io.Reader) []byte {
-	t.Helper()
-
-	body, err := io.ReadAll(r)
-	require.NoError(t, err)
-
-	return body
-}

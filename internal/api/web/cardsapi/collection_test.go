@@ -190,7 +190,7 @@ func TestSearchCollectedNoSession(t *testing.T) {
 	assert.Equal(t, web.StatusUnauthorized, resp.StatusCode)
 }
 
-func TestCollectItemAdd(t *testing.T) {
+func TestCollectItem_Add(t *testing.T) {
 	srv := collectionServer(t)
 	cases := []struct {
 		name                string
@@ -247,7 +247,7 @@ func TestCollectItemAdd(t *testing.T) {
 	}
 }
 
-func TestCollectItemRemove(t *testing.T) {
+func TestCollectItem_Remove(t *testing.T) {
 	srv := collectionServer(t)
 	cases := []struct {
 		name                string
@@ -304,7 +304,7 @@ func TestCollectItemRemove(t *testing.T) {
 	}
 }
 
-func TestCollectItemNoSession(t *testing.T) {
+func TestCollectItem_NotLoggedIn(t *testing.T) {
 	srv := collectionServer(t)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodPost),
@@ -339,7 +339,11 @@ func collectionServer(t *testing.T) *web.Server {
 
 	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.CollectionRoutes(r.Group("/"), srv.Cfg.Auth, collectSvc)
+		cfg := web.Auth{
+			HeaderUserID:    web.HeaderUserID,
+			HeaderUserEmail: web.HeaderUserEmail,
+		}
+		cardsapi.CollectionRoutes(r.Group("/"), cfg, collectSvc)
 	})
 
 	return srv

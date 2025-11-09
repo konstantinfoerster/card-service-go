@@ -154,7 +154,7 @@ func TestUserFromCtx(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUserFromCtxInvalidInput(t *testing.T) {
+func TestUserFromCtx_InvalidInput(t *testing.T) {
 	cases := []struct {
 		name    string
 		setUser func(c *fiber.Ctx)

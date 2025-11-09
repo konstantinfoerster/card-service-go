@@ -16,7 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func TestNewServerErrorHandler(t *testing.T) {
+func TestNewServer_ErrorHandler(t *testing.T) {
 	cases := []struct {
 		name       string
 		appErr     aerrors.AppError
@@ -62,7 +62,7 @@ func TestNewServerErrorHandler(t *testing.T) {
 	}
 }
 
-func TestNewServerShutdownOnInteruptSignal(t *testing.T) {
+func TestNewServer_ShutdownOnInteruptSignal(t *testing.T) {
 	srv := web.NewTestServer()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

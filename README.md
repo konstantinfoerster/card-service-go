@@ -3,11 +3,22 @@
 
 # Card-Manager in Go
 
-Web application that help you to manage your card collection.
+A web application that help you to manage your card collection.
+
+## Features
+
+- Search for cards
+- Add cards to your card-collection
+- Remove cards from you card-collection
+- Detect cards based on an uploaded card image
 
 ## Requirements
 
-- go version >= 1.23
+- go version >= 1.24
+- postgres
+- opencv4
+- make (optional)
+- docker (optional)
 
 ## Run locally
 
@@ -15,44 +26,38 @@ Run `go run cmd/main.go` to start the web application with the default configura
 
 Flags:
 
-| Flag            | Usage                              | Default Value            | Description                    |
-| --------------- | ---------------------------------- | ------------------------ | ------------------------------ |
-| `-c`,`--config` | `-c configs/application-prod.yaml` | configs/application.yaml | path to the configuration file |
+| Flag            | Usage                         | Default Value            | Description                    |
+| --------------- | ----------------------------- | ------------------------ | ------------------------------ |
+| `-c`,`--config` | `-c configs/application.yaml` | configs/application.yaml | path to the configuration file |
 
 ## Test
 
-- Run **all** tests with `go test -v ./...`
-- Run **unit tests** `go test -v -short ./...`
-- Run **integration tests** `go test -v -run Integration ./...`
+- Run **all** tests with `go test -v ./...` or `make test`
+- Run **unit tests** `go test -v -short ./...` or `make test-unit`
+- Run **integration tests** `go test -v -run Integration ./...` or `make test-it`
 
 **Integration tests** require **docker** to be installed.
 
 ## Build
 
-Build it with `go build -o card-service cmd/main.go`
-
-## Dependencies
-
-Update all dependencies with `go get -u ./...`. Run `go mod tidy` afterwards to update and cleanup the `go.mod` file.
-For mor information check: https://github.com/golang/go/wiki/Modules#how-to-upgrade-and-downgrade-dependencies
+Build it with `go build -o card-service cmd/main.go` (without detect functionality). To enable opencv integration you will need
+to install opencv4 on your local machine and then execute `CGO_ENABLED=1; go build -o card-service -tags opencv cmd/main.go` to build the application.
 
 ## Misc
 
-### Docker linting
+### Linting
 
-The linter [Hadolint](https://github.com/hadolint/hadolint) can be used to apply best practice on your Dockerfile.
+To run all linter just run `make lint` or check the steps below.
 
-Just run `docker run --pull always --rm -i hadolint/hadolint < build/Dockerfile` to check your Dockerfile.
+#### Code
 
-### Golang linting
-
-The lint aggregator [golangci-lint](https://golangci-lint.run/) can be used to apply best practice and find errors in
-your golang code.
+The lint aggregator [golangci-lint](https://golangci-lint.run/) can is used to apply best practice and find errors in this project.
 
 Just run `docker run --pull always --rm -v $(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -v`
 inside the root dir of the project to start the linting process.
 
-# TODOs
+#### Dockerfile
 
-- try testify suite
-- replace google oauth with golang.org/x/oauth2
+The linter [Hadolint](https://github.com/hadolint/hadolint) can be used to apply best practice on your Dockerfile.
+
+Just run `docker run --pull always --rm -i hadolint/hadolint < build/Dockerfile` to check your Dockerfile.

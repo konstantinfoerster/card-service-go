@@ -94,7 +94,7 @@ func TestSearch(t *testing.T) {
 			assertContent: func(t *testing.T, rBody io.Reader) {
 				body := test.ToString(t, rBody)
 				test.AssertContainsFullHTML(t, body)
-				test.AssertContainsLogin(t, body)
+				require.Contains(t, body, "data-testid=\"user-login-btn\"")
 				assert.Contains(t, body, "data-testid=\"search-result-txt\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-"), "expected 3 cards in %s", body)
 			},
@@ -170,7 +170,7 @@ func TestSearch(t *testing.T) {
 	}
 }
 
-func TestSearchWithUser(t *testing.T) {
+func TestSearch_LoggedIn(t *testing.T) {
 	srv := searchServer(t)
 	cases := []struct {
 		name                string
@@ -272,7 +272,7 @@ func TestSearchWithUser(t *testing.T) {
 	}
 }
 
-func TestSearch_UserNotLoggedIn_NoCollectActions(t *testing.T) {
+func TestSearch_NotLoggedIn_NoCollectActions(t *testing.T) {
 	srv := searchServer(t)
 	req := test.NewRequest(
 		test.WithMethod(web.MethodGet),
@@ -390,16 +390,16 @@ func TestDetail(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sessionOpt := tc.user
-			if sessionOpt == nil {
-				sessionOpt = func() test.RequestOpt { return nil }
+			userOpt := tc.user
+			if userOpt == nil {
+				userOpt = func() test.RequestOpt { return nil }
 			}
 
 			req := test.NewRequest(
 				test.WithMethod(web.MethodGet),
 				test.WithURLf("http://localhost/cards/%s", tc.cardID),
 				test.WithHeader(tc.header),
-				sessionOpt(),
+				userOpt(),
 			)
 
 			resp, err := srv.Test(req)
@@ -590,7 +590,11 @@ func searchServer(t *testing.T) *web.Server {
 
 	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.SearchRoutes(r.Group("/"), srv.Cfg.Auth, searchSvc)
+		cfg := web.Auth{
+			HeaderUserID:    web.HeaderUserID,
+			HeaderUserEmail: web.HeaderUserEmail,
+		}
+		cardsapi.SearchRoutes(r.Group("/"), cfg, searchSvc)
 	})
 
 	return srv

@@ -97,13 +97,16 @@ func run(cfg config.Config) error {
 	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
 	detectSvc := cards.NewDetectService(cardRepo, detectRep, detector)
 
-	srv := web.NewServer(cfg.Server).RegisterRoutes(func(r fiber.Router) {
-		r.Static("/public", "./public")
+	srv, err := web.NewServer(cfg.Server)
+	if err != nil {
+		return fmt.Errorf("failed to create web-server, %w", err)
+	}
 
-		cardsapi.DashboardRoutes(r, cfg.Server.Auth)
-		cardsapi.SearchRoutes(r, cfg.Server.Auth, cardSvc)
-		cardsapi.CollectionRoutes(r, cfg.Server.Auth, collectSvc)
-		cardsapi.DetectRoutes(r, cfg.Server.Auth, detectSvc)
+	srv.RegisterRoutes(func(r fiber.Router) {
+		cardsapi.DashboardRoutes(r, cfg.Auth)
+		cardsapi.SearchRoutes(r, cfg.Auth, cardSvc)
+		cardsapi.CollectionRoutes(r, cfg.Auth, collectSvc)
+		cardsapi.DetectRoutes(r, cfg.Auth, detectSvc)
 	})
 
 	errg, ctx := errgroup.WithContext(context.Background())

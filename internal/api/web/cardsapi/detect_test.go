@@ -114,7 +114,12 @@ func detectTestServer(t *testing.T) *web.Server {
 
 	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.DetectRoutes(r.Group("/"), srv.Cfg.Auth, svc)
+		cfg := web.Auth{
+			HeaderUserID:    web.HeaderUserID,
+			HeaderUserEmail: web.HeaderUserEmail,
+		}
+
+		cardsapi.DetectRoutes(r.Group("/"), cfg, svc)
 	})
 
 	return srv

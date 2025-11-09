@@ -3,11 +3,9 @@ package web
 import "fmt"
 
 type Config struct {
-	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
-	TLS         TLS    `yaml:"tls"`
-	Auth        Auth   `yaml:"auth"`
-	TemplateDir string `yaml:"template_path"`
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+	TLS  TLS    `yaml:"tls"`
 }
 
 func (c Config) Addr() string {

@@ -22,6 +22,7 @@ type Config struct {
 	Images   postgres.Images `yaml:"images"`
 	Server   web.Config      `yaml:"server"`
 	Probes   web.Config      `yaml:"probes"`
+	Auth     web.Auth        `yaml:"auth"`
 }
 
 type Logging struct {
@@ -41,18 +42,17 @@ func NewConfig(path string) (Config, error) {
 			Level: "info",
 		},
 		Server: web.Config{
-			TemplateDir: "./views",
-			Port:        3000,
-			Auth: web.Auth{
-				HeaderUserID:    web.HeaderUserID,
-				HeaderUserEmail: web.HeaderUserEmail,
-				TestMode:        false,
-				LoginURL:        "/login",
-				LogoutURL:       "/logout",
-			},
+			Port: 3000,
 		},
 		Probes: web.Config{
 			Port: 3001,
+		},
+		Auth: web.Auth{
+			HeaderUserID:    web.HeaderUserID,
+			HeaderUserEmail: web.HeaderUserEmail,
+			TestMode:        false,
+			LoginURL:        "/login",
+			LogoutURL:       "/logout",
 		},
 	}
 

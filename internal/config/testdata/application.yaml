@@ -3,9 +3,14 @@ logging:
   level: trace
 
 server:
-  auth:
-    header_user_id: "X-my-userid"
-    header_user_email: "X-my-useremail"
-    test_mode: true
-    login_url: "https://localhost/oidc/login"
-    logout_url: "https://localhost/oidc/logout"
+  port: 13000
+
+probes:
+  port: 13001
+
+auth:
+  header_user_id: "X-my-userid"
+  header_user_email: "X-my-useremail"
+  test_mode: true
+  login_url: "https://localhost/oidc/login"
+  logout_url: "https://localhost/oidc/logout"
