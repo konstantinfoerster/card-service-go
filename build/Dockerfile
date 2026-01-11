@@ -1,36 +1,34 @@
-FROM golang:1.24-alpine3.22 AS builder
+FROM golang:1.25-alpine3.23 AS builder
 
 WORKDIR /app
 
 # download go modules
 COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+RUN go mod download && go mod verify 
 
 # copy source files
 COPY . /app
 
 # build project
-ENV GOOS="linux"
-ENV GOARCH="amd64"
-ENV CGO_ENABLED="0"
+ENV GOOS="linux" \
+    GOARCH="amd64" \
+    CGO_ENABLED="0" 
 
-RUN go build -ldflags="-s -w" -o service cmd/main.go \
+RUN go build -tags timetzdata -ldflags="-s -w" -o service cmd/main.go \
       && chmod 0755 /app/service \
-      && go clean -modcache -cache
+      && go clean -modcache -cache 
 
-FROM alpine:3.22 AS dev
+FROM alpine:3.23 AS dev
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"
 
-COPY --from=builder /app/service /usr/bin/
+RUN addgroup -g 10001 nonroot \
+  && adduser -D -u 10001 -G nonroot nonroot 
 
-# hadolint ignore=DL3018
-RUN set -eux; \
-    apk add --no-progress --quiet --no-cache --upgrade \
-        tzdata
+COPY --from=builder --chown=nonroot:nonroot /app/service /usr/bin/
 
-USER nobody
+USER nonroot
 
 ENTRYPOINT ["/usr/bin/service"]
 CMD ["--config", "/config/application.yaml"]

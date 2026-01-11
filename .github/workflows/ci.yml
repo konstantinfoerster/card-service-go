@@ -5,8 +5,8 @@ on:
   pull_request:
 
 env:
-  GO_VERSION: '1.24.x'
-  GO_LINT_VERSION: 'v2.6'
+  GO_VERSION: '1.25.x'
+  GO_LINT_VERSION: 'v2.8'
 
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Set up Go version
       uses: actions/setup-go@v6
@@ -35,7 +35,7 @@ jobs:
       GO111MODULE: on
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Run Gosec
         uses: securego/gosec@master
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go version
         uses: actions/setup-go@v6
@@ -59,7 +59,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: ${{ env.GO_LINT_VERSION }}
           skip-cache: true
@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6

@@ -1,4 +1,4 @@
-FROM ghcr.io/hybridgroup/opencv:4.11.0
+FROM ghcr.io/hybridgroup/opencv:4.13.0
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"
@@ -7,22 +7,30 @@ WORKDIR /app
 
 # download go modules
 COPY go.mod go.sum ./
-RUN go mod download && go mod verify
+RUN go mod download && go mod verify 
 
 # copy source files
 COPY . /app
 
 # build project
-ENV GOOS="linux"
-ENV GOARCH="amd64"
-ENV CGO_ENABLED="1"
+ENV GOOS="linux" \
+    GOARCH="amd64" \
+    CGO_ENABLED="1"
 
-RUN go build -tags opencv -ldflags="-s -w" -o service cmd/main.go \
+RUN go build -tags opencv,timetzdata -ldflags="-s -w" -o service cmd/main.go \
       && chmod 0755 /app/service \
       && cp /app/service /usr/bin/service \
       && go clean -modcache -cache
 
-USER nobody
+RUN groupadd -g 10001 nonroot \
+      && useradd \
+          -u 10001 \
+          -g 10001 \
+          --create-home \
+          -s /usr/sbin/nologin \
+          nonroot
+
+USER nonroot
 
 ENTRYPOINT ["/usr/bin/service"]
 CMD ["--config", "/config/application.yaml"]
