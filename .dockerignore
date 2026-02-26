@@ -1,5 +1,6 @@
 .idea/
 .git/
 .github/
+build/
 configs/
 !configs/application.yaml

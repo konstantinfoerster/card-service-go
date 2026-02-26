@@ -15,8 +15,10 @@ type DetectService interface {
 	Detect(ctx context.Context, collector cards.Collector, in io.Reader) (cards.Matches, error)
 }
 
-func DetectRoutes(r fiber.Router, auth web.AuthMiddleware, detectSvc DetectService) {
-	r.Post("/detect", auth.Relaxed(), Detect(detectSvc))
+func DetectRoutes(r fiber.Router, cfg web.Auth, detectSvc DetectService) {
+	authHandler := web.NewMiddleware(cfg, web.AllowUnauthorized())
+
+	r.Post("/detect", authHandler, Detect(detectSvc))
 }
 
 func Detect(svc DetectService) fiber.Handler {
@@ -35,7 +37,7 @@ func Detect(svc DetectService) fiber.Handler {
 		}
 		defer aio.Close(file)
 
-		result, err := svc.Detect(c.Context(), asCollector(user), file)
+		result, err := svc.Detect(c.Context(), asCollector(user.ID), file)
 		if err != nil {
 			return err
 		}

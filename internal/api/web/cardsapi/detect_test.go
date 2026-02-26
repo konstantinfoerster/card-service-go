@@ -10,7 +10,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
@@ -21,13 +20,13 @@ import (
 )
 
 func TestDetect(t *testing.T) {
-	srv, provider := detectTestServer(t)
+	srv := detectTestServer(t)
 	four := 4
 	cases := []struct {
-		name       string
-		img        string
-		userCookie test.RequestOpt
-		expected   []cardsapi.Card
+		name     string
+		img      string
+		user     test.RequestOpt
+		expected []cardsapi.Card
 	}{
 		{
 			name: "match",
@@ -49,9 +48,7 @@ func TestDetect(t *testing.T) {
 		{
 			name: "match with user",
 			img:  "cardImageModified.jpg",
-			userCookie: test.WithEncryptedCookie(
-				t, "SESSION", test.Base64Encoded(t, provider.Token("myuser")),
-			),
+			user: test.WithUser("myuser"),
 			expected: []cardsapi.Card{
 				{
 					ID:     "Y2FyZD0xJmZhY2U9MQ==",
@@ -81,7 +78,7 @@ func TestDetect(t *testing.T) {
 			req := test.NewRequest(
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/detect"),
-				tc.userCookie,
+				tc.user,
 				test.WithMultipartFile(t, fImg, fImg.Name()),
 			)
 			resp, err := srv.Test(req)
@@ -97,9 +94,7 @@ func TestDetect(t *testing.T) {
 	}
 }
 
-func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
-	srv := web.NewTestServer()
-
+func detectTestServer(t *testing.T) *web.Server {
 	cfg := postgres.Images{Host: "testdata"}
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
@@ -107,23 +102,27 @@ func detectTestServer(t *testing.T) (*web.Server, *auth.FakeProvider) {
 	require.NoError(t, err)
 	item, err := cards.NewCollectable(cards.NewID(1), 1)
 	require.NoError(t, err)
+	loggedInUser := web.NewUser("myuser")
 	collected := map[string][]cards.Collectable{
-		"myuser": {item},
+		loggedInUser.ID: {item},
 	}
 	cRepo, err := memory.NewCardRepository(seed, collected)
 	require.NoError(t, err)
 
-	oCfg := auth.Config{}
-	validClaim := auth.NewClaims("myuser", "myUser")
-	provider := auth.NewFakeProvider(auth.WithClaims(validClaim))
-	authSvc := auth.New(oCfg, auth.NewProviders(provider))
 	detector := imaging.NewFakeDetector()
 	svc := cards.NewDetectService(cRepo, dRepo, detector)
+
+	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {
-		cardsapi.DetectRoutes(r.Group("/"), web.NewAuthMiddleware(oCfg, authSvc), svc)
+		cfg := web.Auth{
+			HeaderUserID:    web.HeaderUserID,
+			HeaderUserEmail: web.HeaderUserEmail,
+		}
+
+		cardsapi.DetectRoutes(r.Group("/"), cfg, svc)
 	})
 
-	return srv, provider
+	return srv
 }
 
 func currentDir() string {

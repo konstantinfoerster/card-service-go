@@ -2,26 +2,34 @@ package web
 
 import (
 	"context"
+	"embed"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os/signal"
-	"path"
-	"runtime"
 	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
 	"golang.org/x/sync/errgroup"
 )
+
+var (
+	ErrInitServer = errors.New("failed to initialize server")
+)
+
+//go:embed templates/* assets/*
+var embeddedFiles embed.FS
 
 type Server struct {
 	app     *fiber.App
@@ -31,20 +39,14 @@ type Server struct {
 }
 
 func NewTestServer() *Server {
-	_, cf, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("failed to get current dir")
-	}
-	currentDir := path.Join(path.Dir(cf))
+	cfg := Config{}
 
-	cfg := Config{
-		Cookie: Cookie{
-			EncryptionKey: "01234567890123456789012345678901",
-		},
-		TemplateDir: path.Join(currentDir, "../../../views"),
+	srv, err := NewServer(cfg)
+	if err != nil {
+		panic(err)
 	}
 
-	return NewServer(cfg)
+	return srv
 }
 
 func NewProbeServer(cfg Config,
@@ -71,8 +73,12 @@ func NewProbeServer(cfg Config,
 	}
 }
 
-func NewServer(cfg Config) *Server {
-	engine := html.New(cfg.TemplateDir, ".gohtml")
+func NewServer(cfg Config) (*Server, error) {
+	tmplFS, err := fs.Sub(embeddedFiles, "templates")
+	if err != nil {
+		return nil, errors.Join(err, ErrInitServer)
+	}
+	engine := html.NewFileSystem(http.FS(tmplFS), ".gohtml")
 	engine.AddFuncMap(map[string]any{
 		"isLastIndex": func(index, length int) bool {
 			return index+1 == length
@@ -87,10 +93,7 @@ func NewServer(cfg Config) *Server {
 	})
 
 	app.Use(recover.New(recover.Config{
-		EnableStackTrace: true,
-	}))
-	app.Use(encryptcookie.New(encryptcookie.Config{
-		Key: cfg.Cookie.EncryptionKey,
+		EnableStackTrace: false,
 	}))
 	// FIXME: can be removed after switching to htmx
 	app.Use(cors.New(cors.Config{
@@ -106,12 +109,17 @@ func NewServer(cfg Config) *Server {
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
 	}))
+	app.Use("/public", filesystem.New(filesystem.Config{
+		Root:       http.FS(embeddedFiles),
+		PathPrefix: "assets",
+		Browse:     false,
+	}))
 
 	return &Server{
 		app: app,
 		Cfg: cfg,
 		log: slog.Default(),
-	}
+	}, nil
 }
 
 func (s *Server) RegisterRoutes(routes func(app fiber.Router)) *Server {

@@ -2,8 +2,6 @@ package test
 
 import (
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,7 +12,6 @@ import (
 	"maps"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/encryptcookie"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/stretchr/testify/require"
 )
@@ -117,7 +114,7 @@ func WithAccept(mimeType string) RequestOpt {
 func HTMXRequest() RequestOpt {
 	return func(req *httpRequest) {
 		WithHeader(map[string]string{
-			web.HeaderHTMXRequest: "true",
+			"HX-Request": "true",
 		})(req)
 	}
 }
@@ -138,38 +135,10 @@ func WithHeader(header map[string]string) RequestOpt {
 	}
 }
 
-func WithCookie(name, value string) RequestOpt {
-	return func(req *httpRequest) {
-		if name == "" {
-			return
-		}
-
-		req.cookies = append(req.cookies, &http.Cookie{Name: name, Value: value})
-	}
-}
-
-func WithSessionCookie(value string) RequestOpt {
-	return func(req *httpRequest) {
-		req.cookies = append(req.cookies, &http.Cookie{Name: "SESSION", Value: value})
-	}
-}
-
-func WithEncryptedCookie(t *testing.T, name, value string) RequestOpt {
-	return func(req *httpRequest) {
-		v, err := encryptcookie.EncryptCookie(value, CookieEncryptionKey)
-		require.NoError(t, err)
-
-		WithCookie(name, v)(req)
-	}
-}
-
-func Base64Encoded(t *testing.T, value any) string {
-	rawValue, err := json.Marshal(&value)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return base64.URLEncoding.EncodeToString(rawValue)
+func WithUser(value string) RequestOpt {
+	return WithHeader(map[string]string{
+		web.HeaderUserID: value,
+	})
 }
 
 func Close(t *testing.T, resp *http.Response) {
@@ -205,10 +174,4 @@ func AssertContainsProfile(t *testing.T, val string) {
 	t.Helper()
 
 	require.Contains(t, val, "data-testid=\"user-profile-btn\"")
-}
-
-func AssertContainsLogin(t *testing.T, val string) {
-	t.Helper()
-
-	require.Contains(t, val, "data-testid=\"user-login-btn\"")
 }

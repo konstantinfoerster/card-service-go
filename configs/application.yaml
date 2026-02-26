@@ -1,6 +1,6 @@
 ---
 logging:
-  level: INFO
+  level: info
 
 database:
   host: 127.0.0.1
@@ -15,21 +15,16 @@ server:
     enabled: false
     cert_file: ""
     key_file: ""
-  cookie:
-    # must be a 32 character string
-    encryption_key: "12345678901234567890123456789012"
+
+auth:
+  test_mode: false
+  user_id: tester
+  user_email: tester@localhost
+  login_url: /login
+  logout_url: /logout
 
 probes:
   port: 8081
-
-oidc:
-  session_cookie_name: SESSION
-  state_cookie_age: 60s
-  provider:
-    google:
-      redirect_uri: http://localhost:3000/api/v1/login/google/callback
-      client_id: "<client-id>"
-      secret: "<client-secret>"
 
 images:
   host: http://localhost:8080

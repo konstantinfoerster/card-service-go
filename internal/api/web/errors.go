@@ -60,7 +60,7 @@ func RespondWithProblemJSON(c *fiber.Ctx, err error) error {
 		code = StatusInternalServerError
 	}
 
-	return sendError(c, code, appErr.Key, appErr.Msg, err)
+	return sendError(c, code, appErr.Key, appErr.Msg, appErr.Cause)
 }
 
 func sendError(c *fiber.Ctx, code int, key, title string, err error) error {

@@ -20,21 +20,23 @@ type CardService interface {
 	Detail(ctx context.Context, id cards.ID, collector cards.Collector, page cards.Page) (cards.CardDetail, error)
 }
 
-func SearchRoutes(r fiber.Router, auth web.AuthMiddleware, searchSvc CardService) {
+func SearchRoutes(r fiber.Router, cfg web.Auth, searchSvc CardService) {
 	log := slog.Default()
-	r.Get("/cards", auth.Relaxed(), searchCards(searchSvc, log))
-	r.Get("/cards/:id", auth.Relaxed(), details(searchSvc, detailsTmpl, log))
-	r.Get("/cards/:id/prints", auth.Relaxed(), details(searchSvc, printsTmpl, log))
+	authHandler := web.NewMiddleware(cfg, web.AllowUnauthorized())
+
+	r.Get("/cards", authHandler, searchCards(searchSvc, cfg, log))
+	r.Get("/cards/:id", authHandler, details(searchSvc, detailsTmpl, log))
+	r.Get("/cards/:id/prints", authHandler, details(searchSvc, printsTmpl, log))
 }
 
-func searchCards(svc CardService, log *slog.Logger) fiber.Handler {
+func searchCards(svc CardService, cfg web.Auth, log *slog.Logger) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, _ := web.UserFromCtx(c)
 
 		searchTerm := c.Query("name")
 		page := newPage(c)
 		log.Debug("search for card", slog.String("name", searchTerm), slog.Any("page", page))
-		result, err := svc.Search(c.Context(), searchTerm, asCollector(user), page)
+		result, err := svc.Search(c.Context(), searchTerm, asCollector(user.ID), page)
 		if err != nil {
 			return err
 		}
@@ -55,7 +57,7 @@ func searchCards(svc CardService, log *slog.Logger) fiber.Handler {
 				return web.RenderPartial(c, "card_list", data)
 			}
 
-			return web.RenderPage(c, "search", data)
+			return web.RenderPage(c, cfg, "search", data)
 		}
 
 		log.Debug("render json page",
@@ -81,7 +83,7 @@ func details(svc CardService, tmplName string, log *slog.Logger) fiber.Handler {
 		}
 
 		page := newPage(c)
-		detail, err := svc.Detail(c.Context(), id, asCollector(user), page)
+		detail, err := svc.Detail(c.Context(), id, asCollector(user.ID), page)
 		if err != nil {
 			return err
 		}

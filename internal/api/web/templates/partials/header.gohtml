@@ -48,7 +48,9 @@
       </form>
       {{- if .User -}}
         <div data-testid="user-profile-btn" class="visible-desktop">
-          <button class="btn btn-outline-primary btn-profile" id="btn-profile" aria-controls="profile"
+          <button class="btn btn-outline-primary btn-profile"
+                  id="btn-profile"
+                  aria-controls="profile"
                   aria-expanded="false">
             <span class="fw-bold">{{ .User.Initials}}</span>
           </button>
@@ -56,13 +58,16 @@
             <li>
               <div class="pb-2">Logged in as {{ .User.Username}}</div>
             </li>
-            <li><a class="btn btn-secondary w-100" href="/api/v1/logout">Logout</a></li>
+            <li>
+              <a class="btn btn-secondary w-100" 
+                 href="{{ .LogoutURL}}">Logout</a>
+            </li>
           </ul>
         </div>
       {{- else -}}
         <a data-testid="user-login-btn"
            class="btn btn-default btn-small visible-desktop"
-           href="/api/v1/login/google"
+           href="{{ .LoginURL }}"
         >
           Login with Google
         </a>

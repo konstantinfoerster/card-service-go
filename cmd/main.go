@@ -13,14 +13,24 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
-	"github.com/konstantinfoerster/card-service-go/internal/api/web/loginapi"
-	"github.com/konstantinfoerster/card-service-go/internal/auth"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"golang.org/x/sync/errgroup"
 )
+
+type arrayFlag []string
+
+func (a *arrayFlag) String() string {
+	return fmt.Sprintf("%v", *a)
+}
+
+func (a *arrayFlag) Set(value string) error {
+	*a = append(*a, value)
+
+	return nil
+}
 
 func setup() config.Config {
 	wd, err := os.Getwd()
@@ -47,12 +57,15 @@ func setup() config.Config {
 		With("service", "card-service")
 	slog.SetDefault(logger)
 
-	var configPath string
-	flag.StringVar(&configPath, "c", "./configs/application.yaml", "path to the configuration file")
-	flag.StringVar(&configPath, "config", "./configs/application.yaml", "path to the configuration file")
+	var configPaths arrayFlag
+	flag.Var(&configPaths, "config", "path to the configuration files e.g. --config /config.yaml --config /secret.yaml")
 	flag.Parse()
 
-	cfg, err := config.NewConfig(configPath)
+	if len(configPaths) == 0 {
+		configPaths = append(configPaths, "configs/application.yaml")
+	}
+
+	cfg, err := config.ReadConfigs(configPaths...)
 	if err != nil {
 		panic(err)
 	}
@@ -88,13 +101,6 @@ func run(cfg config.Config) error {
 	}
 	defer aio.Close(dbCon)
 
-	oidcProvider, err := auth.FromConfiguration(cfg.Oidc)
-	if err != nil {
-		return fmt.Errorf("failed to load oidc provider, %w", err)
-	}
-
-	timeSvc := auth.NewTimeService()
-	authSvc := auth.New(cfg.Oidc, oidcProvider)
 	detector := imaging.NewDetector()
 
 	cardRepo := postgres.NewCardRepository(dbCon, cfg.Images)
@@ -106,19 +112,16 @@ func run(cfg config.Config) error {
 	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
 	detectSvc := cards.NewDetectService(cardRepo, detectRep, detector)
 
-	authMiddleware := web.NewAuthMiddleware(cfg.Oidc, authSvc)
+	srv, err := web.NewServer(cfg.Server)
+	if err != nil {
+		return fmt.Errorf("failed to create web-server, %w", err)
+	}
 
-	srv := web.NewServer(cfg.Server).RegisterRoutes(func(r fiber.Router) {
-		r.Static("/public", "./public")
-
-		cardsapi.DashboardRoutes(r, authMiddleware)
-		cardsapi.SearchRoutes(r, authMiddleware, cardSvc)
-		cardsapi.CollectionRoutes(r, authMiddleware, collectSvc)
-		cardsapi.DetectRoutes(r, authMiddleware, detectSvc)
-
-		apiV1 := r.Group("/api").Group("/v1")
-
-		loginapi.Routes(apiV1, authMiddleware, cfg.Oidc, authSvc, timeSvc)
+	srv.RegisterRoutes(func(r fiber.Router) {
+		cardsapi.DashboardRoutes(r, cfg.Auth)
+		cardsapi.SearchRoutes(r, cfg.Auth, cardSvc)
+		cardsapi.CollectionRoutes(r, cfg.Auth, collectSvc)
+		cardsapi.DetectRoutes(r, cfg.Auth, detectSvc)
 	})
 
 	errg, ctx := errgroup.WithContext(context.Background())

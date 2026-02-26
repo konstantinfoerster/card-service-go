@@ -4,7 +4,30 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func RenderPage(c *fiber.Ctx, tmplName string, data fiber.Map) error {
+type ClientUser struct {
+	Username string `json:"username"`
+	Initials string `json:"initials"`
+}
+
+func NewClientUser(u User) *ClientUser {
+	if u.ID == "" {
+		return nil
+	}
+
+	username := u.Email
+	if username == "" {
+		username = "Unknown"
+	}
+
+	initials := []rune(username)[0:2]
+
+	return &ClientUser{
+		Username: username,
+		Initials: string(initials),
+	}
+}
+
+func RenderPage(c *fiber.Ctx, cfg Auth, tmplName string, data fiber.Map) error {
 	if data == nil {
 		data = fiber.Map{}
 	}
@@ -13,6 +36,8 @@ func RenderPage(c *fiber.Ctx, tmplName string, data fiber.Map) error {
 
 	data["User"] = NewClientUser(user)
 	data["activePage"] = tmplName
+	data["LoginURL"] = cfg.LoginURL
+	data["LogoutURL"] = cfg.LogoutURL
 
 	return c.Render(tmplName, data, "layouts/main")
 }

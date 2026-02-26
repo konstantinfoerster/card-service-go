@@ -2,7 +2,19 @@
 logging:
   level: trace
 
-oidc:
-  session_cookie_name: SESSION_TEST
-  state_cookie_age: 120m
+server:
+  port: 13000
 
+probes:
+  port: 13001
+
+database:
+  username: 
+  password: 
+
+auth:
+  header_user_id: "X-my-userid"
+  header_user_email: "X-my-useremail"
+  test_mode: true
+  login_url: "https://localhost/oidc/login"
+  logout_url: "https://localhost/oidc/logout"
