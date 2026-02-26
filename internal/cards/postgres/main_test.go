@@ -79,7 +79,7 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 	// TODO: read env variables from config
 	var initScriptDirPermissions int64 = 0755
 	req := testcontainers.ContainerRequest{
-		Image:        "postgres:17-alpine",
+		Image:        "postgres:18-alpine",
 		ExposedPorts: []string{"5432/tcp"},
 		Files: []testcontainers.ContainerFile{
 			{

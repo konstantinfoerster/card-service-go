@@ -23,13 +23,6 @@ type TLS struct {
 	Enabled  bool   `yaml:"enabled"`
 }
 
-type Cookie struct {
-	// EncryptionKey a 32 character string
-	EncryptionKey string `yaml:"encryption_key"`
-	// Except cookies that should not be encrypted
-	Except []string `yaml:"except"`
-}
-
 type Auth struct {
 	LoginURL        string `yaml:"login_url"`
 	LogoutURL       string `yaml:"logout_url"`
