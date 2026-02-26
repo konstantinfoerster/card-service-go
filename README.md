@@ -14,7 +14,7 @@ A web application that help you to manage your card collection.
 
 ## Requirements
 
-- go version >= 1.24
+- go version >= 1.25
 - postgres
 - opencv4
 - make (optional)
@@ -26,9 +26,9 @@ Run `go run cmd/main.go` to start the web application with the default configura
 
 Flags:
 
-| Flag            | Usage                         | Default Value            | Description                    |
-| --------------- | ----------------------------- | ------------------------ | ------------------------------ |
-| `-c`,`--config` | `-c configs/application.yaml` | configs/application.yaml | path to the configuration file |
+| Flag       | Usage                               | Default Value            | Description                    |
+| ---------- | ----------------------------------- | ------------------------ | ------------------------------ |
+| `--config` | `--config configs/application.yaml` | configs/application.yaml | path to the configuration file |
 
 ## Test
 

@@ -43,7 +43,7 @@ update:
 	go get gocv.io/x/gocv 
 	go get golang.org/x/image
 	go get golang.org/x/sync 
-	go get gopkg.in/yaml.v3 
+	go get go.yaml.in/yaml/v4 
 	go mod tidy
 .PHONY: lint
 lint:

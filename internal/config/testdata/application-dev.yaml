@@ -1,0 +1,14 @@
+---
+database:
+  username: tester
+  password: s3cr3t
+
+server:
+  port: 8443
+  tls:
+    enabled: true
+    cert_file: app.crt
+
+auth:
+  login_url: "https://localhost:8443/dev/oidc/login"
+  logout_url: "https://localhost:8443/dev/oidc/logout"

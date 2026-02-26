@@ -41,7 +41,7 @@ func (r *PostgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes
 				sb.WriteString("+")
 			}
 			queryArgs = append(queryArgs, v)
-			sb.WriteString(fmt.Sprintf("BIT_COUNT(image.phash%d # $%d)", x+1, len(queryArgs)))
+			fmt.Fprintf(&sb, "BIT_COUNT(image.phash%d # $%d)", x+1, len(queryArgs))
 		}
 		sb.WriteString(")")
 	}

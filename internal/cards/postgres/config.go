@@ -10,7 +10,7 @@ type Config struct {
 	Port     string `yaml:"port"`
 	Database string `yaml:"database"`
 	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Password string `yaml:"password"` // #nosec G117 field is only used internaly
 	MaxConns int32  `yaml:"max_conns"`
 }
 

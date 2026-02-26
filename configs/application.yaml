@@ -15,12 +15,13 @@ server:
     enabled: false
     cert_file: ""
     key_file: ""
-  auth:
-    test_mode: false
-    user_id: tester
-    user_email: tester@localhost
-    login_url: /login
-    logout_url: /logout
+
+auth:
+  test_mode: false
+  user_id: tester
+  user_email: tester@localhost
+  login_url: /login
+  logout_url: /logout
 
 probes:
   port: 8081

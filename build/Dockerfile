@@ -31,7 +31,7 @@ COPY --from=builder --chown=nonroot:nonroot /app/service /usr/bin/
 USER nonroot
 
 ENTRYPOINT ["/usr/bin/service"]
-CMD ["--config", "/config/application.yaml"]
+CMD ["--config", "/opts/app/application.yaml"]
 
 LABEL org.opencontainers.image.title="Card-Manager Service" \
       org.opencontainers.image.description="Application that helps you to manage your card collection" \

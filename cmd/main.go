@@ -20,6 +20,18 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type arrayFlag []string
+
+func (a *arrayFlag) String() string {
+	return fmt.Sprintf("%v", *a)
+}
+
+func (a *arrayFlag) Set(value string) error {
+	*a = append(*a, value)
+
+	return nil
+}
+
 func setup() config.Config {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -45,12 +57,15 @@ func setup() config.Config {
 		With("service", "card-service")
 	slog.SetDefault(logger)
 
-	var configPath string
-	flag.StringVar(&configPath, "c", "./configs/application.yaml", "path to the configuration file")
-	flag.StringVar(&configPath, "config", "./configs/application.yaml", "path to the configuration file")
+	var configPaths arrayFlag
+	flag.Var(&configPaths, "config", "path to the configuration files e.g. --config /config.yaml --config /secret.yaml")
 	flag.Parse()
 
-	cfg, err := config.NewConfig(configPath)
+	if len(configPaths) == 0 {
+		configPaths = append(configPaths, "configs/application.yaml")
+	}
+
+	cfg, err := config.ReadConfigs(configPaths...)
 	if err != nil {
 		panic(err)
 	}

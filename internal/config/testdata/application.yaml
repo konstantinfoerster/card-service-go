@@ -8,6 +8,10 @@ server:
 probes:
   port: 13001
 
+database:
+  username: 
+  password: 
+
 auth:
   header_user_id: "X-my-userid"
   header_user_email: "X-my-useremail"

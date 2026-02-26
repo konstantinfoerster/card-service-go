@@ -8,7 +8,7 @@ import (
 
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 var (
@@ -29,15 +29,8 @@ type Logging struct {
 	Level string `yaml:"level"`
 }
 
-func NewConfig(path string) (Config, error) {
-	p := filepath.Clean(path)
-
-	data, err := os.ReadFile(p)
-	if err != nil {
-		return Config{}, errors.Join(err, ErrReadFile)
-	}
-
-	defaultConfig := Config{
+func ReadConfigs(path ...string) (Config, error) {
+	cfg := Config{
 		Logging: Logging{
 			Level: "info",
 		},
@@ -56,16 +49,34 @@ func NewConfig(path string) (Config, error) {
 		},
 	}
 
-	err = yaml.Unmarshal(data, &defaultConfig)
+	for _, p := range path {
+		p = filepath.Clean(p)
+
+		configRaw, err := os.ReadFile(p)
+		if err != nil {
+			return Config{}, errors.Join(err, ErrReadFile)
+		}
+
+		cfg, err = readConfig(configRaw, cfg)
+		if err != nil {
+			return Config{}, errors.Join(err, ErrInvalidContent)
+		}
+	}
+
+	return cfg, nil
+}
+
+func readConfig(configRaw []byte, target Config) (Config, error) {
+	err := yaml.Unmarshal(configRaw, &target)
 	if err != nil {
-		return Config{}, errors.Join(err, ErrInvalidContent)
+		return Config{}, err
 	}
 
 	// TODO: validate config content
 
-	if strings.HasSuffix(defaultConfig.Images.Host, "") {
-		defaultConfig.Images.Host += "/"
+	if strings.HasSuffix(target.Images.Host, "") {
+		target.Images.Host += "/"
 	}
 
-	return defaultConfig, nil
+	return target, nil
 }
