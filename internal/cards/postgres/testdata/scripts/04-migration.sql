@@ -1,0 +1,10 @@
+CREATE TABLE test_collection
+(
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+);
+
+CREATE TABLE withError
+(
+    name CHAR(3) PRIMARY KEY NOT NULL)
+);
+

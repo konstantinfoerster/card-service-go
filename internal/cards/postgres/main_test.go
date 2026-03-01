@@ -17,6 +17,7 @@ import (
 )
 
 var connection *postgres.DBConnection
+var migrationCfg postgres.Config
 var collector = cards.NewCollector("myUser")
 
 func TestMain(m *testing.M) {
@@ -25,14 +26,26 @@ func TestMain(m *testing.M) {
 	ctx := context.Background()
 	dbRunner := newRunner()
 	if !testing.Short() {
-		if err := dbRunner.Start(ctx); err != nil {
+		info, err := dbRunner.Start(ctx)
+		if err != nil {
 			panic(err)
 		}
 
-		var err error
-		connection, err = postgres.Connect(ctx, dbRunner.Config())
-		if err != nil {
-			panic(err)
+		appCfg := postgres.Config{
+			Username: "tester",
+			Password: "tester",
+			Host:     info.Host,
+			Port:     info.Port,
+			Database: "cardmanager",
+		}
+		connection = Connect(ctx, appCfg)
+
+		migrationCfg = postgres.Config{
+			Username: "migration",
+			Password: "migration",
+			Host:     info.Host,
+			Port:     info.Port,
+			Database: "migration",
 		}
 	}
 
@@ -51,9 +64,13 @@ func (lc *logConsumer) Accept(l testcontainers.Log) {
 	slog.Debug(string(l.Content))
 }
 
+type ConnectionInfo struct {
+	Host string
+	Port string
+}
+
 type databaseRunner struct {
 	container testcontainers.Container
-	cfg       postgres.Config
 	running   bool
 }
 
@@ -61,20 +78,29 @@ func newRunner() *databaseRunner {
 	return &databaseRunner{}
 }
 
-func (r *databaseRunner) Start(ctx context.Context) error {
+func (r *databaseRunner) Start(ctx context.Context) (ConnectionInfo, error) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("failed to get current dir")
 	}
 
-	dbDir, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(file), "testdata", "db"))
+	scriptsDir, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(file), "scripts"))
 	if err != nil {
-		return err
+		return ConnectionInfo{}, err
 	}
 
-	username := "tester"
-	password := "tester"
-	database := "cardmanager"
+	dbDir, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(file), "testdata", "db"))
+	if err != nil {
+		return ConnectionInfo{}, err
+	}
+
+	appUser := "tester"
+	appPassword := "tester"
+	appDatabase := "cardmanager"
+
+	migrationUser := "migration"
+	migrationPassword := migrationUser
+	migrationDatabase := migrationUser
 
 	// TODO: read env variables from config
 	var initScriptDirPermissions int64 = 0755
@@ -88,7 +114,7 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 				FileMode:          initScriptDirPermissions,
 			},
 			{
-				HostFilePath:      filepath.Join(dbDir, "02-create-tables.sql"),
+				HostFilePath:      filepath.Join(scriptsDir, "001-create-tables.sql"),
 				ContainerFilePath: "/docker-entrypoint-initdb.d/02-create-tables.sql",
 				FileMode:          initScriptDirPermissions,
 			},
@@ -99,11 +125,15 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 			},
 		},
 		Env: map[string]string{
-			"POSTGRES_DB":       "postgres",
-			"POSTGRES_PASSWORD": "test",
-			"APP_DB_USER":       username,
-			"APP_DB_PASS":       password,
-			"APP_DB_NAME":       database,
+			"POSTGRES_DB":        "postgres",
+			"POSTGRES_USER":      "postgres",
+			"POSTGRES_PASSWORD":  "test",
+			"APP_DB_USER":        appUser,
+			"APP_DB_PASS":        appPassword,
+			"APP_DB_NAME":        appDatabase,
+			"MIGRATION_USER":     migrationUser,
+			"MIGRATION_PASSWORD": migrationPassword,
+			"MIGRATION_DATABASE": migrationDatabase,
 		},
 		AlwaysPullImage: true,
 		WaitingFor:      wait.ForLog("[1] LOG:  database system is ready to accept connections"),
@@ -120,29 +150,25 @@ func (r *databaseRunner) Start(ctx context.Context) error {
 		Started:          true,
 	})
 	if err != nil {
-		return err
+		return ConnectionInfo{}, err
 	}
 
 	ip, err := r.container.Host(ctx)
 	if err != nil {
-		return err
+		return ConnectionInfo{}, err
 	}
 
 	mappedPort, err := r.container.MappedPort(ctx, "5432")
 	if err != nil {
-		return err
+		return ConnectionInfo{}, err
 	}
 
 	r.running = true
-	r.cfg = postgres.Config{
-		Username: username,
-		Password: password,
-		Host:     ip,
-		Port:     mappedPort.Port(),
-		Database: database,
-	}
 
-	return nil
+	return ConnectionInfo{
+		Host: ip,
+		Port: mappedPort.Port(),
+	}, nil
 }
 
 func (r *databaseRunner) Stop(ctx context.Context) error {
@@ -153,6 +179,11 @@ func (r *databaseRunner) Stop(ctx context.Context) error {
 	return r.container.Terminate(ctx)
 }
 
-func (r *databaseRunner) Config() postgres.Config {
-	return r.cfg
+func Connect(ctx context.Context, cfg postgres.Config) *postgres.DBConnection {
+	connection, err := postgres.Connect(ctx, cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	return connection
 }

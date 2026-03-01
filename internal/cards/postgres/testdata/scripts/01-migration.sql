@@ -1,0 +1,14 @@
+CREATE TABLE test_lang
+(
+    lang CHAR(3) PRIMARY KEY NOT NULL
+);
+
+INSERT INTO test_lang
+VALUES ('deu');
+
+
+CREATE TABLE test_sub_type
+(
+    id   INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+);
+

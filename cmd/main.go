@@ -97,9 +97,14 @@ func run(cfg config.Config) error {
 	ctx := context.Background()
 	dbCon, err := postgres.Connect(ctx, cfg.Database)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database %w", err)
+		return fmt.Errorf("failed to connect to database, %w", err)
 	}
 	defer aio.Close(dbCon)
+
+	migrator := postgres.NewMigrator(dbCon, postgres.Scripts)
+	if err := migrator.Run(ctx); err != nil {
+		return fmt.Errorf("failed to run migration scripts, %w", err)
+	}
 
 	detector := imaging.NewDetector()
 

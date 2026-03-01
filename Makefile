@@ -12,9 +12,11 @@ build:
 	go build -o $(BINARY_NAME) cmd/main.go
 .PHONY: docker-build
 docker-build:
+	@echo "Build image version $(VERSION)"
 	docker build --build-arg RELEASE="$(VERSION)" -t card-service:$(VERSION) -f build/opencv.Dockerfile .
 .PHONY: docker-build-nocv
 docker-build-nocv:
+	@echo "Build nocv image version $(VERSION)"
 	docker build --build-arg RELEASE="$(VERSION)" -t card-service:$(VERSION) -f build/Dockerfile .
 .PHONY: docker-run
 docker-run: docker
