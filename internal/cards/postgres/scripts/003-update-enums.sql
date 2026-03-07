@@ -1,0 +1,1 @@
+ALTER TYPE card_set_type ADD VALUE 'ETERNAL';
