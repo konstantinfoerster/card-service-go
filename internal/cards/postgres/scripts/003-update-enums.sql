@@ -1,0 +1,1 @@
+ALTER TYPE layout ADD VALUE 'PREPARE';
