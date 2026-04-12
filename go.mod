@@ -1,9 +1,9 @@
 module github.com/konstantinfoerster/card-service-go
 
-go 1.26
+go 1.25.0
 
 require (
-	github.com/anthonynsimon/bild v0.15.0
+	github.com/anthonynsimon/bild v0.14.0
 	github.com/corona10/goimagehash v1.1.0
 	github.com/gofiber/fiber/v2 v2.52.12
 	github.com/gofiber/template/html/v2 v2.1.3
