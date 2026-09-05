@@ -2,8 +2,11 @@ package cards
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
@@ -56,6 +59,26 @@ func EmptyMatches(p Page) Matches {
 type Hash struct {
 	Value []uint64
 	Bits  int
+}
+
+func FromHexString(hash string) (Hash, error) {
+	if len(hash) != 64 {
+		return Hash{}, fmt.Errorf("invalid hash length: expected 64 characters, got %d", len(hash))
+	}
+
+	b, err := hex.DecodeString(hash)
+	if err != nil || len(b) != 32 {
+		return Hash{}, fmt.Errorf("invalid hash bytes")
+	}
+
+	// 2. Jeweils 8 Bytes direkt als uint64 interpretieren (BigEndian)
+	v := []uint64{
+		binary.BigEndian.Uint64(b[0:8]),
+		binary.BigEndian.Uint64(b[8:16]),
+		binary.BigEndian.Uint64(b[16:24]),
+		binary.BigEndian.Uint64(b[24:32]),
+	}
+	return Hash{Value: v, Bits: 256}, nil
 }
 
 func (h Hash) AsBase2() []string {
@@ -123,6 +146,14 @@ func (s *DetectService) Detect(ctx context.Context, c Collector, in io.Reader) (
 		hashes = append(hashes, rhash)
 	}
 
+	return s.DetectByHash(ctx, c, hashes...)
+}
+
+func (s *DetectService) DetectByHash(ctx context.Context, c Collector, hashes ...Hash) (Matches, error) {
+	if len(hashes) == 0 {
+		return EmptyMatches(DefaultPage()), nil
+	}
+
 	scores, err := s.dRepo.Top5MatchesByHash(ctx, hashes...)
 	if err != nil {
 		return Matches{}, aerrors.NewUnknownError(err, "unable-to-execute-hash-search")
@@ -130,6 +161,10 @@ func (s *DetectService) Detect(ctx context.Context, c Collector, in io.Reader) (
 
 	if len(scores) == 0 {
 		return EmptyMatches(DefaultPage()), nil
+	}
+
+	for _, s := range scores {
+		slog.Info("detected ", slog.Int("id", s.ID.CardID))
 	}
 
 	filter := NewFilter().WithCollector(c)

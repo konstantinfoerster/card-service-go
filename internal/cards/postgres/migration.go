@@ -66,7 +66,7 @@ func (m *PostgresMigrator) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to read %s from scripts dir, %w", scriptName, err)
 			}
 
-			for _, q := range strings.Split(string(b), ";") {
+			for q := range strings.SplitSeq(string(b), ";") {
 				query := strings.TrimSpace(q)
 				if query == "" {
 					continue

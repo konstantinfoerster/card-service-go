@@ -1,0 +1,20 @@
+{{- define "title"}}Detect{{end -}}
+<h2>Live card detection</h2>
+
+<select id="camera">
+    <option>loading camera</option>
+</select>
+<div id="status">Loading ...</div>
+
+<div id="videoWrapper">
+    <div class="media-box hidden-video">
+      <video id="videoInput"></video>
+    </div>
+    <div class="media-box">
+      <canvas id="canvasOutput"></canvas>
+      <canvas id="canvasDetect"></canvas>
+    </div>
+</div>
+
+<script async src="/public/js/opencv.js" type="text/javascript"></script>
+<script async src="/public/js/detect.js" type="text/javascript"></script>

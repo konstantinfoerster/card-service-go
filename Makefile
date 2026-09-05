@@ -35,7 +35,7 @@ test-it:
 	go test --count=1 -run Integration ./...
 .PHONY: update
 update:
-	go get github.com/anthonynsimon/bild
+	# go get github.com/anthonynsimon/bild
 	go get github.com/corona10/goimagehash 
 	go get github.com/gofiber/fiber/v2
 	go get github.com/gofiber/template/html/v2 

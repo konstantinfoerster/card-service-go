@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine3.23 AS builder
+FROM golang:1.26-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN go build -tags timetzdata -ldflags="-s -w" -o service cmd/main.go \
       && chmod 0755 /app/service \
       && go clean -modcache -cache 
 
-FROM alpine:3.23 AS dev
+FROM alpine:3.24 AS dev
 
 ARG RELEASE
 ENV IMG_VERSION="${RELEASE}"

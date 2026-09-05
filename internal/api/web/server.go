@@ -109,11 +109,21 @@ func NewServer(cfg Config) (*Server, error) {
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
 	}))
-	app.Use("/public", filesystem.New(filesystem.Config{
-		Root:       http.FS(embeddedFiles),
-		PathPrefix: "assets",
-		Browse:     false,
-	}))
+
+	switch cfg.Mode {
+	case dev:
+		app.Use("/public", filesystem.New(filesystem.Config{
+			Root:       http.Dir("./internal/api/web/assets"),
+			PathPrefix: "",
+			Browse:     false,
+		}))
+	default:
+		app.Use("/public", filesystem.New(filesystem.Config{
+			Root:       http.FS(embeddedFiles),
+			PathPrefix: "assets",
+			Browse:     false,
+		}))
+	}
 
 	return &Server{
 		app: app,

@@ -751,3 +751,64 @@ input::placeholder {
   font-size: smaller;
   margin: 0 0.2rem;
 }
+
+#videoWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+  align-items: flex-start;
+  margin-top: 20px;
+  position: relative;
+}
+
+.media-box {
+  flex: 1 1 280px;
+  max-width: 100%;
+  background: #111;
+  border-radius: 8px;
+  border: 2px solid #555;
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
+
+  canvas {
+    display: block;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  &.hidden-video {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    border: none;
+  }
+}
+
+#canvasOutput {
+  border: 2px solid red;
+  position: relative;
+  z-index: 1;
+
+  &.hidden {
+   visibility: hidden;
+  }
+}
+
+#canvasDetect {
+  cursor: pointer;
+  border: 2px solid green;
+
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: none;
+
+  &.visible {
+    display: block;
+  }
+}

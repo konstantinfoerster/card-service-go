@@ -2,10 +2,18 @@ package web
 
 import "fmt"
 
+type Mode string
+
+const (
+	dev  Mode = "dev"
+	prod Mode = "prod"
+)
+
 type Config struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 	TLS  TLS    `yaml:"tls"`
+	Mode Mode   `yaml:"mode"`
 }
 
 func (c Config) Addr() string {

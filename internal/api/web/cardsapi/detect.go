@@ -1,56 +1,89 @@
 package cardsapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
-	"github.com/konstantinfoerster/card-service-go/internal/aio"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
 
 type DetectService interface {
 	Detect(ctx context.Context, collector cards.Collector, in io.Reader) (cards.Matches, error)
+	DetectByHash(ctx context.Context, collector cards.Collector, hashes ...cards.Hash) (cards.Matches, error)
 }
 
 func DetectRoutes(r fiber.Router, cfg web.Auth, detectSvc DetectService) {
 	authHandler := web.NewMiddleware(cfg, web.AllowUnauthorized())
 
-	r.Post("/detect", authHandler, Detect(detectSvc))
+	r.Post("/detect", authHandler, detect(detectSvc))
+	r.Get("/detect/live", authHandler, detectLive(cfg))
+	// r.Get("/detect/:hash", authHandler, detectByHash(detectSvc))
 }
 
-func Detect(svc DetectService) fiber.Handler {
+func detect(svc DetectService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// when user is not set, the user specific collection data won't be loaded
 		user, _ := web.UserFromCtx(c)
 
-		fHeader, err := c.FormFile("file")
-		if err != nil {
-			return aerrors.NewInvalidInputError(err, "invalid-file", "failed to read file from form")
+		var req struct {
+			Image string `json:"image"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return err
 		}
 
-		file, err := fHeader.Open()
+		imgBytes, err := base64.StdEncoding.DecodeString(req.Image)
 		if err != nil {
-			return aerrors.NewInvalidInputError(err, "invalid-file", "failed to open file")
+			return err
 		}
-		defer aio.Close(file)
+		result, err := svc.Detect(c.Context(), asCollector(user.ID), bytes.NewReader(imgBytes))
+		if err != nil {
+			return err
+		}
 
-		result, err := svc.Detect(c.Context(), asCollector(user.ID), file)
+		slog.Info("detected", slog.Int("size", result.Size))
+
+		pagedResult := newPagedResponse(result.PagedResult)
+		return web.RenderJSON(c, pagedResult)
+	}
+}
+
+func detectByHash(svc DetectService) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user, _ := web.UserFromCtx(c)
+
+		sHash := c.Params("hash")
+		if sHash == "" {
+			emptyMatches := cards.EmptyMatches(cards.DefaultPage())
+			return web.RenderJSON(c, newPagedResponse(emptyMatches.PagedResult))
+		}
+
+		hash, err := cards.FromHexString(sHash)
+		if err != nil {
+			return err
+		}
+
+		result, err := svc.DetectByHash(c.Context(), asCollector(user.ID), hash)
 		if err != nil {
 			return err
 		}
 
 		pagedResult := newPagedResponse(result.PagedResult)
-		if web.AcceptsHTML(c) || web.IsHTMX(c) {
-			data := fiber.Map{
-				"Page": pagedResult,
-			}
-
-			return web.RenderPartial(c, "search", data)
-		}
 
 		return web.RenderJSON(c, pagedResult)
+	}
+}
+
+func detectLive(cfg web.Auth) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if web.IsHTMX(c) {
+			return web.RenderPartial(c, "detect", nil)
+		}
+
+		return web.RenderPage(c, cfg, "detect", nil)
 	}
 }

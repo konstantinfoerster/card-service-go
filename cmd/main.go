@@ -101,10 +101,10 @@ func run(cfg config.Config) error {
 	}
 	defer aio.Close(dbCon)
 
-	migrator := postgres.NewMigrator(dbCon, postgres.Scripts)
-	if err := migrator.Run(ctx); err != nil {
-		return fmt.Errorf("failed to run migration scripts, %w", err)
-	}
+	// migrator := postgres.NewMigrator(dbCon, postgres.Scripts)
+	// if err := migrator.Run(ctx); err != nil {
+	// 	return fmt.Errorf("failed to run migration scripts, %w", err)
+	// }
 
 	detector := imaging.NewDetector()
 
