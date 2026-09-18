@@ -75,7 +75,7 @@ func setup() config.Config {
 	}
 
 	if cfg.Server.Debug {
-		if err = os.MkdirAll(cfg.Server.DebugDir, 0755); err != nil {
+		if err = os.MkdirAll(cfg.Server.DebugDir, 0700); err != nil {
 			panic(err)
 		}
 	}
