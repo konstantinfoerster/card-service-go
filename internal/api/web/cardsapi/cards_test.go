@@ -154,6 +154,7 @@ func TestSearch(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/cards?name=Demonic&"+tc.page),
 				test.WithHeader(tc.header),
@@ -255,6 +256,7 @@ func TestSearch_LoggedIn(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/cards?name=Demonic"),
 				test.WithUser("myuser"),
@@ -275,6 +277,7 @@ func TestSearch_LoggedIn(t *testing.T) {
 func TestSearch_NotLoggedIn_NoCollectActions(t *testing.T) {
 	srv := searchServer(t)
 	req := test.NewRequest(
+		t.Context(),
 		test.WithMethod(web.MethodGet),
 		test.WithURL("http://localhost/cards?name=Demonic"),
 		test.WithHeader(map[string]string{
@@ -396,6 +399,7 @@ func TestDetail(t *testing.T) {
 			}
 
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodGet),
 				test.WithURLf("http://localhost/cards/%s", tc.cardID),
 				test.WithHeader(tc.header),
@@ -549,6 +553,7 @@ func TestPrints(t *testing.T) {
 			}
 
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodGet),
 				test.WithURLf("http://localhost/cards/%s/prints%s", tc.cardID, tc.queryParameter),
 				test.WithHeader(tc.header),

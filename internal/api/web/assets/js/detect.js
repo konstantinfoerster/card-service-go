@@ -3,12 +3,44 @@ const videoEl = document.getElementById("videoInput");
 const canvasOutput = document.getElementById("canvasOutput");
 const canvasDetect = document.getElementById("canvasDetect");
 
-const cameraEl = document.getElementById("camera");
-cameraEl.addEventListener("change", function (e) {
-  console.log("changed", e.target.value);
+// output size a detected object is warped to, matching an object's ~2.5:3.5 ratio
+const OBJECT_WARP_WIDTH = 350;
+const OBJECT_WARP_HEIGHT = 490;
 
+const txtSelectCamera = "Please select a camera ...";
+
+const cameraEl = document.getElementById("camera");
+cameraEl.addEventListener("change", async function (e) {
   const deviceId = e.target.value;
-  startStream(deviceId);
+
+  if (!deviceId) {
+    stopStream();
+    statusEl.innerText = txtSelectCamera;
+
+    return;
+  }
+
+  statusEl.innerText = "Starting stream...";
+  try {
+    // TODO: clean up references when creating new stream
+    videoEl.srcObject = await videoState.newStream(deviceId);
+    videoEl.onloadedmetadata = () => {
+      videoEl.width = videoEl.videoWidth;
+      videoEl.height = videoEl.videoHeight;
+
+      videoState.renew(
+        new cv.VideoCapture(videoEl),
+        new cv.Mat(videoEl.videoHeight, videoEl.videoWidth, cv.CV_8UC4),
+        new cv.Mat(videoEl.videoHeight, videoEl.videoWidth, cv.CV_8UC1),
+      );
+
+      processVideo();
+    };
+
+    videoEl.play();
+  } catch (err) {
+    statusEl.innerText = "Error: Failed to start stream. " + err;
+  }
 });
 
 canvasDetect.addEventListener("click", () => {
@@ -53,7 +85,7 @@ let videoState = {
   detected: false,
 
   lastApiCall: 0,
-  API_COOLDOWN: 500, //ms
+  API_COOLDOWN_MILLIS: 500,
 
   /**
    * Reads current video frame into the source matrix.
@@ -146,13 +178,13 @@ let videoState = {
   },
 
   /**
-   * Fetches card metadata based on the found image.
+   * Fetches object metadata based on the found image.
    * @param {cv.Mat} imgMat - The detected image.
    * @returns {Promise<void>}
    */
   async onImageDetect(imgMat) {
     const now = Date.now();
-    if (now - this.lastApiCall <= this.API_COOLDOWN) {
+    if (now - this.lastApiCall <= this.API_COOLDOWN_MILLIS) {
       imgMat.delete();
       return;
     }
@@ -160,45 +192,35 @@ let videoState = {
     this.detected = true;
     this.lastApiCall = now;
 
-    const dataUrl = canvasDetect.toDataURL("image/jpeg", 0.8); // reduced quality
-
     try {
       cv.imshow("canvasDetect", imgMat);
+
+      const dataUrl = canvasDetect.toDataURL("image/jpeg", 0.8);
 
       statusEl.innerText = "Checking match...";
       const rawBase64 = dataUrl.split(",")[1];
       const matches = await fetchMatchesByImage(rawBase64);
-      console.log("matches", matches);
 
       if (matches.data.length === 0) {
+        // drop the rejected object, it would otherwise flash on the next detection
+        canvasDetect
+          .getContext("2d")
+          .clearRect(0, 0, canvasDetect.width, canvasDetect.height);
         this.detected = false;
         return;
       }
 
-      for (const match of matches.data) {
-        // overwrite with image from server
-        const ctx = canvasDetect.getContext("2d");
-        const img = new Image();
-        img.onload = function () {
-          ctx.drawImage(img, 0, 0);
-        };
-        img.src = match.image;
+      const match = matches.data[0];
 
-        showDetectOverlay();
+      showDetectOverlay();
 
-        // take first image
-        statusEl.innerText =
-          "Detected: " +
-          match.name +
-          " | " +
-          match.set.name +
-          " |" +
-          match.set.code;
-        statusEl.innerText += "Draw detected image " + img.src;
-        return;
-      }
-
-      this.detected = false;
+      statusEl.innerText =
+        "Detected: " +
+        match.name +
+        " | " +
+        match.set.name +
+        " |" +
+        match.set.code;
     } catch (err) {
       console.log("fetch err", err);
 
@@ -219,7 +241,6 @@ window.onload = async () => {
   try {
     // create new stream to force an ask for permission
     await videoState.newStream();
-    console.log("requested permissions");
   } catch (err) {
     statusEl.innerText = "Error: Camera API not available. " + err;
     return;
@@ -228,7 +249,6 @@ window.onload = async () => {
     videoState.stopStream();
   }
 
-  console.log("going to prepare camera list");
   if (typeof cv !== "undefined" && cv.getBuildInformation) {
     console.log("already loaded", cv.getBuildInformation());
     fillCameraList();
@@ -244,12 +264,19 @@ window.onload = async () => {
   }
 };
 
-window.onbeforeunload = () => {
+function stopStream() {
   videoState.stopStream();
-};
+  videoEl.pause();
+}
+
+// stop stream on page leave
+window.onbeforeunload = stopStream;
+
+// stop camera on htmx swap
+document.addEventListener("htmx:beforeSwap", stopStream);
 
 async function fillCameraList() {
-  statusEl.innerText = "Please select a camera ...";
+  statusEl.innerText = txtSelectCamera;
   const devices = await navigator.mediaDevices.enumerateDevices();
   console.log("found devices", devices);
   const vDevices = devices.filter((dev) => dev.kind === "videoinput");
@@ -265,36 +292,13 @@ async function fillCameraList() {
   };
 
   cameraEl.innerHTML = "";
-  cameraEl.appendChild(optFn("select camera", null));
+  // an empty value keeps the "no camera selected"
+  cameraEl.appendChild(optFn("Select camera", ""));
   vDevices.forEach((dev, index) => {
     const label = dev.label || `Camera ${index}`;
 
     cameraEl.appendChild(optFn(label, dev.deviceId));
   });
-}
-
-async function startStream(deviceId) {
-  statusEl.innerText = "Starting stream...";
-
-  try {
-    videoEl.srcObject = await videoState.newStream(deviceId);
-    videoEl.onloadedmetadata = () => {
-      videoEl.width = videoEl.videoWidth;
-      videoEl.height = videoEl.videoHeight;
-
-      videoState.renew(
-        new cv.VideoCapture(videoEl),
-        new cv.Mat(videoEl.videoHeight, videoEl.videoWidth, cv.CV_8UC4),
-        new cv.Mat(videoEl.videoHeight, videoEl.videoWidth, cv.CV_8UC1),
-      );
-
-      processVideo();
-    };
-
-    videoEl.play();
-  } catch (err) {
-    statusEl.innerText = "Error: Camera API not available. " + err;
-  }
 }
 
 function processVideo() {
@@ -341,9 +345,9 @@ function processVideo() {
       return;
     }
 
-    let detectedCard = detectCardFromImage(videoState.src);
-    if (detectedCard) {
-      videoState.onImageDetect(detectedCard);
+    let detectedObject = detectObjectFromImage(videoState.src);
+    if (detectedObject) {
+      videoState.onImageDetect(detectedObject);
     }
 
     cv.cvtColor(videoState.src, videoState.dest, cv.COLOR_RGBA2GRAY);
@@ -360,33 +364,21 @@ function processVideo() {
 }
 
 /**
- * @param {cv.Mat} src - Das unverarbeitete Kamerabild
- * @returns {cv.Mat|null} - Die freigestellte Karte oder null
+ * @param {cv.Mat} src - The raw camera frame
+ * @returns {cv.Mat|null} - The warped object, or null
  */
-function detectCardFromImage(src) {
-  // Vorbereitung der Matrizen (Entspricht den Variablen-Deklarationen in Go)
+function detectObjectFromImage(src) {
   let gray = new cv.Mat();
   let blurred = new cv.Mat();
   let edged = new cv.Mat();
   let contours = new cv.MatVector();
   let hierarchy = new cv.Mat();
 
-  let warpedCard = null;
+  let warpedObject = null;
 
   try {
-    // 1. Preprocessing: Graustufen & Weichzeichner (gocv.CvtColor / gocv.GaussianBlur)
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+    findObjectEdges(src, gray, blurred, edged);
 
-    // 2. Kanten erkennen (gocv.Canny)
-    cv.Canny(blurred, edged, 75, 200);
-
-    // Morphologischer Filter, um kleine Lücken in den Linien zu schließen
-    let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(9, 9));
-    cv.morphologyEx(edged, edged, cv.MORPH_CLOSE, kernel);
-    kernel.delete();
-
-    // 3. Konturen finden (gocv.FindContours)
     cv.findContours(
       edged,
       contours,
@@ -395,40 +387,21 @@ function detectCardFromImage(src) {
       cv.CHAIN_APPROX_SIMPLE,
     );
 
-    let maxArea = 0;
-    let bestApprox = null;
+    const candidates = findObjectCandidates(contours, src.cols, src.rows);
+    const bestApprox = selectBestCandidate(candidates, src.cols, src.rows);
 
-    // 4. Konturen filtern (Die Schleife über alle gefundenen Formen)
-    for (let i = 0; i < contours.size(); ++i) {
-      let cnt = contours.get(i);
-      let area = cv.contourArea(cnt);
+    if (bestApprox) {
+      warpedObject = transformPerspective(src, bestApprox);
+      bestApprox.delete();
 
-      // Mindestgröße filtern (Go nutzt hier oft Schwellenwerte aus der Config)
-      if (area > 10000) {
-        let peri = cv.arcLength(cnt, true);
-        let approx = new cv.Mat();
-
-        // Kontur vereinfachen / Ecken zählen (gocv.ApproxPolyDP)
-        cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
-
-        // Wenn die Form exakt 4 Ecken hat und die größte bisherige ist
-        if (approx.rows === 4 && area > maxArea) {
-          maxArea = area;
-          if (bestApprox) bestApprox.delete(); // Alten Favoriten löschen
-          bestApprox = approx;
-        } else {
-          approx.delete(); // Nicht gebrauchte Matrix sofort freigeben
-        }
+      // reject blank/featureless candidates (e.g. compression noise on an out-of-focus frame)
+      if (warpedObject && !hasEnoughDetail(warpedObject)) {
+        warpedObject.delete();
+        warpedObject = null;
       }
     }
-
-    // 5. Transformation durchführen, falls eine Karte gefunden wurde
-    if (bestApprox) {
-      warpedCard = transformPerspective(src, bestApprox);
-      bestApprox.delete();
-    }
   } catch (err) {
-    statusEl.innerText = "Error: card detection failed. " + err;
+    statusEl.innerText = "Error: object detection failed. " + err;
   } finally {
     gray.delete();
     blurred.delete();
@@ -437,16 +410,209 @@ function detectCardFromImage(src) {
     hierarchy.delete();
   }
 
-  return warpedCard;
+  return warpedObject;
 }
+
 /**
- * Sortiert die Ecken und schneidet die Karte reibungslos aus
+ * Writes an edge map into the given (caller-owned) gray/blurred/edged Mats.
+ * @param {cv.Mat} src
+ * @param {cv.Mat} gray
+ * @param {cv.Mat} blurred
+ * @param {cv.Mat} edged
+ * @returns {void}
+ */
+function findObjectEdges(src, gray, blurred, edged) {
+  // wide blur suppresses background texture noise while keeping the object's own edges
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  cv.GaussianBlur(gray, blurred, new cv.Size(9, 9), 0);
+
+  // adaptive ("auto Canny") thresholds handle both bright and dark/textured backgrounds
+  const median = medianGray(blurred);
+  const sigma = 0.33;
+  const lower = Math.max(0, (1 - sigma) * median);
+  const upper = Math.min(255, (1 + sigma) * median);
+  cv.Canny(blurred, edged, lower, upper);
+
+  // small kernel: a wider one merges background texture into one frame-sized blob
+  let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
+  cv.morphologyEx(edged, edged, cv.MORPH_CLOSE, kernel);
+  kernel.delete();
+}
+
+/**
+ * Contours with a plausible object-like aspect ratio. Caller owns each `approx` Mat.
+ * @param {cv.MatVector} contours
+ * @param {number} frameWidth
+ * @param {number} frameHeight
+ * @returns {Array<{approx: cv.Mat, area: number, center: {x: number, y: number}}>}
+ */
+function findObjectCandidates(contours, frameWidth, frameHeight) {
+  // reject near-full-frame blobs (over-aggressive edge merging in findObjectEdges)
+  const maxAllowedArea = frameWidth * frameHeight * 0.9;
+  const aspectRatioTolerance = 0.15;
+
+  let candidates = [];
+  for (let i = 0; i < contours.size(); ++i) {
+    let cnt = contours.get(i);
+    let area = cv.contourArea(cnt);
+
+    // filter by minimum size
+    if (area > 10000 && area <= maxAllowedArea) {
+      let peri = cv.arcLength(cnt, true);
+      let approx = new cv.Mat();
+
+      // simplify contour / count corners
+      cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+
+      if (
+        approx.rows === 4 &&
+        objectAspectRatioDiff(approx) <= aspectRatioTolerance
+      ) {
+        const rect = cv.minAreaRect(approx);
+        candidates.push({ approx, area, center: rect.center });
+      } else {
+        approx.delete();
+      }
+    }
+    cnt.delete();
+  }
+
+  return candidates;
+}
+
+/**
+ * Picks the candidate closest to frame center (handles multiple objects in frame), then
+ * the largest one at that spot (wins over a smaller inner sub-region like the text box).
+ * Deletes every other candidate's `approx` Mat.
+ * @param {Array<{approx: cv.Mat, area: number, center: {x: number, y: number}}>} candidates
+ * @param {number} frameWidth
+ * @param {number} frameHeight
+ * @returns {cv.Mat|null}
+ */
+function selectBestCandidate(candidates, frameWidth, frameHeight) {
+  let bestApprox = null;
+
+  if (candidates.length > 0) {
+    const frameCenter = { x: frameWidth / 2, y: frameHeight / 2 };
+    let target = candidates[0];
+    let bestCenterDist = Infinity;
+    for (const c of candidates) {
+      const d = dist(c.center, frameCenter);
+      if (d < bestCenterDist) {
+        bestCenterDist = d;
+        target = c;
+      }
+    }
+
+    const sameLocationRadius = Math.min(frameWidth, frameHeight) * 0.15;
+    let bestArea = 0;
+    for (const c of candidates) {
+      if (
+        dist(c.center, target.center) <= sameLocationRadius &&
+        c.area > bestArea
+      ) {
+        bestArea = c.area;
+        bestApprox = c.approx;
+      }
+    }
+  }
+
+  for (const c of candidates) {
+    if (c.approx !== bestApprox) {
+      c.approx.delete();
+    }
+  }
+
+  return bestApprox;
+}
+
+/**
+ * Median pixel value of a grayscale Mat, used for adaptive Canny thresholds.
+ * @param {cv.Mat} mat - Grayscale image (CV_8UC1).
+ * @returns {number} Median pixel value (0-255).
+ */
+function medianGray(mat) {
+  const data = mat.data;
+  const histogram = new Uint32Array(256);
+  for (let i = 0; i < data.length; i++) {
+    histogram[data[i]]++;
+  }
+
+  const half = data.length / 2;
+  let cumulative = 0;
+  for (let v = 0; v < 256; v++) {
+    cumulative += histogram[v];
+    if (cumulative >= half) {
+      return v;
+    }
+  }
+
+  return 255;
+}
+
+/**
+ * Euclidean distance between two points.
+ * @param {{x: number, y: number}} a
+ * @param {{x: number, y: number}} b
+ * @returns {number}
+ */
+function dist(a, b) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/**
+ * How far a detected quad's aspect ratio is from an object's (~0.71, portrait).
+ * @param {cv.Mat} approx - 4-point contour approximation (CV_32SC2).
+ * @returns {number} Difference from the target ratio, or Infinity if degenerate.
+ */
+function objectAspectRatioDiff(approx) {
+  const rect = cv.minAreaRect(approx);
+  const w = rect.size.width;
+  const h = rect.size.height;
+  if (w === 0 || h === 0) {
+    return Infinity;
+  }
+
+  const ratio = Math.min(w, h) / Math.max(w, h);
+  const objectRatio = OBJECT_WARP_WIDTH / OBJECT_WARP_HEIGHT;
+
+  return Math.abs(ratio - objectRatio);
+}
+
+/**
+ * Whether a candidate has enough pixel variation to plausibly be a real object.
+ * @param {cv.Mat} mat - Warped candidate object image.
+ * @returns {boolean}
+ */
+function hasEnoughDetail(mat) {
+  let gray = new cv.Mat();
+  let mean = new cv.Mat();
+  let stddev = new cv.Mat();
+
+  try {
+    cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+    cv.meanStdDev(gray, mean, stddev);
+
+    const minStdDev = 20; // blank frames measure near 0
+    return stddev.data64F[0] >= minStdDev;
+  } finally {
+    gray.delete();
+    mean.delete();
+    stddev.delete();
+  }
+}
+
+/**
+ * Sorts the corners and warps the object into a straightened, fixed-size image.
  */
 function transformPerspective(sourceMat, contour) {
-  const targetWidth = 350;
-  const targetHeight = 490;
+  const targetWidth = OBJECT_WARP_WIDTH;
+  const targetHeight = OBJECT_WARP_HEIGHT;
 
-  // 1. Punkte aus der OpenCV-Struktur in ein JS-Array extrahieren
+  // 1. Extract points from the OpenCV structure into a JS array
   let pts = [];
   for (let i = 0; i < 4; i++) {
     pts.push({
@@ -455,16 +621,32 @@ function transformPerspective(sourceMat, contour) {
     });
   }
 
-  // 2. Mathematische Ecken-Sortierung (Summe & Differenz)
+  // 1b. the quad usually only captures the inner frame, not the object's own border
+  // (often too low-contrast to detect) - expand outward to approximate the true edge
+  const borderExpansion = 0.06;
+  const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length;
+  const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length;
+  pts = pts.map((p) => ({
+    x: Math.min(
+      Math.max(cx + (p.x - cx) * (1 + borderExpansion), 0),
+      sourceMat.cols - 1,
+    ),
+    y: Math.min(
+      Math.max(cy + (p.y - cy) * (1 + borderExpansion), 0),
+      sourceMat.rows - 1,
+    ),
+  }));
+
+  // 2. Sort corners mathematically (sum & difference)
   let sums = pts.map((p) => p.x + p.y);
   let diffs = pts.map((p) => p.y - p.x);
 
-  let tl = pts[sums.indexOf(Math.min(...sums))]; // Top-Left (kleinste Summe)
-  let tr = pts[diffs.indexOf(Math.min(...diffs))]; // Top-Right (kleinste Differenz)
-  let br = pts[sums.indexOf(Math.max(...sums))]; // Bottom-Right (größte Summe)
-  let bl = pts[diffs.indexOf(Math.max(...diffs))]; // Bottom-Left (größte Differenz)
+  let tl = pts[sums.indexOf(Math.min(...sums))]; // top-left (smallest sum)
+  let tr = pts[diffs.indexOf(Math.min(...diffs))]; // top-right (smallest difference)
+  let br = pts[sums.indexOf(Math.max(...sums))]; // bottom-right (largest sum)
+  let bl = pts[diffs.indexOf(Math.max(...diffs))]; // bottom-left (largest difference)
 
-  // 3. Koordinaten-Matrizen für OpenCV erstellen
+  // 3. Build coordinate matrices
   let srcCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [
     tl.x,
     tl.y,
@@ -487,7 +669,7 @@ function transformPerspective(sourceMat, contour) {
     targetHeight,
   ]);
 
-  // 4. Matrix berechnen und Bild verformen (gocv.GetPerspectiveTransform / gocv.WarpPerspective)
+  // 4. Compute the matrix and warp the image
   let M = cv.getPerspectiveTransform(srcCoords, dstCoords);
   let result = new cv.Mat();
   cv.warpPerspective(
@@ -497,7 +679,6 @@ function transformPerspective(sourceMat, contour) {
     new cv.Size(targetWidth, targetHeight),
   );
 
-  // 5. Temporäre Berechnungsmatrizen löschen
   srcCoords.delete();
   dstCoords.delete();
   M.delete();
@@ -506,19 +687,15 @@ function transformPerspective(sourceMat, contour) {
 }
 
 async function fetchMatchesByImage(base64Image) {
-  try {
-    const response = await fetch("/detect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: base64Image }),
-    });
+  const response = await fetch("/detect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: base64Image }),
+  });
 
-    if (!response.ok) {
-      throw new Error("API Error");
-    }
-
-    return await response.json();
-  } catch (e) {
-    throw e;
+  if (!response.ok) {
+    throw new Error("API Error: " + response.status);
   }
+
+  return await response.json();
 }

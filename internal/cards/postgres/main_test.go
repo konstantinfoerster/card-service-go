@@ -119,6 +119,21 @@ func (r *databaseRunner) Start(ctx context.Context) (ConnectionInfo, error) {
 				FileMode:          initScriptDirPermissions,
 			},
 			{
+				HostFilePath:      filepath.Join(scriptsDir, "002-update-enums.sql"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/02b-update-enums.sql",
+				FileMode:          initScriptDirPermissions,
+			},
+			{
+				HostFilePath:      filepath.Join(scriptsDir, "003-update-enums.sql"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/02c-update-enums.sql",
+				FileMode:          initScriptDirPermissions,
+			},
+			{
+				HostFilePath:      filepath.Join(scriptsDir, "004-update-hashfields.sql"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/02d-update-hashfields.sql",
+				FileMode:          initScriptDirPermissions,
+			},
+			{
 				HostFilePath:      filepath.Join(dbDir, "03-data.sql"),
 				ContainerFilePath: "/docker-entrypoint-initdb.d/03-data.sql",
 				FileMode:          initScriptDirPermissions,

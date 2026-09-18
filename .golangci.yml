@@ -9,7 +9,7 @@ linters:
     - funlen
     - nestif
     - depguard # (replaced by gomodguard) Go linter that checks if package imports are in a list of acceptable packages
-    - exhaustruct # checks if all structure fields are initialized (really useful?)
+    - exhaustruct_v5 # checks if all structure fields are initialized (really useful?)
     - forbidigo # (don't need for a CLI) Forbids identifiers
     - forcetypeassert # (replaced by errcheck) finds missing type assertions
     - godox # detection of FIXME, TODO and other comment keywords
@@ -19,7 +19,7 @@ linters:
     - promlinter # (no prometheus here) check Prometheus metrics naming via promlint
     - thelper # (useful, but needs some configuration) detects golang test helpers without t.Helper() call and checks the consistency of test helpers
     - wrapcheck # (many detects, really useful?) checks that errors returned from external packages are wrapped
-    - wsl # (too strict) forces you to use empty lines
+    - wsl_v5 # (too strict) forces you to use empty lines
     - zerologlint # zerolog is not used
   enable:
     - asasalint
@@ -114,6 +114,9 @@ linters:
       case:
         rules:
           yaml: snake
+    goconst:
+      ignore-map-keys: true
+      ignore-tests: true
   exclusions:
     generated: lax
     presets:
@@ -126,7 +129,6 @@ linters:
           - forcetypeassert
           - funlen
           - gochecknoglobals
-          - gocons
           - lll
         path: _test\.go
       - linters:

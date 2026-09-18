@@ -14,6 +14,11 @@ type Config struct {
 	Port int    `yaml:"port"`
 	TLS  TLS    `yaml:"tls"`
 	Mode Mode   `yaml:"mode"`
+	// Debug enables debug features like saving image posted that are received by the web-api.
+	Debug bool `yaml:"debug"`
+	// DebugDir directory where the debug output is written to,
+	// defaults to "debug" if empty.
+	DebugDir string `yaml:"debug_dir"`
 }
 
 func (c Config) Addr() string {

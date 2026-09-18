@@ -31,7 +31,7 @@ RUN addgroup -g 10001 nonroot \
 
 COPY --from=builder --chown=nonroot:nonroot /app/service /usr/bin/
 
-USER nonroot
+USER 10001:10001
 
 ENTRYPOINT ["/usr/bin/service"]
 CMD ["--config", "/opts/app/application.yaml"]

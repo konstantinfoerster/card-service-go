@@ -1,12 +1,12 @@
 package cards
 
 import (
+	"cmp"
 	"context"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
-	"log/slog"
+	"slices"
+	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
@@ -45,6 +45,11 @@ func NewMatches(cards Cards, scores Scores, page Page) Matches {
 		}
 	}
 
+	// sort by lowest-distance, lowest = best match
+	slices.SortStableFunc(matches, func(a, b Match) int {
+		return cmp.Compare(a.Confidence, b.Confidence)
+	})
+
 	return Matches{
 		NewPagedResult(matches, page),
 	}
@@ -56,38 +61,44 @@ func EmptyMatches(p Page) Matches {
 	}
 }
 
+// PHashThreshold is the max Hamming distance for a 256-bit pHash to count as a match (~23%).
+const PHashThreshold = 60
+
+// DHashThreshold is the max Hamming distance for a dhash to count as a match. Looser
+// than PHashThreshold's ratio since dhash is noisier for camera-vs-scan comparisons.
+const DHashThreshold = 28
+
 type Hash struct {
-	Value []uint64
-	Bits  int
+	PHashR []uint64
+	PHashG []uint64
+	PHashB []uint64
+	DHash  uint64
 }
 
-func FromHexString(hash string) (Hash, error) {
-	if len(hash) != 64 {
-		return Hash{}, fmt.Errorf("invalid hash length: expected 64 characters, got %d", len(hash))
+// asBase2 concatenates the given 64-bit words into a single base-2 string.
+func asBase2(words []uint64) string {
+	var sb strings.Builder
+	for _, v := range words {
+		fmt.Fprintf(&sb, "%064b", v)
 	}
 
-	b, err := hex.DecodeString(hash)
-	if err != nil || len(b) != 32 {
-		return Hash{}, fmt.Errorf("invalid hash bytes")
-	}
-
-	// 2. Jeweils 8 Bytes direkt als uint64 interpretieren (BigEndian)
-	v := []uint64{
-		binary.BigEndian.Uint64(b[0:8]),
-		binary.BigEndian.Uint64(b[8:16]),
-		binary.BigEndian.Uint64(b[16:24]),
-		binary.BigEndian.Uint64(b[24:32]),
-	}
-	return Hash{Value: v, Bits: 256}, nil
+	return sb.String()
 }
 
-func (h Hash) AsBase2() []string {
-	base2 := make([]string, 0, len(h.Value))
-	for _, v := range h.Value {
-		base2 = append(base2, fmt.Sprintf("%064b", v))
-	}
+func (h Hash) PHashRBase2() string {
+	return asBase2(h.PHashR)
+}
 
-	return base2
+func (h Hash) PHashGBase2() string {
+	return asBase2(h.PHashG)
+}
+
+func (h Hash) PHashBBase2() string {
+	return asBase2(h.PHashB)
+}
+
+func (h Hash) DHashBase2() string {
+	return fmt.Sprintf("%064b", h.DHash)
 }
 
 type DetectRepository interface {
@@ -114,10 +125,11 @@ func NewDetectService(cRepo CardRepository, dRepo DetectRepository, detector Det
 
 type Degree int
 
+// Degree rotation angle in degrees.
 const (
-	None Degree = iota
-	Degree90
-	Degree180
+	None      Degree = 0
+	Degree90  Degree = 90
+	Degree180 Degree = 180
 )
 
 type Detectable interface {
@@ -161,10 +173,6 @@ func (s *DetectService) DetectByHash(ctx context.Context, c Collector, hashes ..
 
 	if len(scores) == 0 {
 		return EmptyMatches(DefaultPage()), nil
-	}
-
-	for _, s := range scores {
-		slog.Info("detected ", slog.Int("id", s.ID.CardID))
 	}
 
 	filter := NewFilter().WithCollector(c)

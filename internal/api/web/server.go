@@ -117,6 +117,8 @@ func NewServer(cfg Config) (*Server, error) {
 			PathPrefix: "",
 			Browse:     false,
 		}))
+	case prod:
+		fallthrough
 	default:
 		app.Use("/public", filesystem.New(filesystem.Config{
 			Root:       http.FS(embeddedFiles),

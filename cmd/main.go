@@ -74,6 +74,12 @@ func setup() config.Config {
 		panic(err)
 	}
 
+	if cfg.Server.Debug {
+		if err = os.MkdirAll(cfg.Server.DebugDir, 0755); err != nil {
+			panic(err)
+		}
+	}
+
 	slog.Info("logging", slog.String("value", logLevel.Level().Level().String()))
 	slog.Info("server", slog.Group("system",
 		slog.String("os", runtime.GOOS),
@@ -101,10 +107,10 @@ func run(cfg config.Config) error {
 	}
 	defer aio.Close(dbCon)
 
-	// migrator := postgres.NewMigrator(dbCon, postgres.Scripts)
-	// if err := migrator.Run(ctx); err != nil {
-	// 	return fmt.Errorf("failed to run migration scripts, %w", err)
-	// }
+	migrator := postgres.NewMigrator(dbCon, postgres.Scripts)
+	if err := migrator.Run(ctx); err != nil {
+		return fmt.Errorf("failed to run migration scripts, %w", err)
+	}
 
 	detector := imaging.NewDetector()
 
@@ -126,7 +132,7 @@ func run(cfg config.Config) error {
 		cardsapi.DashboardRoutes(r, cfg.Auth)
 		cardsapi.SearchRoutes(r, cfg.Auth, cardSvc)
 		cardsapi.CollectionRoutes(r, cfg.Auth, collectSvc)
-		cardsapi.DetectRoutes(r, cfg.Auth, detectSvc)
+		cardsapi.DetectRoutes(r, cfg.Auth, cfg.Server, detectSvc)
 	})
 
 	errg, ctx := errgroup.WithContext(context.Background())

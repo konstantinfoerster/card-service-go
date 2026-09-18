@@ -159,6 +159,7 @@ func TestSearchCollected(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodGet),
 				test.WithURL("http://localhost/mycards?name=Domonic&"+tc.page),
 				test.WithUser("myuser"),
@@ -179,6 +180,7 @@ func TestSearchCollected(t *testing.T) {
 func TestSearchCollectedNoSession(t *testing.T) {
 	srv := collectionServer(t)
 	req := test.NewRequest(
+		t.Context(),
 		test.WithMethod(web.MethodGet),
 		test.WithURL("http://localhost/mycards?name=Demonic"),
 	)
@@ -229,6 +231,7 @@ func TestCollectItem_Add(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
 				test.WithUser("myuser"),
@@ -277,6 +280,7 @@ func TestCollectItem_Remove(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// collect item
 			reqAdd := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
 				test.WithUser("myuser"),
@@ -286,6 +290,7 @@ func TestCollectItem_Remove(t *testing.T) {
 			defer test.Close(t, respAdd)
 			// remove collected item
 			reqRemove := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/mycards"),
 				test.WithUser("myuser"),
@@ -307,6 +312,7 @@ func TestCollectItem_Remove(t *testing.T) {
 func TestCollectItem_NotLoggedIn(t *testing.T) {
 	srv := collectionServer(t)
 	req := test.NewRequest(
+		t.Context(),
 		test.WithMethod(web.MethodPost),
 		test.WithURL("http://localhost/mycards"),
 		test.WithJSONBody(t, cardsapi.Item{ID: "Y2FyZD0x"}),

@@ -10,7 +10,7 @@ database:
   password: changeit
 
 server:
-  mode: dev
+  mode: prod
   port: 8080
   tls:
     enabled: false
