@@ -6,7 +6,7 @@ on:
 
 env:
   GO_VERSION: '1.25.x'
-  GO_LINT_VERSION: 'v2.10'
+  GO_LINT_VERSION: 'v2.13'
 
 permissions:
   contents: read

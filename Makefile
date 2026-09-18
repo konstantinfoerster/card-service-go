@@ -49,6 +49,7 @@ update:
 	go mod tidy
 .PHONY: lint
 lint:
+	docker run --pull always --rm -v $(CURRENT_DIR)\:/app -w /app golangci/golangci-lint\:latest golangci-lint config verify
 	docker run --pull always --rm -v $(CURRENT_DIR)\:/app -w /app golangci/golangci-lint\:latest golangci-lint run -v
 	docker run --pull always --rm -i hadolint/hadolint < build/Dockerfile
 	docker run --pull always --rm -i hadolint/hadolint < build/opencv.Dockerfile
