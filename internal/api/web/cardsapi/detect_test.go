@@ -1,6 +1,9 @@
 package cardsapi_test
 
 import (
+	"context"
+	"encoding/base64"
+	"io"
 	"os"
 	"path"
 	"runtime"
@@ -13,24 +16,32 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
-	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+type stubDetectRepository struct {
+	scores cards.Scores
+}
+
+func (s stubDetectRepository) Top5MatchesByHash(_ context.Context, _ ...cards.Hash) (cards.Scores, error) {
+	return s.scores, nil
+}
+
 func TestDetect(t *testing.T) {
-	srv := detectTestServer(t)
 	four := 4
 	cases := []struct {
 		name     string
 		img      string
 		user     test.RequestOpt
+		scores   cards.Scores
 		expected []cardsapi.Card
 	}{
 		{
-			name: "match",
-			img:  "cardImageModified.jpg",
+			name:   "match",
+			img:    "cardImageModified.jpg",
+			scores: cards.Scores{{ID: cards.NewID(1).WithFace(1), Score: 4}},
 			expected: []cardsapi.Card{
 				{
 					ID:    "Y2FyZD0xJmZhY2U9MQ==",
@@ -46,9 +57,10 @@ func TestDetect(t *testing.T) {
 			},
 		},
 		{
-			name: "match with user",
-			img:  "cardImageModified.jpg",
-			user: test.WithUser("myuser"),
+			name:   "match with user",
+			img:    "cardImageModified.jpg",
+			user:   test.WithUser("myuser"),
+			scores: cards.Scores{{ID: cards.NewID(1).WithFace(1), Score: 4}},
 			expected: []cardsapi.Card{
 				{
 					ID:     "Y2FyZD0xJmZhY2U9MQ==",
@@ -67,19 +79,27 @@ func TestDetect(t *testing.T) {
 		{
 			name:     "no score",
 			img:      "noscore.jpg",
+			scores:   cards.Scores{},
 			expected: []cardsapi.Card{},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			srv := detectTestServer(t, stubDetectRepository{scores: tc.scores})
+
 			fImg, err := os.Open(path.Join(currentDir(), "testdata", tc.img))
 			defer aio.Close(fImg)
 			require.NoError(t, err)
+			rawImg, err := io.ReadAll(fImg)
+			require.NoError(t, err)
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/detect"),
 				tc.user,
-				test.WithMultipartFile(t, fImg, fImg.Name()),
+				test.WithJSONBody(t, cardsapi.DetectRequest{
+					Image: base64.StdEncoding.EncodeToString(rawImg),
+				}),
 			)
 			resp, err := srv.Test(req)
 			defer test.Close(t, resp)
@@ -94,11 +114,43 @@ func TestDetect(t *testing.T) {
 	}
 }
 
-func detectTestServer(t *testing.T) *web.Server {
-	cfg := postgres.Images{Host: "testdata"}
+func TestDetectInvalidImage(t *testing.T) {
+	cases := []struct {
+		name string
+		body any
+	}{
+		{
+			name: "no image",
+			body: cardsapi.DetectRequest{},
+		},
+		{
+			name: "no base64 image",
+			body: cardsapi.DetectRequest{
+				Image: "not base64",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := detectTestServer(t, stubDetectRepository{})
+
+			req := test.NewRequest(
+				t.Context(),
+				test.WithMethod(web.MethodPost),
+				test.WithURL("http://localhost/detect"),
+				test.WithJSONBody(t, tc.body),
+			)
+			resp, err := srv.Test(req)
+			defer test.Close(t, resp)
+
+			require.NoError(t, err)
+			assert.Equal(t, web.StatusBadRequest, resp.StatusCode)
+		})
+	}
+}
+
+func detectTestServer(t *testing.T, dRepo cards.DetectRepository) *web.Server {
 	seed, err := test.CardSeed()
-	require.NoError(t, err)
-	dRepo, err := memory.NewDetectRepository(seed, cfg)
 	require.NoError(t, err)
 	item, err := cards.NewCollectable(cards.NewID(1), 1)
 	require.NoError(t, err)
@@ -119,7 +171,7 @@ func detectTestServer(t *testing.T) *web.Server {
 			HeaderUserEmail: web.HeaderUserEmail,
 		}
 
-		cardsapi.DetectRoutes(r.Group("/"), cfg, svc)
+		cardsapi.DetectRoutes(r.Group("/"), cfg, web.Config{}, svc)
 	})
 
 	return srv

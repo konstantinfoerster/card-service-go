@@ -83,6 +83,7 @@ func TestAuthMiddleware(t *testing.T) {
 				})
 
 				req := test.NewRequest(
+					t.Context(),
 					test.WithMethod(http.MethodGet),
 					test.WithURL("/test"),
 					test.WithHeader(tc.header),
@@ -118,6 +119,7 @@ func TestAuthMiddleware(t *testing.T) {
 				})
 
 				req := test.NewRequest(
+					t.Context(),
 					test.WithMethod(http.MethodGet),
 					test.WithURL("/test"),
 					test.WithHeader(tc.header),
@@ -145,6 +147,7 @@ func TestUserFromCtx(t *testing.T) {
 		return nil
 	})
 	req := test.NewRequest(
+		t.Context(),
 		test.WithMethod(http.MethodGet),
 		test.WithURL("/test"),
 	)
@@ -192,6 +195,7 @@ func TestUserFromCtx_InvalidInput(t *testing.T) {
 				return nil
 			})
 			req := test.NewRequest(
+				t.Context(),
 				test.WithMethod(http.MethodGet),
 				test.WithURL("/test"),
 			)

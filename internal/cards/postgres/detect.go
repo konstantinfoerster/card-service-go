@@ -29,23 +29,34 @@ func (r *PostgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes
 
 	limit := 5
 	queryArgs := []any{limit}
-	var sb strings.Builder
-	sb.WriteString("LEAST(")
-	for i, hash := range hashes {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString("(")
-		for x, v := range hash.AsBase2() {
-			if x > 0 {
-				sb.WriteString("+")
-			}
-			queryArgs = append(queryArgs, v)
-			fmt.Fprintf(&sb, "BIT_COUNT(image.phash%d # $%d)", x+1, len(queryArgs))
-		}
-		sb.WriteString(")")
+
+	sumExprs := make([]string, 0, len(hashes))
+	condExprs := make([]string, 0, len(hashes))
+	for _, hash := range hashes {
+		queryArgs = append(queryArgs, hash.PHashRBase2())
+		rIdx := len(queryArgs)
+		queryArgs = append(queryArgs, hash.PHashGBase2())
+		gIdx := len(queryArgs)
+		queryArgs = append(queryArgs, hash.PHashBBase2())
+		bIdx := len(queryArgs)
+		queryArgs = append(queryArgs, hash.DHashBase2())
+		dIdx := len(queryArgs)
+
+		rExpr := fmt.Sprintf("BIT_COUNT(image.phash_r # $%d)", rIdx)
+		gExpr := fmt.Sprintf("BIT_COUNT(image.phash_g # $%d)", gIdx)
+		bExpr := fmt.Sprintf("BIT_COUNT(image.phash_b # $%d)", bIdx)
+		dExpr := fmt.Sprintf("BIT_COUNT(image.dhash # $%d)", dIdx)
+
+		sumExprs = append(sumExprs, fmt.Sprintf("(%s+%s+%s+%s)", rExpr, gExpr, bExpr, dExpr))
+		// a candidate hash only matches if every field individually clears its own threshold
+		condExprs = append(condExprs, fmt.Sprintf(
+			"(%s < %d AND %s < %d AND %s < %d AND %s < %d)",
+			rExpr, cards.PHashThreshold, gExpr, cards.PHashThreshold, bExpr, cards.PHashThreshold, dExpr, cards.DHashThreshold,
+		))
 	}
-	sb.WriteString(")")
+
+	scoreExpr := "LEAST(" + strings.Join(sumExprs, ",") + ")"
+	whereExpr := strings.Join(condExprs, " OR ")
 
 	query := fmt.Sprintf(`
 SELECT
@@ -53,12 +64,12 @@ SELECT
 FROM
   card_image as image
 WHERE
-  CAST(%s as int) < 60
+  %s
 GROUP BY
-  image.card_id, image.face_id, image.phash1, image.phash2, image.phash3, image.phash4
+  image.card_id, image.face_id, image.phash_r, image.phash_g, image.phash_b, image.dhash
 ORDER BY
-  image.face_id, %s
-LIMIT $1`, sb.String(), sb.String(), sb.String())
+  %s, image.card_id, image.face_id
+LIMIT $1`, scoreExpr, whereExpr, scoreExpr)
 	rows, err := r.db.Conn.Query(ctx, query, queryArgs...)
 	if err != nil {
 		return cards.Scores{}, fmt.Errorf("failed to execute top 5 phash select %w", err)

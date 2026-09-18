@@ -9,6 +9,11 @@
         >My Cards</a>
       </li>
     {{- end -}}
+    <li><a
+          href="/detect/live"
+          class="nav-link{{if eq .activePage "detect"}} active{{end}}"
+      >Detect</a>
+    </li>
   <li class="visible-mobile">
     <ul role="list">
         {{- if .User -}}

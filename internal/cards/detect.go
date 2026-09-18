@@ -1,9 +1,12 @@
 package cards
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
@@ -42,6 +45,11 @@ func NewMatches(cards Cards, scores Scores, page Page) Matches {
 		}
 	}
 
+	// sort by lowest-distance, lowest = best match
+	slices.SortStableFunc(matches, func(a, b Match) int {
+		return cmp.Compare(a.Confidence, b.Confidence)
+	})
+
 	return Matches{
 		NewPagedResult(matches, page),
 	}
@@ -53,18 +61,44 @@ func EmptyMatches(p Page) Matches {
 	}
 }
 
+// PHashThreshold is the max Hamming distance for a 256-bit pHash to count as a match (~23%).
+const PHashThreshold = 60
+
+// DHashThreshold is the max Hamming distance for a dhash to count as a match. Looser
+// than PHashThreshold's ratio since dhash is noisier for camera-vs-scan comparisons.
+const DHashThreshold = 28
+
 type Hash struct {
-	Value []uint64
-	Bits  int
+	PHashR []uint64
+	PHashG []uint64
+	PHashB []uint64
+	DHash  uint64
 }
 
-func (h Hash) AsBase2() []string {
-	base2 := make([]string, 0, len(h.Value))
-	for _, v := range h.Value {
-		base2 = append(base2, fmt.Sprintf("%064b", v))
+// asBase2 concatenates the given 64-bit words into a single base-2 string.
+func asBase2(words []uint64) string {
+	var sb strings.Builder
+	for _, v := range words {
+		fmt.Fprintf(&sb, "%064b", v)
 	}
 
-	return base2
+	return sb.String()
+}
+
+func (h Hash) PHashRBase2() string {
+	return asBase2(h.PHashR)
+}
+
+func (h Hash) PHashGBase2() string {
+	return asBase2(h.PHashG)
+}
+
+func (h Hash) PHashBBase2() string {
+	return asBase2(h.PHashB)
+}
+
+func (h Hash) DHashBase2() string {
+	return fmt.Sprintf("%064b", h.DHash)
 }
 
 type DetectRepository interface {
@@ -91,10 +125,11 @@ func NewDetectService(cRepo CardRepository, dRepo DetectRepository, detector Det
 
 type Degree int
 
+// Degree rotation angle in degrees.
 const (
-	None Degree = iota
-	Degree90
-	Degree180
+	None      Degree = 0
+	Degree90  Degree = 90
+	Degree180 Degree = 180
 )
 
 type Detectable interface {
@@ -121,6 +156,14 @@ func (s *DetectService) Detect(ctx context.Context, c Collector, in io.Reader) (
 			return Matches{}, aerrors.NewUnknownError(err, "rotated-hashing-failed")
 		}
 		hashes = append(hashes, rhash)
+	}
+
+	return s.DetectByHash(ctx, c, hashes...)
+}
+
+func (s *DetectService) DetectByHash(ctx context.Context, c Collector, hashes ...Hash) (Matches, error) {
+	if len(hashes) == 0 {
+		return EmptyMatches(DefaultPage()), nil
 	}
 
 	scores, err := s.dRepo.Top5MatchesByHash(ctx, hashes...)

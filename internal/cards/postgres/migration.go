@@ -66,7 +66,7 @@ func (m *PostgresMigrator) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to read %s from scripts dir, %w", scriptName, err)
 			}
 
-			for _, q := range strings.Split(string(b), ";") {
+			for q := range strings.SplitSeq(string(b), ";") {
 				query := strings.TrimSpace(q)
 				if query == "" {
 					continue
@@ -77,7 +77,7 @@ func (m *PostgresMigrator) Run(ctx context.Context) error {
 				}
 			}
 
-			err = m.addMigrated(ctx, scriptName)
+			err = m.addMigrated(ctx, db, scriptName)
 			if err != nil {
 				return err
 			}
@@ -95,7 +95,7 @@ func (m *PostgresMigrator) Run(ctx context.Context) error {
 	return nil
 }
 
-func (m *PostgresMigrator) addMigrated(ctx context.Context, name string) error {
+func (m *PostgresMigrator) addMigrated(ctx context.Context, db *DBConnection, name string) error {
 	args := pgx.NamedArgs{
 		"name": name,
 	}
@@ -105,7 +105,7 @@ INSERT INTO
 VALUES
 	(@name)
 `
-	if _, err := m.db.Conn.Exec(ctx, query, args); err != nil {
+	if _, err := db.Conn.Exec(ctx, query, args); err != nil {
 		return fmt.Errorf("insert migration entry failed, %w", err)
 	}
 

@@ -19,3 +19,6 @@ go.work
 
 configs/
 !configs/application.yaml
+
+debug/
+cmd/debughash/

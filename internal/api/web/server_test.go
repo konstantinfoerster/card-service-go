@@ -47,7 +47,7 @@ func TestNewServer_ErrorHandler(t *testing.T) {
 					return tc.appErr
 				})
 			})
-			req := httptest.NewRequest(web.MethodGet, "https://localhost/", nil)
+			req := httptest.NewRequestWithContext(t.Context(), web.MethodGet, "https://localhost/", nil)
 
 			resp, err := srv.Test(req)
 			defer test.Close(t, resp)

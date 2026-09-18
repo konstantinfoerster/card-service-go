@@ -35,7 +35,7 @@ test-it:
 	go test --count=1 -run Integration ./...
 .PHONY: update
 update:
-	go get github.com/anthonynsimon/bild
+	# go get github.com/anthonynsimon/bild
 	go get github.com/corona10/goimagehash 
 	go get github.com/gofiber/fiber/v2
 	go get github.com/gofiber/template/html/v2 
@@ -49,6 +49,7 @@ update:
 	go mod tidy
 .PHONY: lint
 lint:
+	docker run --pull always --rm -v $(CURRENT_DIR)\:/app -w /app golangci/golangci-lint\:latest golangci-lint config verify
 	docker run --pull always --rm -v $(CURRENT_DIR)\:/app -w /app golangci/golangci-lint\:latest golangci-lint run -v
 	docker run --pull always --rm -i hadolint/hadolint < build/Dockerfile
 	docker run --pull always --rm -i hadolint/hadolint < build/opencv.Dockerfile

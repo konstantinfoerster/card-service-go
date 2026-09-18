@@ -30,7 +30,7 @@ RUN groupadd -g 10001 nonroot \
           -s /usr/sbin/nologin \
           nonroot
 
-USER nonroot
+USER 10001:10001
 
 ENTRYPOINT ["/usr/bin/service"]
 CMD ["--config", "/opts/app/application.yaml"]

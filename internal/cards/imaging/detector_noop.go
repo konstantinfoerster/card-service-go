@@ -16,5 +16,14 @@ func NewDetector() *NoopDetector {
 }
 
 func (d NoopDetector) Detect(in io.Reader) ([]cards.Detectable, error) {
-	return make([]cards.Detectable, 0), nil
+	if in == nil {
+		return make([]cards.Detectable, 0), nil
+	}
+
+	img, err := NewImage(in)
+	if err != nil {
+		return nil, err
+	}
+
+	return []cards.Detectable{img}, nil
 }

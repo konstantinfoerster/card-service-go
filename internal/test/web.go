@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -28,7 +29,7 @@ type httpRequest struct {
 	cookies []*http.Cookie
 }
 
-func NewRequest(options ...RequestOpt) *http.Request {
+func NewRequest(ctx context.Context, options ...RequestOpt) *http.Request {
 	r := &httpRequest{
 		header:  make(map[string]string),
 		cookies: make([]*http.Cookie, 0),
@@ -46,7 +47,7 @@ func NewRequest(options ...RequestOpt) *http.Request {
 		body = bytes.NewReader(r.body)
 	}
 
-	req := httptest.NewRequest(r.method, r.url, body)
+	req := httptest.NewRequestWithContext(ctx, r.method, r.url, body)
 
 	for _, c := range r.cookies {
 		req.AddCookie(c)

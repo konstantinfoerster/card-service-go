@@ -12,6 +12,9 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
 EOSQL
 
 psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02-create-tables.sql
+psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02b-update-enums.sql
+psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02c-update-enums.sql
+psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02d-update-hashfields.sql
 psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/03-data.sql
 
 # create migration user and database
