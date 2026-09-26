@@ -14,18 +14,18 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/detection"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
 	"github.com/konstantinfoerster/card-service-go/internal/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type stubDetectRepository struct {
+type stubFinderRepository struct {
 	scores cards.Scores
 }
 
-func (s stubDetectRepository) Top5MatchesByHash(_ context.Context, _ ...cards.Hash) (cards.Scores, error) {
+func (s stubFinderRepository) Top5MatchesByHash(_ context.Context, _ ...detection.Hash) (cards.Scores, error) {
 	return s.scores, nil
 }
 
@@ -85,7 +85,7 @@ func TestDetect(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := detectTestServer(t, stubDetectRepository{scores: tc.scores})
+			srv := detectTestServer(t, stubFinderRepository{scores: tc.scores})
 
 			fImg, err := os.Open(path.Join(currentDir(), "testdata", tc.img))
 			defer aio.Close(fImg)
@@ -129,10 +129,16 @@ func TestDetectInvalidImage(t *testing.T) {
 				Image: "not base64",
 			},
 		},
+		{
+			name: "base64 but no image",
+			body: cardsapi.DetectRequest{
+				Image: base64.StdEncoding.EncodeToString([]byte("no image")),
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := detectTestServer(t, stubDetectRepository{})
+			srv := detectTestServer(t, stubFinderRepository{})
 
 			req := test.NewRequest(
 				t.Context(),
@@ -149,7 +155,7 @@ func TestDetectInvalidImage(t *testing.T) {
 	}
 }
 
-func detectTestServer(t *testing.T, dRepo cards.DetectRepository) *web.Server {
+func detectTestServer(t *testing.T, finder detection.Finder) *web.Server {
 	seed, err := test.CardSeed()
 	require.NoError(t, err)
 	item, err := cards.NewCollectable(cards.NewID(1), 1)
@@ -161,8 +167,8 @@ func detectTestServer(t *testing.T, dRepo cards.DetectRepository) *web.Server {
 	cRepo, err := memory.NewCardRepository(seed, collected)
 	require.NoError(t, err)
 
-	detector := imaging.NewFakeDetector()
-	svc := cards.NewDetectService(cRepo, dRepo, detector)
+	matcher := detection.NewMatcher(finder, detection.NewHasher())
+	svc := cards.NewDetectService(cRepo, matcher)
 
 	srv := web.NewTestServer()
 	srv.RegisterRoutes(func(r fiber.Router) {

@@ -55,6 +55,7 @@ func NewProbeServer(cfg Config,
 ) *Server {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
+		BodyLimit:             cfg.MaxBodySize,
 	})
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
@@ -85,9 +86,14 @@ func NewServer(cfg Config) (*Server, error) {
 		},
 	})
 
-	// FIXME: make body size configurable
+	// avoid 0 and negative values, 0 = unlimited
+	if cfg.MaxBodySize <= 0 {
+		cfg.MaxBodySize = DefaultMaxBodySize
+	}
+
 	app := fiber.New(fiber.Config{
-		Views: engine,
+		Views:     engine,
+		BodyLimit: cfg.MaxBodySize,
 		// FIXME: error handler does not handle text/html requests
 		ErrorHandler: RespondWithProblemJSON,
 	})

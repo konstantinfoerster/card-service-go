@@ -1,9 +1,9 @@
 module github.com/konstantinfoerster/card-service-go
 
-go 1.25.0
+go 1.27.0
 
 require (
-	github.com/anthonynsimon/bild v0.14.0
+	github.com/anthonynsimon/bild v0.17.1
 	github.com/corona10/goimagehash v1.1.0
 	github.com/gofiber/fiber/v2 v2.52.15
 	github.com/gofiber/template/html/v2 v2.1.3
@@ -11,9 +11,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	go.yaml.in/yaml/v3 v3.0.5
-	gocv.io/x/gocv v0.43.0
-	golang.org/x/image v0.45.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.23.0
 )
 
 require (
@@ -75,7 +73,7 @@ require (
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 )

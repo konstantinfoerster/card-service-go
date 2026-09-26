@@ -9,11 +9,17 @@ const (
 	prod Mode = "prod"
 )
 
+// DefaultMaxBodySize request body limit in bytes (1 MiB).
+const DefaultMaxBodySize = 1024 * 1024
+
 type Config struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 	TLS  TLS    `yaml:"tls"`
 	Mode Mode   `yaml:"mode"`
+	// MaxBodySize maximum accepted request body size in bytes,
+	// defaults to 1 MiB if not set.
+	MaxBodySize int `yaml:"max_body_size"`
 	// Debug enables debug features like saving image posted that are received by the web-api.
 	Debug bool `yaml:"debug"`
 	// DebugDir directory where the debug output is written to,
