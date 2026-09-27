@@ -17,7 +17,7 @@ const (
 	faceIDKey = "face"
 )
 
-var ErrInvalidInput = errors.New("invalid unput")
+var ErrInvalidInput = errors.New("invalid input")
 
 func newPage(c *fiber.Ctx) cards.Page {
 	size, _ := strconv.Atoi(c.Query("size", ""))

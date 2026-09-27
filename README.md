@@ -3,61 +3,77 @@
 
 # Card-Manager in Go
 
-A web application that help you to manage your card collection.
+A web application that helps you to manage your card collection.
 
 ## Features
 
 - Search for cards
 - Add cards to your card-collection
-- Remove cards from you card-collection
+- Remove cards from your card-collection
 - Detect cards based on an uploaded card image
+
+## TODOs
+
+- compress assets
+- fingerprint assets
+- pin image version to digest and use dependabot to update it
 
 ## Requirements
 
-- go version >= 1.25
+- go version >= 1.27
 - postgres
-- opencv4
 - make (optional)
 - docker (optional)
 
 ## Run locally
 
-Run `go run cmd/main.go` to start the web application with the default configuration file (configs/application.yaml).
+Run `go run cmd/main.go` to start the web application with the default configuration file (`configs/application.yaml`).
 
 Flags:
 
-| Flag       | Usage                               | Default Value            | Description                    |
-| ---------- | ----------------------------------- | ------------------------ | ------------------------------ |
-| `--config` | `--config configs/application.yaml` | configs/application.yaml | path to the configuration file |
+| Flag       | Usage                               | Default Value            | Description                                      |
+| ---------- | ----------------------------------- | ------------------------ | ------------------------------------------------ |
+| `--config` | `--config configs/application.yaml` | configs/application.yaml | path to the configuration files, can be repeated |
+
+You can also run `make run-local` to start the application (uses `configs/application-local.yaml`).
 
 ## Test
 
 - Run **all** tests with `go test -v ./...` or `make test`
 - Run **unit tests** `go test -v -short ./...` or `make test-unit`
-- Run **integration tests** `go test -v -run Integration ./...` or `make test-it`
 
-**Integration tests** require **docker** to be installed.
+Running **all** tests requires **docker** to be installed.
 
 ## Build
 
-Build it with `go build -o card-service cmd/main.go` (without detect functionality). To enable opencv integration you will need
-to install opencv4 on your local machine and then execute `CGO_ENABLED=1; go build -o card-service -tags opencv cmd/main.go` to build the application.
+Build it with `go build -o card-service cmd/main.go` or `make build`.
+
+### Docker
+
+The **dev** docker image can be built via:
+
+- `docker build --target dev -t card-service:local-dev -f build/Dockerfile .`
+  or `make docker-build`.
+
+The **prod** image can be built with target `prod`.
+
+Hint: The config file is expected to be mounted to `/opts/app/application.yaml`.
 
 ## Misc
 
 ### Linting
 
-To run all linter just run `make lint` or check the steps below.
+To run all linters just run `make lint` or check the steps below.
 
 #### Code
 
-The lint aggregator [golangci-lint](https://golangci-lint.run/) can is used to apply best practice and find errors in this project.
+The lint aggregator [golangci-lint](https://golangci-lint.run/) is used to apply best practices and find errors in this project.
 
 Just run `docker run --pull always --rm -v $(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run -v`
 inside the root dir of the project to start the linting process.
 
 #### Dockerfile
 
-The linter [Hadolint](https://github.com/hadolint/hadolint) can be used to apply best practice on your Dockerfile.
+The linter [Hadolint](https://github.com/hadolint/hadolint) can be used to apply best practices on your Dockerfile.
 
 Just run `docker run --pull always --rm -i hadolint/hadolint < build/Dockerfile` to check your Dockerfile.

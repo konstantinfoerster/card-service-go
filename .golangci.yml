@@ -18,6 +18,7 @@ linters:
     - prealloc # (premature optimization) finds slice declarations that could potentially be preallocated
     - promlinter # (no prometheus here) check Prometheus metrics naming via promlint
     - thelper # (useful, but needs some configuration) detects golang test helpers without t.Helper() call and checks the consistency of test helpers
+    - unparam # no real use here
     - wrapcheck # (many detects, really useful?) checks that errors returned from external packages are wrapped
     - wsl_v5 # (too strict) forces you to use empty lines
     - zerologlint # zerolog is not used
@@ -84,7 +85,6 @@ linters:
     - testpackage
     - tparallel
     - unconvert
-    - unparam
     - unused
     - usestdlibvars
     - wastedassign

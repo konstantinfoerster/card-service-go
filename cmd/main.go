@@ -14,7 +14,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
-	"github.com/konstantinfoerster/card-service-go/internal/cards/imaging"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/detection"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"golang.org/x/sync/errgroup"
@@ -112,8 +112,6 @@ func run(cfg config.Config) error {
 		return fmt.Errorf("failed to run migration scripts, %w", err)
 	}
 
-	detector := imaging.NewDetector()
-
 	cardRepo := postgres.NewCardRepository(dbCon, cfg.Images)
 	cardSvc := cards.NewCardService(cardRepo)
 
@@ -121,7 +119,8 @@ func run(cfg config.Config) error {
 	collectSvc := cards.NewCollectionService(collectRepo)
 
 	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
-	detectSvc := cards.NewDetectService(cardRepo, detectRep, detector)
+	matcher := detection.NewMatcher(detectRep, detection.NewHasher())
+	detectSvc := cards.NewDetectService(cardRepo, matcher)
 
 	srv, err := web.NewServer(cfg.Server)
 	if err != nil {

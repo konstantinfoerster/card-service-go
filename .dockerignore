@@ -3,4 +3,7 @@
 .github/
 build/
 configs/
-!configs/application.yaml
+**/*_test.go
+**/testdata/
+*.md
+card-service

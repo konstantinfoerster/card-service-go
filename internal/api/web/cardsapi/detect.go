@@ -44,7 +44,7 @@ func detect(svc DetectService, cfg web.Config) fiber.Handler {
 		}
 
 		if req.Image == "" {
-			return aerrors.NewInvalidInputError(nil, "invalid-image", "no image provided")
+			return aerrors.NewInvalidInputError(nil, "invalid-body", "no image provided")
 		}
 
 		imgBytes, err := base64.StdEncoding.DecodeString(req.Image)

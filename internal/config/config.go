@@ -35,9 +35,10 @@ func ReadConfigs(path ...string) (Config, error) {
 			Level: "info",
 		},
 		Server: web.Config{
-			Port:     3000,
-			Debug:    false,
-			DebugDir: "debug",
+			Port:        3000,
+			MaxBodySize: web.DefaultMaxBodySize,
+			Debug:       false,
+			DebugDir:    "debug",
 		},
 		Probes: web.Config{
 			Port: 3001,

@@ -3,13 +3,14 @@ package cards
 import (
 	"cmp"
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"slices"
-	"strings"
 
 	"github.com/konstantinfoerster/card-service-go/internal/aerrors"
 )
+
+var ErrInvalidInput = errors.New("invalid input")
 
 type Score struct {
 	ID    ID
@@ -61,129 +62,51 @@ func EmptyMatches(p Page) Matches {
 	}
 }
 
-// PHashThreshold is the max Hamming distance for a 256-bit pHash to count as a match (~23%).
-const PHashThreshold = 60
-
-// DHashThreshold is the max Hamming distance for a dhash to count as a match. Looser
-// than PHashThreshold's ratio since dhash is noisier for camera-vs-scan comparisons.
-const DHashThreshold = 28
-
-type Hash struct {
-	PHashR []uint64
-	PHashG []uint64
-	PHashB []uint64
-	DHash  uint64
-}
-
-// asBase2 concatenates the given 64-bit words into a single base-2 string.
-func asBase2(words []uint64) string {
-	var sb strings.Builder
-	for _, v := range words {
-		fmt.Fprintf(&sb, "%064b", v)
-	}
-
-	return sb.String()
-}
-
-func (h Hash) PHashRBase2() string {
-	return asBase2(h.PHashR)
-}
-
-func (h Hash) PHashGBase2() string {
-	return asBase2(h.PHashG)
-}
-
-func (h Hash) PHashBBase2() string {
-	return asBase2(h.PHashB)
-}
-
-func (h Hash) DHashBase2() string {
-	return fmt.Sprintf("%064b", h.DHash)
-}
-
-type DetectRepository interface {
-	Top5MatchesByHash(ctx context.Context, hashes ...Hash) (Scores, error)
-}
-
-type Detector interface {
-	Detect(img io.Reader) ([]Detectable, error)
+type Matcher interface {
+	Top5Matches(ctx context.Context, in io.Reader) (Scores, error)
 }
 
 type DetectService struct {
-	cRepo    CardRepository
-	dRepo    DetectRepository
-	detector Detector
+	cRepo   CardRepository
+	matcher Matcher
 }
 
-func NewDetectService(cRepo CardRepository, dRepo DetectRepository, detector Detector) *DetectService {
+func NewDetectService(cRepo CardRepository, matcher Matcher) *DetectService {
 	return &DetectService{
-		cRepo:    cRepo,
-		dRepo:    dRepo,
-		detector: detector,
+		cRepo:   cRepo,
+		matcher: matcher,
 	}
-}
-
-type Degree int
-
-// Degree rotation angle in degrees.
-const (
-	None      Degree = 0
-	Degree90  Degree = 90
-	Degree180 Degree = 180
-)
-
-type Detectable interface {
-	Rotate(angle Degree) Detectable
-	Hash() (Hash, error)
 }
 
 func (s *DetectService) Detect(ctx context.Context, c Collector, in io.Reader) (Matches, error) {
-	result, dErr := s.detector.Detect(in)
-	if dErr != nil {
-		return Matches{}, aerrors.NewUnknownError(dErr, "detection-failed")
-	}
-
-	hashes := make([]Hash, 0)
-	for _, r := range result {
-		hash, err := r.Hash()
-		if err != nil {
-			return Matches{}, aerrors.NewUnknownError(err, "hashing-failed")
-		}
-		hashes = append(hashes, hash)
-
-		rhash, err := r.Rotate(Degree180).Hash()
-		if err != nil {
-			return Matches{}, aerrors.NewUnknownError(err, "rotated-hashing-failed")
-		}
-		hashes = append(hashes, rhash)
-	}
-
-	return s.DetectByHash(ctx, c, hashes...)
-}
-
-func (s *DetectService) DetectByHash(ctx context.Context, c Collector, hashes ...Hash) (Matches, error) {
-	if len(hashes) == 0 {
+	if in == nil {
 		return EmptyMatches(DefaultPage()), nil
 	}
 
-	scores, err := s.dRepo.Top5MatchesByHash(ctx, hashes...)
+	scores, err := s.matcher.Top5Matches(ctx, in)
 	if err != nil {
-		return Matches{}, aerrors.NewUnknownError(err, "unable-to-execute-hash-search")
+		if errors.Is(err, ErrInvalidInput) {
+			return Matches{}, aerrors.NewInvalidInputError(err, "invalid-detect-input", "invalid detection input")
+		}
+
+		return Matches{}, aerrors.NewUnknownError(err, "unable-to-execute-matching")
 	}
 
 	if len(scores) == 0 {
 		return EmptyMatches(DefaultPage()), nil
 	}
 
-	filter := NewFilter().WithCollector(c)
+	ids := make([]ID, 0, len(scores))
 	for _, s := range scores {
-		filter = filter.WithID(s.ID)
+		ids = append(ids, s.ID)
 	}
+	filter := NewFilter().WithCollector(c).WithID(ids...)
+
 	limit := 5
 	page := NewPage(1, limit)
 	cards, err := s.cRepo.Find(ctx, filter, page)
 	if err != nil {
-		return Matches{}, aerrors.NewUnknownError(err, "unable-to-execute-card-search-by-id")
+		return Matches{}, aerrors.NewUnknownError(err, "unable-to-execute-card-search")
 	}
 
 	matches := NewMatches(cards, scores, page)

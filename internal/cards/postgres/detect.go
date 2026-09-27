@@ -7,7 +7,14 @@ import (
 	"time"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/detection"
 )
+
+// PHashThreshold max Hamming distance for a 256-bit pHash to count as a match.
+const PHashThreshold = 60
+
+// DHashThreshold max Hamming distance for a dhash to count as a match.
+const DHashThreshold = 28
 
 type PostgresDetectRepository struct {
 	db  *DBConnection
@@ -21,7 +28,8 @@ func NewDetectRepository(connection *DBConnection, cfg Images) *PostgresDetectRe
 	}
 }
 
-func (r *PostgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes ...cards.Hash) (cards.Scores, error) {
+func (r *PostgresDetectRepository) Top5MatchesByHash(
+	ctx context.Context, hashes ...detection.Hash) (cards.Scores, error) {
 	defer cards.TimeTracker(time.Now(), "Top5MatchesByHash")
 	if len(hashes) == 0 {
 		return cards.Scores{}, nil
@@ -33,13 +41,13 @@ func (r *PostgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes
 	sumExprs := make([]string, 0, len(hashes))
 	condExprs := make([]string, 0, len(hashes))
 	for _, hash := range hashes {
-		queryArgs = append(queryArgs, hash.PHashRBase2())
+		queryArgs = append(queryArgs, asBase2(hash.PHashR...))
 		rIdx := len(queryArgs)
-		queryArgs = append(queryArgs, hash.PHashGBase2())
+		queryArgs = append(queryArgs, asBase2(hash.PHashG...))
 		gIdx := len(queryArgs)
-		queryArgs = append(queryArgs, hash.PHashBBase2())
+		queryArgs = append(queryArgs, asBase2(hash.PHashB...))
 		bIdx := len(queryArgs)
-		queryArgs = append(queryArgs, hash.DHashBase2())
+		queryArgs = append(queryArgs, asBase2(hash.DHash))
 		dIdx := len(queryArgs)
 
 		rExpr := fmt.Sprintf("BIT_COUNT(image.phash_r # $%d)", rIdx)
@@ -51,7 +59,7 @@ func (r *PostgresDetectRepository) Top5MatchesByHash(ctx context.Context, hashes
 		// a candidate hash only matches if every field individually clears its own threshold
 		condExprs = append(condExprs, fmt.Sprintf(
 			"(%s < %d AND %s < %d AND %s < %d AND %s < %d)",
-			rExpr, cards.PHashThreshold, gExpr, cards.PHashThreshold, bExpr, cards.PHashThreshold, dExpr, cards.DHashThreshold,
+			rExpr, PHashThreshold, gExpr, PHashThreshold, bExpr, PHashThreshold, dExpr, DHashThreshold,
 		))
 	}
 
@@ -89,4 +97,14 @@ LIMIT $1`, scoreExpr, whereExpr, scoreExpr)
 	}
 
 	return result, err
+}
+
+// asBase2 concatenates the given 64-bit words into a single base-2 string.
+func asBase2(words ...uint64) string {
+	var sb strings.Builder
+	for _, v := range words {
+		fmt.Fprintf(&sb, "%064b", v)
+	}
+
+	return sb.String()
 }
