@@ -126,11 +126,12 @@ func NewServer(cfg Config) (*Server, error) {
 	case prod:
 		fallthrough
 	default:
-		app.Use("/public", filesystem.New(filesystem.Config{
-			Root:       http.FS(embeddedFiles),
-			PathPrefix: "assets",
-			Browse:     false,
-		}))
+		assetsFS, err := fs.Sub(embeddedFiles, "assets")
+		if err != nil {
+			return nil, errors.Join(err, ErrInitServer)
+		}
+
+		app.Use("/public", NewStaticMiddleware(assetsFS, "/public"))
 	}
 
 	return &Server{

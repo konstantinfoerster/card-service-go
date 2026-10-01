@@ -62,6 +62,23 @@ func TestNewServer_ErrorHandler(t *testing.T) {
 	}
 }
 
+func TestNewServer_ServesEmbeddedAssetsOnProd(t *testing.T) {
+	srv, err := web.NewServer(web.Config{Mode: "prod"})
+	require.NoError(t, err)
+	req := test.NewRequest(
+		t.Context(),
+		test.WithMethod(web.MethodGet),
+		test.WithURL("/public/css/main.css"),
+	)
+
+	resp, err := srv.Test(req)
+	defer test.Close(t, resp)
+
+	require.NoError(t, err)
+	assert.Equal(t, web.StatusOK, resp.StatusCode)
+	assert.Equal(t, "text/css; charset=utf-8", resp.Header.Get(fiber.HeaderContentType))
+}
+
 func TestNewServer_ShutdownOnInteruptSignal(t *testing.T) {
 	srv := web.NewTestServer()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

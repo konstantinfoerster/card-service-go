@@ -11,7 +11,7 @@ const MethodGet = http.MethodGet
 const MethodPost = http.MethodPost
 
 const StatusOK = http.StatusOK
-const StatusFound = http.StatusFound
+const StatusNotFound = http.StatusNotFound
 const StatusUnauthorized = http.StatusUnauthorized
 const StatusBadRequest = http.StatusBadRequest
 const StatusInternalServerError = http.StatusInternalServerError
