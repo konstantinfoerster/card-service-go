@@ -3,6 +3,7 @@ package web_test
 import (
 	"context"
 	"net/http/httptest"
+	"os"
 	"syscall"
 	"testing"
 	"time"
@@ -77,6 +78,28 @@ func TestNewServer_ServesEmbeddedAssetsOnProd(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, web.StatusOK, resp.StatusCode)
 	assert.Equal(t, "text/css; charset=utf-8", resp.Header.Get(fiber.HeaderContentType))
+}
+
+func TestNewServer_ServesFingerprintedAssetsOnProd(t *testing.T) {
+	srv, err := web.NewServer(web.Config{Mode: "prod"})
+	require.NoError(t, err)
+	assets, err := web.NewAssets(os.DirFS("assets"), "/public")
+	require.NoError(t, err)
+	url, err := assets.Fingerprinted("css/main.css")
+	require.NoError(t, err)
+	req := test.NewRequest(
+		t.Context(),
+		test.WithMethod(web.MethodGet),
+		test.WithURL(url),
+	)
+
+	resp, err := srv.Test(req)
+	defer test.Close(t, resp)
+
+	require.NoError(t, err)
+	assert.Equal(t, web.StatusOK, resp.StatusCode)
+	assert.Equal(t, "text/css; charset=utf-8", resp.Header.Get(fiber.HeaderContentType))
+	assert.Equal(t, "public, max-age=31536000, immutable", resp.Header.Get(fiber.HeaderCacheControl))
 }
 
 func TestNewServer_ShutdownOnInteruptSignal(t *testing.T) {
