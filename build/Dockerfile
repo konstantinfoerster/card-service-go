@@ -1,3 +1,17 @@
+FROM alpine:3.24 AS assets
+
+# hadolint ignore=DL3018 # only used at build time
+RUN apk add --no-cache brotli gzip
+
+WORKDIR /assets
+
+COPY internal/api/web/assets/ .
+
+# pre-compress static files, original files are unchanged
+RUN find . -type f \( -name '*.js' -o -name '*.css' \) \
+      -exec gzip -k -9 {} + \
+      -exec brotli -k -q 11 {} +
+
 FROM golang:1.27-alpine3.24 AS builder
 
 WORKDIR /app
@@ -8,6 +22,8 @@ RUN go mod download && go mod verify
 
 # copy source files
 COPY . .
+# add pre-compressed assets
+COPY --from=assets /assets/ internal/api/web/assets/
 
 # build project
 ENV GOOS="linux" \

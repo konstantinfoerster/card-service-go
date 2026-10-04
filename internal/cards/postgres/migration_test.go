@@ -14,6 +14,10 @@ import (
 )
 
 func TestMigrate_RunAllScripts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	ctx := t.Context()
 	conn := Connect(ctx, migrationCfg)
 	migration := postgres.NewMigrator(conn, postgres.Scripts)
@@ -26,6 +30,10 @@ func TestMigrate_RunAllScripts(t *testing.T) {
 }
 
 func TestMigrate_CanBeRunMultipleTimes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	expectedMigrations := []string{"01-migration.sql", "02-migration.sql"}
 	ctx := t.Context()
 	rawSQL01, err := os.ReadFile("testdata/scripts/01-migration.sql")
@@ -50,6 +58,10 @@ func TestMigrate_CanBeRunMultipleTimes(t *testing.T) {
 }
 
 func TestMigrate_MissingScriptDir(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	ctx := t.Context()
 	fs := fstest.MapFS{}
 	migration := postgres.NewMigrator(connection, fs)
@@ -60,6 +72,10 @@ func TestMigrate_MissingScriptDir(t *testing.T) {
 }
 
 func TestMigrate_EmptyScriptDir(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	ctx := t.Context()
 	fs := fstest.MapFS{
 		"scripts": &fstest.MapFile{Mode: fs.ModeDir},
@@ -72,6 +88,10 @@ func TestMigrate_EmptyScriptDir(t *testing.T) {
 }
 
 func TestMigrate_ErrorDoesNotRevertAppliedScripts(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
 	expectedMigrations := []string{
 		"01-migration.sql",
 		"02-migration.sql",

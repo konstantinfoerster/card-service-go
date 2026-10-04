@@ -8,7 +8,9 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -30,6 +32,9 @@ var (
 
 //go:embed templates/* assets/*
 var embeddedFiles embed.FS
+
+// publicPrefix is the route under which the static assets are served.
+const publicPrefix = "/public"
 
 type Server struct {
 	app     *fiber.App
@@ -79,11 +84,17 @@ func NewServer(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Join(err, ErrInitServer)
 	}
+	static, err := newStaticAssets(cfg.Mode)
+	if err != nil {
+		return nil, errors.Join(err, ErrInitServer)
+	}
+
 	engine := html.NewFileSystem(http.FS(tmplFS), ".gohtml")
 	engine.AddFuncMap(map[string]any{
 		"isLastIndex": func(index, length int) bool {
 			return index+1 == length
 		},
+		"asset": static.url,
 	})
 
 	// avoid 0 and negative values, 0 = unlimited
@@ -113,30 +124,87 @@ func NewServer(cfg Config) (*Server, error) {
 	}))
 	app.Use(favicon.New())
 	app.Use(logger.New(logger.Config{
-		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
+		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${requestPath}\n",
+		CustomTags: map[string]logger.LogFunc{
+			"requestPath": logRequestPath,
+		},
 	}))
 
-	switch cfg.Mode {
-	case dev:
-		app.Use("/public", filesystem.New(filesystem.Config{
-			Root:       http.Dir("./internal/api/web/assets"),
-			PathPrefix: "",
-			Browse:     false,
-		}))
-	case prod:
-		fallthrough
-	default:
-		app.Use("/public", filesystem.New(filesystem.Config{
-			Root:       http.FS(embeddedFiles),
-			PathPrefix: "assets",
-			Browse:     false,
-		}))
+	for _, handler := range static.handlers {
+		app.Use(publicPrefix, handler)
 	}
 
 	return &Server{
 		app: app,
 		Cfg: cfg,
 		log: slog.Default(),
+	}, nil
+}
+
+// logRequestPath writes the path as requested by the client without
+// query parameters to avoid logging sensitive data,
+// fingerprint middleware rewrites the path, but we need the original one.
+func logRequestPath(output logger.Buffer, c *fiber.Ctx, _ *logger.Data, _ string) (int, error) {
+	path, _, _ := strings.Cut(c.OriginalURL(), "?")
+
+	return output.WriteString(path)
+}
+
+// staticAssets defines how asset URLs are built and which handlers serve the files.
+type staticAssets struct {
+	url      func(name string) (string, error)
+	handlers []fiber.Handler
+}
+
+func newStaticAssets(mode Mode) (staticAssets, error) {
+	if mode == dev {
+		return devStaticAssets(), nil
+	}
+
+	return embeddedStaticAssets()
+}
+
+// devStaticAssets serves files from disk, they can change at any time,
+// so they are not fingerprinted, but must exist.
+func devStaticAssets() staticAssets {
+	dir := "./internal/api/web/assets"
+	assetsFS := os.DirFS(dir)
+
+	return staticAssets{
+		url: func(name string) (string, error) {
+			info, err := fs.Stat(assetsFS, name)
+			if err != nil {
+				return "", fmt.Errorf("asset %q: %w: %w", name, ErrUnknownAsset, err)
+			}
+			if info.IsDir() {
+				return "", fmt.Errorf("asset %q is a directory: %w", name, ErrUnknownAsset)
+			}
+
+			return publicPrefix + "/" + name, nil
+		},
+		handlers: []fiber.Handler{
+			filesystem.New(filesystem.Config{Root: http.Dir(dir)}),
+		},
+	}
+}
+
+// embeddedStaticAssets serves the embedded files with fingerprinted URLs.
+func embeddedStaticAssets() (staticAssets, error) {
+	assetsFS, err := fs.Sub(embeddedFiles, "assets")
+	if err != nil {
+		return staticAssets{}, err
+	}
+	assets, err := NewAssets(assetsFS, publicPrefix)
+	if err != nil {
+		return staticAssets{}, err
+	}
+
+	return staticAssets{
+		url: assets.Fingerprinted,
+		handlers: []fiber.Handler{
+			NewFingerprintMiddleware(assets),
+			NewStaticFilesMiddleware(assetsFS, publicPrefix),
+		},
 	}, nil
 }
 
