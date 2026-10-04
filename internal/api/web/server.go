@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -123,7 +124,10 @@ func NewServer(cfg Config) (*Server, error) {
 	}))
 	app.Use(favicon.New())
 	app.Use(logger.New(logger.Config{
-		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
+		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${requestPath}\n",
+		CustomTags: map[string]logger.LogFunc{
+			"requestPath": logRequestPath,
+		},
 	}))
 
 	for _, handler := range static.handlers {
@@ -135,6 +139,15 @@ func NewServer(cfg Config) (*Server, error) {
 		Cfg: cfg,
 		log: slog.Default(),
 	}, nil
+}
+
+// logRequestPath writes the path as requested by the client without
+// query parameters to avoid logging sensitive data,
+// fingerprint middleware rewrites the path, but we need the original one.
+func logRequestPath(output logger.Buffer, c *fiber.Ctx, _ *logger.Data, _ string) (int, error) {
+	path, _, _ := strings.Cut(c.OriginalURL(), "?")
+
+	return output.WriteString(path)
 }
 
 // staticAssets defines how asset URLs are built and which handlers serve the files.
@@ -159,8 +172,12 @@ func devStaticAssets() staticAssets {
 
 	return staticAssets{
 		url: func(name string) (string, error) {
-			if _, err := fs.Stat(assetsFS, name); err != nil {
-				return "", fmt.Errorf("unknown asset %q: %w", name, err)
+			info, err := fs.Stat(assetsFS, name)
+			if err != nil {
+				return "", fmt.Errorf("asset %q: %w: %w", name, ErrUnknownAsset, err)
+			}
+			if info.IsDir() {
+				return "", fmt.Errorf("asset %q is a directory: %w", name, ErrUnknownAsset)
 			}
 
 			return publicPrefix + "/" + name, nil

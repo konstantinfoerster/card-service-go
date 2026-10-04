@@ -61,8 +61,8 @@ func (h Hasher) Hashes(in io.Reader, angles ...Degree) ([]Hash, error) {
 
 	if pixels := cfg.Width * cfg.Height; pixels > MaxPixels {
 		return nil, errors.Join(
-			fmt.Errorf("%w, %dx%d has %d pixels, allowed are %d",
-				ErrImageTooLarge, cfg.Width, cfg.Height, pixels, MaxPixels),
+			fmt.Errorf("image %dx%d has %d pixels, allowed are %d: %w",
+				cfg.Width, cfg.Height, pixels, MaxPixels, ErrImageTooLarge),
 			cards.ErrInvalidInput)
 	}
 

@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 )
+
+var ErrUnknownAsset = errors.New("unknown asset")
 
 // Assets maps asset URLs to fingerprinted URLs that contain a hash of the file content.
 type Assets struct {
@@ -66,7 +69,7 @@ func NewAssets(fsys fs.FS, prefix string) (*Assets, error) {
 func (a *Assets) Fingerprinted(name string) (string, error) {
 	hashedURL, ok := a.hashed[a.prefix+"/"+name]
 	if !ok {
-		return "", fmt.Errorf("unknown asset %q", name)
+		return "", fmt.Errorf("asset %q: %w", name, ErrUnknownAsset)
 	}
 
 	return hashedURL, nil

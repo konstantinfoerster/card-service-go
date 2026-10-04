@@ -45,7 +45,7 @@ func TestAssetsFingerprinted_Unknown(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, err := assets.Fingerprinted(name)
 
-			require.Error(t, err)
+			require.ErrorIs(t, err, web.ErrUnknownAsset)
 		})
 	}
 }
