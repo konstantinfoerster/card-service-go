@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
@@ -111,16 +110,6 @@ func NewServer(cfg Config) (*Server, error) {
 
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: false,
-	}))
-	// FIXME: can be removed after switching to htmx
-	app.Use(cors.New(cors.Config{
-		AllowHeaders: "Origin,Content-Type,Accept,Content-Length,Accept-Language," +
-			"Accept-Encoding,Connection,Access-Control-Allow-Origin",
-		// FIXME: that should be configurable
-		AllowOrigins:     "http://localhost:8000",
-		AllowCredentials: true,
-		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
-		MaxAge:           -1,
 	}))
 	app.Use(favicon.New())
 	app.Use(logger.New(logger.Config{
