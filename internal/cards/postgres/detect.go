@@ -68,16 +68,25 @@ func (r *PostgresDetectRepository) Top5MatchesByHash(
 
 	query := fmt.Sprintf(`
 SELECT
-  image.card_id, image.face_id, %s
-FROM
-  card_image as image
-WHERE
-  %s
-GROUP BY
-  image.card_id, image.face_id, image.phash_r, image.phash_g, image.phash_b, image.dhash
+  card_id, face_id, score
+FROM (
+  -- keep only the best matching image per card name
+  SELECT DISTINCT ON (COALESCE(face.name, card.name))
+    image.card_id, image.face_id, %s AS score
+  FROM
+    card_image AS image
+  INNER JOIN
+    card ON card.id = image.card_id
+  LEFT JOIN
+    card_face AS face ON face.id = image.face_id
+  WHERE
+    %s
+  ORDER BY
+    COALESCE(face.name, card.name), score, image.card_id, image.face_id
+) AS best
 ORDER BY
-  %s, image.card_id, image.face_id
-LIMIT $1`, scoreExpr, whereExpr, scoreExpr)
+  score, card_id, face_id
+LIMIT $1`, scoreExpr, whereExpr)
 	rows, err := r.db.Conn.Query(ctx, query, queryArgs...)
 	if err != nil {
 		return cards.Scores{}, fmt.Errorf("failed to execute top 5 phash select %w", err)

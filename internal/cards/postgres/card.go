@@ -127,7 +127,9 @@ AS
       (image.lang_lang = @lang OR image.lang_lang IS NULL)
   {{end}}
   ORDER BY
-    face.name
+    face.name,
+    card.id,
+    face.id
 )
 SELECT 
   * 

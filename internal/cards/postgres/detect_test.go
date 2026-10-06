@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/detection"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,25 @@ func TestTop5MatchesByHash(t *testing.T) {
 		assert.Less(t, r.Score, postgres.PHashThreshold*3+postgres.DHashThreshold)
 		assert.Positive(t, r.Score)
 	}
+}
+
+func TestTop5MatchesByHash_OnlyBestMatchPerName(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	detectRepo := postgres.NewDetectRepository(connection, postgres.Images{})
+	allBits := uint64(0xFFFFFFFFFFFFFFFF)
+	hash := sameChannelHash([]uint64{allBits, allBits, allBits, allBits}, allBits)
+	expected := cards.Scores{{
+		ID:    cards.NewID(21).WithFace(22),
+		Score: 0,
+	}}
+
+	result, err := detectRepo.Top5MatchesByHash(t.Context(), hash)
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, result)
 }
 
 func TestTop5MatchesByHashNoResult(t *testing.T) {

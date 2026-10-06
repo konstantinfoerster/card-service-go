@@ -211,6 +211,52 @@ func TestFind(t *testing.T) {
 	}
 }
 
+func TestFind_SameNameIsDeterministic(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := postgres.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
+	cases := []struct {
+		name     string
+		filter   cards.Filter
+		expected cards.Card
+	}{
+		{
+			name:   "by name the lowest id wins",
+			filter: cards.NewFilter().WithName("Print Card"),
+			expected: cards.Card{
+				Name:   "Print Card",
+				Set:    cards.Set{Code: "M16", Name: "Magic 2016"},
+				Image:  cards.Image{URL: "http://localhost/images/dummyCard18.png"},
+				ID:     cards.NewID(18).WithFace(19),
+				Number: "31",
+			},
+		},
+		{
+			name:   "by ids the lowest id wins",
+			filter: cards.NewFilter().WithID(cards.NewID(20).WithFace(21), cards.NewID(19).WithFace(20)),
+			expected: cards.Card{
+				Name:   "Print Card",
+				Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
+				Image:  cards.Image{URL: "http://localhost/images/dummyCard19.png"},
+				ID:     cards.NewID(19).WithFace(20),
+				Number: "32",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := cardRepo.Find(t.Context(), tc.filter, cards.NewPage(1, 5))
+
+			require.NoError(t, err)
+			assert.Equal(t, []cards.Card{tc.expected}, result.Result)
+		})
+	}
+}
+
 func TestFindWithCollector(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
