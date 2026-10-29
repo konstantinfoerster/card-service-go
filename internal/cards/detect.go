@@ -100,7 +100,10 @@ func (s *DetectService) Detect(ctx context.Context, c Collector, in io.Reader) (
 	for _, s := range scores {
 		ids = append(ids, s.ID)
 	}
-	filter := NewFilter().WithCollector(c).WithID(ids...)
+	filter := NewFilter().
+		WithCollector(c).
+		WithLanguage(DefaultLang).
+		WithID(ids...)
 
 	limit := 5
 	page := NewPage(1, limit)

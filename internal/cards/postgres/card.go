@@ -42,7 +42,6 @@ func (r *PostgresCardRepository) Find(ctx context.Context, f cards.Filter, page 
 
 	tplParams := make(map[string]any)
 	tplParams["name"] = f.Name
-	tplParams["lang"] = f.Lang
 
 	if f.IDs.NotEmpty() {
 		cardIDs := make([]int, 0)
@@ -78,7 +77,7 @@ AS
 (
   SELECT
     DISTINCT ON (face.name)
-    row_number() over (partition by face.card_id) as rn,
+    row_number() over (partition by face.card_id ORDER BY face.id) as rn,
     face.card_id, face.id, face.name, card.number, set.code, set.name,
     NULLIF(CONCAT(@baseURL::text, image.image_path), @baseURL::text)
     {{if .user}}, coalesce(card_collection.amount, 0) {{else}}, 0 {{end}}
@@ -92,10 +91,20 @@ AS
     card_face AS face
   ON
     card.id = face.card_id
-  LEFT JOIN
-    card_image as image
+  -- one image per face, in the requested language if there is one
+  LEFT JOIN LATERAL (
+    SELECT
+      card_image.image_path
+    FROM
+      card_image
+    WHERE
+      card_image.face_id = face.id
+    ORDER BY
+      card_image.lang_lang = @lang DESC NULLS LAST, card_image.id
+    LIMIT 1
+  ) AS image
   ON
-    face.id = image.face_id
+    true
     {{if .user}}
       {{if .onlyCollected}}
         INNER JOIN
@@ -121,10 +130,6 @@ AS
   {{if .name}}
     AND
       (face.name ILIKE '%' || @name || '%')
-  {{end}}
-  {{if .lang}}
-    AND
-      (image.lang_lang = @lang OR image.lang_lang IS NULL)
   {{end}}
   ORDER BY
     face.name,

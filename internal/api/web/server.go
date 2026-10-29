@@ -172,6 +172,12 @@ func devStaticAssets() staticAssets {
 			return publicPrefix + "/" + name, nil
 		},
 		handlers: []fiber.Handler{
+			func(c *fiber.Ctx) error {
+				// no cache for dev
+				c.Set(fiber.HeaderCacheControl, "no-cache")
+
+				return c.Next()
+			},
 			filesystem.New(filesystem.Config{Root: http.Dir(dir)}),
 		},
 	}

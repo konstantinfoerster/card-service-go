@@ -235,7 +235,7 @@ VALUES (20, 'Print Card', 0);
 INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
 VALUES (21, 20, 'images/dummyCard20.png', 'eng', 'png');
 
--- Card 21 and 22 share a name and have similar hashes, card 21 matches better
+-- Cards 21 and 22 share a name, the hashes of card 21 are all ones
 INSERT INTO card(name, number, rarity, border, layout, card_set_code)
 VALUES ('Same Name Hash Card', '40', 'COMMON', 'WHITE', 'NORMAL', 'M16');
 INSERT INTO card_face(card_id, name, converted_mana_cost)
@@ -247,7 +247,6 @@ VALUES (22, 21, 'images/sameNameHash21.png', 'eng', 'png',
 '1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
 '1111111111111111111111111111111111111111111111111111111111111111');
 
--- Card 22 and 21 share a name and have similar hashes, card 21 matches better
 INSERT INTO card(name, number, rarity, border, layout, card_set_code)
 VALUES ('Same Name Hash Card', '41', 'COMMON', 'WHITE', 'NORMAL', 'M15');
 INSERT INTO card_face(card_id, name, converted_mana_cost)
@@ -258,3 +257,15 @@ VALUES (23, 22, 'images/sameNameHash22.png', 'eng', 'png',
 '1111111111111111111111111111111111111111111111111111111100000000111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
 '1111111111111111111111111111111111111111111111111111111100000000111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
 '1111111111111111111111111111111111111111111111111111111111111111');
+
+-- Card 23 has an image without language, a German and an English one, in that order
+INSERT INTO card(name, number, rarity, border, layout, card_set_code)
+VALUES ('Two Language Card', '50', 'COMMON', 'WHITE', 'NORMAL', 'M16');
+INSERT INTO card_face(card_id, name, converted_mana_cost)
+VALUES (23, 'Two Language Card', 0);
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (24, 23, 'images/noLanguage.png', NULL, 'png');
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (24, 23, 'images/twoLanguageDeu.png', 'deu', 'png');
+INSERT INTO card_image(face_id, card_id, image_path, lang_lang, mime_type)
+VALUES (24, 23, 'images/twoLanguageEng.png', 'eng', 'png');

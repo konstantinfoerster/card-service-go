@@ -108,10 +108,32 @@ func TestFind(t *testing.T) {
 			},
 		},
 		{
-			name:       "no result when image language does not match",
+			name:       "falls back to another image language",
 			searchTerm: "French",
 			page:       cards.NewPage(1, 2),
-			expected:   []cards.Card{},
+			expected: []cards.Card{
+				{
+					Name:   "French",
+					Set:    cards.Set{Code: "M12", Name: "Magic 2012"},
+					Image:  cards.Image{URL: "http://localhost/images/French.png"},
+					ID:     cards.NewID(7).WithFace(7),
+					Number: "1",
+				},
+			},
+		},
+		{
+			name:       "prefers the image in the requested language",
+			searchTerm: "Two Language",
+			page:       cards.NewPage(1, 2),
+			expected: []cards.Card{
+				{
+					Name:   "Two Language Card",
+					Set:    cards.Set{Code: "M16", Name: "Magic 2016"},
+					Image:  cards.Image{URL: "http://localhost/images/twoLanguageEng.png"},
+					ID:     cards.NewID(23).WithFace(24),
+					Number: "50",
+				},
+			},
 		},
 		{
 			name:       "name does not match",
@@ -452,14 +474,6 @@ func TestFindWithCollector(t *testing.T) {
 				WithOnlyCollected(),
 			expected: []cards.Card{
 				{
-					Name:   "Back Face doubleFace",
-					Set:    cards.Set{Code: "M13", Name: "Magic 2013"},
-					Image:  cards.Image{URL: "http://localhost/images/BackFace.png"},
-					ID:     cards.NewID(8).WithFace(9),
-					Amount: 2,
-					Number: "1",
-				},
-				{
 					Name:   "Card 11 with hash",
 					Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
 					Image:  cards.Image{URL: "http://localhost/images/card11Hash.png"},
@@ -474,6 +488,14 @@ func TestFindWithCollector(t *testing.T) {
 					ID:     cards.NewID(12).WithFace(13),
 					Amount: 1,
 					Number: "2",
+				},
+				{
+					Name:   "Card 14 with hash",
+					Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
+					Image:  cards.Image{URL: "http://localhost/images/card14hash.png"},
+					ID:     cards.NewID(14).WithFace(15),
+					Amount: 1,
+					Number: "4",
 				},
 			},
 		},

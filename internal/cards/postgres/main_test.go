@@ -134,6 +134,16 @@ func (r *databaseRunner) Start(ctx context.Context) (ConnectionInfo, error) {
 				FileMode:          initScriptDirPermissions,
 			},
 			{
+				HostFilePath:      filepath.Join(scriptsDir, "005-card-image-face-index.sql"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/02e-card-image-face-index.sql",
+				FileMode:          initScriptDirPermissions,
+			},
+			{
+				HostFilePath:      filepath.Join(scriptsDir, "006-drop-card-image-hashes-index.sql"),
+				ContainerFilePath: "/docker-entrypoint-initdb.d/02f-drop-card-image-hashes-index.sql",
+				FileMode:          initScriptDirPermissions,
+			},
+			{
 				HostFilePath:      filepath.Join(dbDir, "03-data.sql"),
 				ContainerFilePath: "/docker-entrypoint-initdb.d/03-data.sql",
 				FileMode:          initScriptDirPermissions,

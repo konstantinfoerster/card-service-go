@@ -2,7 +2,6 @@ package cardsapi_test
 
 import (
 	"context"
-	"encoding/base64"
 	"io"
 	"os"
 	"path"
@@ -97,8 +96,9 @@ func TestDetect(t *testing.T) {
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/detect"),
 				tc.user,
-				test.WithJSONBody(t, cardsapi.DetectRequest{
-					Image: base64.StdEncoding.EncodeToString(rawImg),
+				test.WithBody(rawImg),
+				test.WithHeader(map[string]string{
+					fiber.HeaderContentType: "image/jpeg",
 				}),
 			)
 			resp, err := srv.Test(req)
@@ -116,24 +116,23 @@ func TestDetect(t *testing.T) {
 
 func TestDetectInvalidImage(t *testing.T) {
 	cases := []struct {
-		name string
-		body any
+		name        string
+		contentType string
+		body        []byte
 	}{
 		{
-			name: "no image",
-			body: cardsapi.DetectRequest{},
+			name:        "no image",
+			contentType: "image/jpeg",
+			body:        nil,
 		},
 		{
-			name: "no base64 image",
-			body: cardsapi.DetectRequest{
-				Image: "not base64",
-			},
+			name:        "not an image",
+			contentType: "image/jpeg",
+			body:        []byte("no image"),
 		},
 		{
-			name: "base64 but no image",
-			body: cardsapi.DetectRequest{
-				Image: base64.StdEncoding.EncodeToString([]byte("no image")),
-			},
+			name:        "unsupported content type",
+			contentType: fiber.MIMEApplicationJSON,
 		},
 	}
 	for _, tc := range cases {
@@ -144,7 +143,8 @@ func TestDetectInvalidImage(t *testing.T) {
 				t.Context(),
 				test.WithMethod(web.MethodPost),
 				test.WithURL("http://localhost/detect"),
-				test.WithJSONBody(t, tc.body),
+				test.WithBody(tc.body),
+				test.WithHeader(map[string]string{fiber.HeaderContentType: tc.contentType}),
 			)
 			resp, err := srv.Test(req)
 			defer test.Close(t, resp)

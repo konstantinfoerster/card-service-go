@@ -50,6 +50,33 @@ func TestTop5MatchesReturnsFinderScores(t *testing.T) {
 	assert.Equal(t, finder.scores, result)
 }
 
+func TestTop5MatchesReturnsAllScoresOnClearLead(t *testing.T) {
+	img := openImage(t, "cardImage.jpg")
+	finder := &recordingFinder{scores: cards.Scores{
+		{ID: cards.NewID(1).WithFace(1), Score: 200},
+		{ID: cards.NewID(2).WithFace(2), Score: 200 + detection.MinLead},
+		{ID: cards.NewID(3).WithFace(3), Score: 230},
+	}}
+
+	result, err := detection.NewMatcher(finder, detection.NewHasher()).Top5Matches(t.Context(), img)
+
+	require.NoError(t, err)
+	assert.Equal(t, finder.scores, result)
+}
+
+func TestTop5MatchesReturnsNothingWithoutClearLead(t *testing.T) {
+	img := openImage(t, "cardImage.jpg")
+	finder := &recordingFinder{scores: cards.Scores{
+		{ID: cards.NewID(1).WithFace(1), Score: 200},
+		{ID: cards.NewID(2).WithFace(2), Score: 200 + detection.MinLead - 1},
+	}}
+
+	result, err := detection.NewMatcher(finder, detection.NewHasher()).Top5Matches(t.Context(), img)
+
+	require.NoError(t, err)
+	assert.Empty(t, result)
+}
+
 func TestTop5MatchesPropagatesFinderError(t *testing.T) {
 	img := openImage(t, "cardImage.jpg")
 	expected := assert.AnError

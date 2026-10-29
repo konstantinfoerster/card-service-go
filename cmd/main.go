@@ -15,6 +15,7 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web/cardsapi"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/detection"
+	"github.com/konstantinfoerster/card-service-go/internal/cards/memory"
 	"github.com/konstantinfoerster/card-service-go/internal/cards/postgres"
 	"github.com/konstantinfoerster/card-service-go/internal/config"
 	"golang.org/x/sync/errgroup"
@@ -118,8 +119,11 @@ func run(cfg config.Config) error {
 	collectRepo := postgres.NewCollectionRepository(dbCon, cfg.Images)
 	collectSvc := cards.NewCollectionService(collectRepo)
 
-	detectRep := postgres.NewDetectRepository(dbCon, cfg.Images)
-	matcher := detection.NewMatcher(detectRep, detection.NewHasher())
+	images, err := postgres.NewDetectRepository(dbCon).AllHashes(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load the card image hashes, %w", err)
+	}
+	matcher := detection.NewMatcher(memory.NewDetectRepository(images), detection.NewHasher())
 	detectSvc := cards.NewDetectService(cardRepo, matcher)
 
 	srv, err := web.NewServer(cfg.Server)

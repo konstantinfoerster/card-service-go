@@ -10,12 +10,10 @@ A web application that helps you to manage your card collection.
 - Search for cards
 - Add cards to your card-collection
 - Remove cards from your card-collection
-- Detect cards based on an uploaded card image
+- Detect cards based on captured camera video stream
 
 ## TODOs
 
-- compress assets
-- fingerprint assets
 - pin image version to digest and use dependabot to update it
 
 ## Requirements

@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
@@ -11,67 +10,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTop5MatchesByHash(t *testing.T) {
+func TestAllHashes(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
 
-	detectRepo := postgres.NewDetectRepository(connection, postgres.Images{})
-	unknownHash := sameChannelHash([]uint64{1, 2, 3, 4}, 0)
-	hash := sameChannelHash([]uint64{
-		9223372036854775807,
-		8828676655832293646,
-		8002350605550622951,
-		4369376647429299945,
-	}, 0xA5A5A5A5A5A5A5A5)
-
-	ctx := context.Background()
-	result, err := detectRepo.Top5MatchesByHash(ctx, unknownHash, hash, unknownHash)
-
-	require.NoError(t, err)
-	require.Len(t, result, 3)
-	for _, r := range result {
-		assert.Less(t, r.Score, postgres.PHashThreshold*3+postgres.DHashThreshold)
-		assert.Positive(t, r.Score)
-	}
-}
-
-func TestTop5MatchesByHash_OnlyBestMatchPerName(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	detectRepo := postgres.NewDetectRepository(connection, postgres.Images{})
+	detectRepo := postgres.NewDetectRepository(connection)
 	allBits := uint64(0xFFFFFFFFFFFFFFFF)
-	hash := sameChannelHash([]uint64{allBits, allBits, allBits, allBits}, allBits)
-	expected := cards.Scores{{
-		ID:    cards.NewID(21).WithFace(22),
-		Score: 0,
-	}}
-
-	result, err := detectRepo.Top5MatchesByHash(t.Context(), hash)
-
-	require.NoError(t, err)
-	assert.Equal(t, expected, result)
-}
-
-func TestTop5MatchesByHashNoResult(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
+	phash := []uint64{allBits, allBits, allBits, allBits}
+	expected := detection.ImageHash{
+		ID:   cards.NewID(21).WithFace(22),
+		Name: "Same Name Hash Card",
+		Hash: detection.Hash{PHashR: phash, PHashG: phash, PHashB: phash, DHash: allBits},
 	}
-	cfg := postgres.Images{}
-	detectRepo := postgres.NewDetectRepository(connection, cfg)
-	unknownHash := sameChannelHash([]uint64{1, 2, 3, 4}, 0)
 
-	ctx := context.Background()
-	result, err := detectRepo.Top5MatchesByHash(ctx, unknownHash)
+	result, err := detectRepo.AllHashes(t.Context())
 
 	require.NoError(t, err)
-	require.Empty(t, result)
-}
-
-// sameChannelHash builds a Hash using the same value for all three phash channels and
-// the given dhash.
-func sameChannelHash(phash []uint64, dhash uint64) detection.Hash {
-	return detection.Hash{PHashR: phash, PHashG: phash, PHashB: phash, DHash: dhash}
+	assert.Len(t, result, 6, "only images with hashes")
+	assert.Contains(t, result, expected)
 }

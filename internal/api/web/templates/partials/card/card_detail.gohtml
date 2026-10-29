@@ -21,6 +21,14 @@
       </div>
       {{- if $.User -}}{{- template  "collect_action" .Card -}}{{- end -}}
     </div>
+    {{- if and $.User .QuickAdd -}}
+    <button class="btn btn-outline-primary quick-add"
+      data-testid="quick-add-btn"
+      hx-post="/mycards"
+      hx-vals='{ "id": "{{ .Card.ID }}","amount": {{ .Card.Amount.Next }} }'
+      hx-swap="none"
+    >&check; Add &amp; scan next</button>
+    {{- end -}}
     <div class="prints">
       <div>Prints</div>
       {{- template  "card_prints" .  -}}

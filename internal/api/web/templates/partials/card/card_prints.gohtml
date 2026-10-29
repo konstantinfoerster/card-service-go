@@ -13,8 +13,8 @@
               data-testid="card-detail-link"
               hx-get="/cards/{{ $print.ID }}"
               hx-trigger="click" 
-              hx-target="#sidebar"
-              hx-swap="innerHtml"
+              hx-target="#card-detail"
+              hx-swap="outerHTML"
            >
            {{- if $.User -}}
              <span class="badge" data-testid="card-print-amount-{{ $print.Amount.Print }}">{{ $print.Amount.Print }}</span>
