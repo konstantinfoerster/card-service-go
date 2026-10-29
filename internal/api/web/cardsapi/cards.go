@@ -96,8 +96,9 @@ func details(svc CardService, tmplName string, log *slog.Logger) fiber.Handler {
 			slog.Any("page", page),
 		)
 		data := fiber.Map{
-			"Card":   newCard(detail.Card),
-			"Prints": newPagedResponse(detail.Prints.PagedResult),
+			"Card":     newCard(detail.Card),
+			"Prints":   newPagedResponse(detail.Prints.PagedResult),
+			"QuickAdd": c.QueryBool("quickAdd"),
 		}
 
 		return web.RenderPartial(c, tmplName, data)

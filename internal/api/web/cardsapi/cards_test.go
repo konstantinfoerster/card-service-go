@@ -303,6 +303,7 @@ func TestDetail(t *testing.T) {
 		name                string
 		header              map[string]string
 		cardID              string
+		query               string
 		user                func() test.RequestOpt
 		expectedContentType string
 		assertContent       func(t *testing.T, rBody io.Reader)
@@ -322,6 +323,38 @@ func TestDetail(t *testing.T) {
 				assert.NotContains(t, body, "data-testid=\"card-print-more\"")
 				assert.Equalf(t, 3, strings.Count(body, "data-testid=\"card-print-id"), "expected 3 prints in %s", body)
 				assert.Equalf(t, 2, strings.Count(body, "data-testid=\"card-detail-link"), "expected 2 card detail links in %s", body)
+			},
+		},
+		{
+			name: "card detail from detection with user shows quick add",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			user: func() test.RequestOpt {
+				return test.WithUser("myuser")
+			},
+			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
+			query:               "?quickAdd=true",
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.Contains(t, body, "data-testid=\"quick-add-btn\"")
+				assert.Contains(t, body, "data-testid=\"add-card-btn\"")
+			},
+		},
+		{
+			name: "card detail from detection without user hides quick add",
+			header: map[string]string{
+				web.HeaderHTMXRequest: "true",
+			},
+			cardID:              "Y2FyZD00MzQmZmFjZT00MzQ=", // 434
+			query:               "?quickAdd=true",
+			expectedContentType: fiber.MIMETextHTMLCharsetUTF8,
+			assertContent: func(t *testing.T, rBody io.Reader) {
+				body := test.ToString(t, rBody)
+				test.AssertContainsPartialHTML(t, body)
+				assert.NotContains(t, body, "data-testid=\"quick-add-btn\"")
 			},
 		},
 		{
@@ -387,6 +420,7 @@ func TestDetail(t *testing.T) {
 				assert.Equalf(t, 1, strings.Count(body, "data-testid=\"card-print-amount-00"), "expected 1 print with amount 00 in %s", body)
 				assert.Equal(t, 1, strings.Count(body, "data-testid=\"add-card-btn\""))
 				assert.Equal(t, 0, strings.Count(body, "data-testid=\"remove-card-btn\""), "expected no remove button")
+				assert.NotContains(t, body, "data-testid=\"quick-add-btn\"", "only shown in the card detection")
 			},
 		},
 	}
@@ -401,7 +435,7 @@ func TestDetail(t *testing.T) {
 			req := test.NewRequest(
 				t.Context(),
 				test.WithMethod(web.MethodGet),
-				test.WithURLf("http://localhost/cards/%s", tc.cardID),
+				test.WithURLf("http://localhost/cards/%s%s", tc.cardID, tc.query),
 				test.WithHeader(tc.header),
 				userOpt(),
 			)

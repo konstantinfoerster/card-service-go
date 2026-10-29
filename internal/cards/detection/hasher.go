@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"math/bits"
 
 	_ "image/jpeg"
 	_ "image/png"
@@ -29,6 +30,25 @@ type Hash struct {
 	PHashG []uint64
 	PHashB []uint64
 	DHash  uint64
+}
+
+// Distance is the summed Hamming distance of all hashes.
+func (h Hash) Distance(o Hash) int {
+	d := bits.OnesCount64(h.DHash ^ o.DHash)
+	for i := range h.PHashR {
+		d += bits.OnesCount64(h.PHashR[i] ^ o.PHashR[i])
+		d += bits.OnesCount64(h.PHashG[i] ^ o.PHashG[i])
+		d += bits.OnesCount64(h.PHashB[i] ^ o.PHashB[i])
+	}
+
+	return d
+}
+
+// ImageHash is the hash of a stored card image.
+type ImageHash struct {
+	ID   cards.ID
+	Name string
+	Hash Hash
 }
 
 type Degree int

@@ -3,7 +3,6 @@ package cardsapi
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,12 +15,6 @@ import (
 	"github.com/konstantinfoerster/card-service-go/internal/api/web"
 	"github.com/konstantinfoerster/card-service-go/internal/cards"
 )
-
-// DetectRequest detect request body.
-type DetectRequest struct {
-	// Image base64 encoded image.
-	Image string `json:"image"`
-}
 
 type DetectService interface {
 	Detect(ctx context.Context, collector cards.Collector, in io.Reader) (cards.Matches, error)
@@ -38,18 +31,13 @@ func detect(svc DetectService, cfg web.Config) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, _ := web.UserFromCtx(c)
 
-		var req DetectRequest
-		if err := c.BodyParser(&req); err != nil {
-			return aerrors.NewInvalidInputError(err, "invalid-body", "failed to parse body")
+		if !c.Is("jpeg") && !c.Is("png") {
+			return aerrors.NewInvalidInputMsg("invalid-content-type", "expected an image/jpeg or image/png body")
 		}
 
-		if req.Image == "" {
-			return aerrors.NewInvalidInputError(nil, "invalid-body", "no image provided")
-		}
-
-		imgBytes, err := base64.StdEncoding.DecodeString(req.Image)
-		if err != nil {
-			return aerrors.NewInvalidInputError(err, "invalid-image", "unexpected image encoding")
+		imgBytes := c.Body()
+		if len(imgBytes) == 0 {
+			return aerrors.NewInvalidInputMsg("invalid-body", "no image provided")
 		}
 
 		if cfg.Debug {

@@ -85,6 +85,10 @@
 
   --card-max-width: 332px;
   --card-max-height: 462px;
+  /* card width to height ratio (63mm x 88mm) */
+  --card-ratio: 63 / 88;
+  --card-frame: 4px solid var(--clr-background-700);
+  --card-radius: calc(var(--border-radius) * 2);
   --detail-max-width: 375px;
 }
 
@@ -326,41 +330,44 @@ p {
     var(--clr-background-700) 10px,
     var(--clr-background-700) 15px
   );
-  border-radius: calc(var(--border-radius) * 2);
-  border: 4px solid var(--clr-background-700);
-}
-
-.card-image:has(img[hx-get]) {
+  border-radius: var(--card-radius);
+  border: var(--card-frame);
   cursor: pointer;
 }
 
-.card-actions button:nth-child(1) {
+/* buttons − amount + attached below the image, sharing its frame */
+.card-actions {
+  width: 100%;
+  margin: 0;
+  border: var(--card-frame);
   border-top: 0;
-  border-radius: 0 0 0 var(--border-radius);
-  font-size: var(--fs-2);
-  padding-bottom: 0.25rem;
-  padding-top: 0.25rem;
-  color: var(--clr-background);
-}
+  border-radius: 0 0 var(--card-radius) var(--card-radius);
+  overflow: hidden;
 
-.card-actions button:nth-child(2) {
-  border-top: 0;
-  border-left: 0;
-  border-right: 0;
-  padding: 0;
-  border-radius: 0;
-  line-height: 2;
-  background-color: var(--clr-body-background);
-  font-size: var(--fs-0);
-}
+  button {
+    border: 0;
+    border-radius: 0;
+    font-size: var(--fs-1);
+    line-height: 1.4;
+    padding: 0.25rem 1rem;
 
-.card-actions button:nth-child(3) {
-  border-top: 0;
-  border-radius: 0 0 var(--border-radius) 0;
-  font-size: var(--fs-2);
-  padding-bottom: 0.25rem;
-  padding-top: 0.25rem;
-  color: var(--clr-background);
+    &.remove,
+    &.add {
+      color: var(--clr-background);
+    }
+
+    &.amount {
+      /* overrides the stretching of .btn-group > .btn */
+      flex: 0 0 auto;
+      padding-inline: 0.25rem;
+      min-width: 2.5rem;
+      background-color: var(--clr-body-background);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
 }
 
 .hidden-card {
@@ -389,6 +396,9 @@ p {
   padding: 0.5rem;
   overflow-y: auto;
   transition: opacity 0.2s linear;
+  /* header and image stay in place, only the prints scroll */
+  display: flex;
+  flex-direction: column;
 }
 
 #card-detail.htmx-added {
@@ -422,9 +432,37 @@ body:has(#card-detail) {
 .prints {
   margin-top: 0.5rem;
   width: 100%;
+  /* only prints should scroll */
+  overflow-y: auto;
+}
+
+#card-detail .quick-add {
+  width: 100%;
+  margin-top: 0.5rem;
+  font-size: var(--fs-1);
+}
+
+#card-detail .card-image-wrapper {
+  /* let image fit into into available space */
+  width: min(100%, calc(50dvh * var(--card-ratio)));
+  margin: 0 auto;
+}
+
+#card-detail .card-image,
+#card-detail .card-image img {
+  width: 100%;
+  cursor: default;
+}
+
+#card-detail .card-image img {
+  height: auto;
+  aspect-ratio: var(--card-ratio);
 }
 
 .prints div:first-child {
+  /* make header not scroll */
+  position: sticky;
+  top: 0;
   font-weight: bold;
   background-color: var(--clr-primary-600);
   border-top: 2px solid var(--clr-primary-800);
@@ -552,15 +590,9 @@ body:has(#card-detail) {
     font-size: var(--fs-3);
   }
 
-  .content .card-actions button:nth-child(1),
-  .content .card-actions button:nth-child(3) {
-    font-size: var(--fs-3);
-    padding-bottom: 0.5rem;
-    padding-top: 0.5rem;
-  }
-
-  .content .card-actions button:nth-child(2) {
-    font-size: var(--fs-3);
+  #detect-result .match-prev,
+  #detect-result .match-next {
+    font-size: var(--fs-1);
   }
 
   .visible-desktop {
@@ -642,27 +674,8 @@ label.btn {
   cursor: default !important;
 }
 
-.btn-icon {
-  fill: var(--btn-bg);
-  stroke: var(--clr-text);
-}
-
-.btn-icon:hover:not(:disabled) {
-  stroke: var(--btn-color-hover, var(--clr-background-900));
-  fill: var(--btn-bg-hover);
-}
-
-.btn-small.btn-icon {
-  padding: 0.145rem 0.4rem;
-}
-
-.btn-icon svg {
-  width: 26px;
-  height: 26px;
-}
-
 .btn-outline-primary {
-  --btn-bg: tranparent;
+  --btn-bg: transparent;
   --btn-border-color: var(--clr-primary);
   --btn-bg-hover: var(--clr-primary-500);
 }
@@ -725,10 +738,6 @@ input::placeholder {
   font-size: var(--fs-0);
 }
 
-.w-max-content {
-  max-width: fit-content;
-}
-
 .grid-auto-fit {
   --grid-min-col-size: var(--card-max-width);
   --grid-min-col-size-calc: min(100%, var(--grid-min-col-size));
@@ -752,63 +761,78 @@ input::placeholder {
   margin: 0 0.2rem;
 }
 
-#videoWrapper {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  width: 100%;
-  align-items: flex-start;
-  margin-top: 20px;
+.preview {
   position: relative;
 }
 
-.media-box {
-  flex: 1 1 280px;
-  max-width: 100%;
-  background: #111;
-  border-radius: 8px;
-  border: 2px solid #555;
-  overflow: hidden;
-  box-sizing: border-box;
-  position: relative;
+.preview video,
+.preview canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 
-  canvas {
-    display: block;
-    width: 100% !important;
-    height: auto !important;
+.preview canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* nearly fullscreen, centered */
+#detect-result {
+  width: calc(100vw - 1rem);
+  height: calc(100dvh - 1rem);
+  max-width: 28rem;
+  /* overrides the default max-height of dialogs */
+  max-height: none;
+  margin: auto;
+  border: none;
+  border-radius: var(--border-radius);
+  /* clips the card detail to the rounded corners */
+  overflow: hidden;
+
+  &::backdrop {
+    background: rgb(0 0 0 / 0.6);
   }
 
-  &.hidden-video {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
-    overflow: hidden;
+  [data-card] {
+    height: 100%;
+  }
+
+  #card-detail {
+    height: 100%;
+    width: 100%;
     border: none;
   }
-}
 
-#canvasOutput {
-  border: 2px solid red;
-  position: relative;
-  z-index: 1;
+  .prints {
+    /* use the space left by header, image and button, and scroll inside it */
+    flex: 1 1 auto;
+    min-height: 0;
+    overscroll-behavior: contain;
+  }
 
-  &.hidden {
-   visibility: hidden;
+  .match-prev,
+  .match-next {
+    position: absolute;
+    top: 50%;
+    translate: 0 -50%;
+    font-size: var(--fs-3);
+
+    &:disabled {
+      opacity: 0.4;
+    }
+  }
+
+  .match-prev {
+    left: 1rem;
+  }
+
+  .match-next {
+    right: 1rem;
   }
 }
 
-#canvasDetect {
-  cursor: pointer;
-  border: 2px solid green;
-
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  display: none;
-
-  &.visible {
-    display: block;
-  }
+detect-result {
+  display: contents;
 }

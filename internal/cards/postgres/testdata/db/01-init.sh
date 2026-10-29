@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-export PGPASSWORD=$APP_DB_PASS;
 # create app user and database
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
   CREATE USER $APP_DB_USER WITH PASSWORD '$APP_DB_PASS';
@@ -10,12 +9,6 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
   \c $APP_DB_NAME
   GRANT ALL ON SCHEMA public TO $APP_DB_USER;
 EOSQL
-
-psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02-create-tables.sql
-psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02b-update-enums.sql
-psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02c-update-enums.sql
-psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/02d-update-hashfields.sql
-psql --username "$APP_DB_USER" --dbname "$APP_DB_NAME" -f  /docker-entrypoint-initdb.d/03-data.sql
 
 # create migration user and database
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL

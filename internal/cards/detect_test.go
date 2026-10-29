@@ -105,7 +105,10 @@ func TestDetectSearchesScoredCards(t *testing.T) {
 	_, err := svc.Detect(t.Context(), collector, strings.NewReader(""))
 
 	require.NoError(t, err)
-	expected := cards.NewFilter().WithCollector(collector).WithID(cards.NewID(1), cards.NewID(2))
+	expected := cards.NewFilter().
+		WithCollector(collector).
+		WithLanguage(cards.DefaultLang).
+		WithID(cards.NewID(1), cards.NewID(2))
 	assert.Equal(t, expected, repo.filter)
 	assert.Equal(t, cards.NewPage(1, 5), repo.page)
 }

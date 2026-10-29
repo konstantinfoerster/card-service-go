@@ -108,10 +108,32 @@ func TestFind(t *testing.T) {
 			},
 		},
 		{
-			name:       "no result when image language does not match",
+			name:       "falls back to another image language",
 			searchTerm: "French",
 			page:       cards.NewPage(1, 2),
-			expected:   []cards.Card{},
+			expected: []cards.Card{
+				{
+					Name:   "French",
+					Set:    cards.Set{Code: "M12", Name: "Magic 2012"},
+					Image:  cards.Image{URL: "http://localhost/images/French.png"},
+					ID:     cards.NewID(7).WithFace(7),
+					Number: "1",
+				},
+			},
+		},
+		{
+			name:       "prefers the image in the requested language",
+			searchTerm: "Two Language",
+			page:       cards.NewPage(1, 2),
+			expected: []cards.Card{
+				{
+					Name:   "Two Language Card",
+					Set:    cards.Set{Code: "M16", Name: "Magic 2016"},
+					Image:  cards.Image{URL: "http://localhost/images/twoLanguageEng.png"},
+					ID:     cards.NewID(23).WithFace(24),
+					Number: "50",
+				},
+			},
 		},
 		{
 			name:       "name does not match",
@@ -207,6 +229,52 @@ func TestFind(t *testing.T) {
 			require.Len(t, result.Result, len(tc.expected))
 			assert.Equal(t, tc.page.Page(), result.Page)
 			assert.ElementsMatch(t, tc.expected, result.Result)
+		})
+	}
+}
+
+func TestFind_SameNameIsDeterministic(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+	cfg := postgres.Images{Host: "http://localhost/"}
+	cardRepo := postgres.NewCardRepository(connection, cfg)
+
+	cases := []struct {
+		name     string
+		filter   cards.Filter
+		expected cards.Card
+	}{
+		{
+			name:   "by name the lowest id wins",
+			filter: cards.NewFilter().WithName("Print Card"),
+			expected: cards.Card{
+				Name:   "Print Card",
+				Set:    cards.Set{Code: "M16", Name: "Magic 2016"},
+				Image:  cards.Image{URL: "http://localhost/images/dummyCard18.png"},
+				ID:     cards.NewID(18).WithFace(19),
+				Number: "31",
+			},
+		},
+		{
+			name:   "by ids the lowest id wins",
+			filter: cards.NewFilter().WithID(cards.NewID(20).WithFace(21), cards.NewID(19).WithFace(20)),
+			expected: cards.Card{
+				Name:   "Print Card",
+				Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
+				Image:  cards.Image{URL: "http://localhost/images/dummyCard19.png"},
+				ID:     cards.NewID(19).WithFace(20),
+				Number: "32",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := cardRepo.Find(t.Context(), tc.filter, cards.NewPage(1, 5))
+
+			require.NoError(t, err)
+			assert.Equal(t, []cards.Card{tc.expected}, result.Result)
 		})
 	}
 }
@@ -406,14 +474,6 @@ func TestFindWithCollector(t *testing.T) {
 				WithOnlyCollected(),
 			expected: []cards.Card{
 				{
-					Name:   "Back Face doubleFace",
-					Set:    cards.Set{Code: "M13", Name: "Magic 2013"},
-					Image:  cards.Image{URL: "http://localhost/images/BackFace.png"},
-					ID:     cards.NewID(8).WithFace(9),
-					Amount: 2,
-					Number: "1",
-				},
-				{
 					Name:   "Card 11 with hash",
 					Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
 					Image:  cards.Image{URL: "http://localhost/images/card11Hash.png"},
@@ -428,6 +488,14 @@ func TestFindWithCollector(t *testing.T) {
 					ID:     cards.NewID(12).WithFace(13),
 					Amount: 1,
 					Number: "2",
+				},
+				{
+					Name:   "Card 14 with hash",
+					Set:    cards.Set{Code: "M15", Name: "Magic 2015"},
+					Image:  cards.Image{URL: "http://localhost/images/card14hash.png"},
+					ID:     cards.NewID(14).WithFace(15),
+					Amount: 1,
+					Number: "4",
 				},
 			},
 		},

@@ -1,24 +1,22 @@
 {{ define "collect_action" }}
 <div
     hx-target="this"
-    hx-swap="innerHTML"
-    class="btn-group w-100 card-actions"
+    hx-swap="outerHTML"
+    class="btn-group card-actions"
     role="group"
 >
   <button
-      class="btn btn-primary"
-      hx-post="/mycards"
-      hx-vals='{ "id": "{{ .ID }}","amount": {{ .Amount.Next }} }'
-      data-testid="add-card-btn"
-  > +
-  </button>
-  <button class="btn btn-outline-primary btn-text-only">{{ .Amount }}</button>
-  <button
-      class="btn btn-primary"
+      class="btn btn-primary remove"
       {{ if .Amount  }}data-testid="remove-card-btn"{{ else }}disabled{{ end }}
       hx-post="/mycards"
       hx-vals='{ "id": "{{ .ID }}","amount": {{ .Amount.Previous }} }'
-  > -
-  </button>
+  >&minus;</button>
+  <button class="btn btn-text-only amount">{{ .Amount }}</button>
+  <button
+      class="btn btn-primary add"
+      hx-post="/mycards"
+      hx-vals='{ "id": "{{ .ID }}","amount": {{ .Amount.Next }} }'
+      data-testid="add-card-btn"
+  >+</button>
 </div>
 {{ end }}

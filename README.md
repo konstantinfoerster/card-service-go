@@ -10,12 +10,10 @@ A web application that helps you to manage your card collection.
 - Search for cards
 - Add cards to your card-collection
 - Remove cards from your card-collection
-- Detect cards based on an uploaded card image
+- Detect cards based on captured camera video stream
 
 ## TODOs
 
-- compress assets
-- fingerprint assets
 - pin image version to digest and use dependabot to update it
 
 ## Requirements
@@ -36,6 +34,9 @@ Flags:
 | `--config` | `--config configs/application.yaml` | configs/application.yaml | path to the configuration files, can be repeated |
 
 You can also run `make run-local` to start the application (uses `configs/application-local.yaml`).
+
+The card detection loads the image hashes once at startup. Restart the application after an import,
+so new or changed images are detected.
 
 ## Test
 
