@@ -35,6 +35,9 @@ Flags:
 
 You can also run `make run-local` to start the application (uses `configs/application-local.yaml`).
 
+The card detection loads the image hashes once at startup. Restart the application after an import,
+so new or changed images are detected.
+
 ## Test
 
 - Run **all** tests with `go test -v ./...` or `make test`

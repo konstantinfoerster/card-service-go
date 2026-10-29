@@ -39,6 +39,9 @@ func TestMain(m *testing.M) {
 			Database: "cardmanager",
 		}
 		connection = Connect(ctx, appCfg)
+		if err := setupSchemaAndData(ctx, connection); err != nil {
+			panic(err)
+		}
 
 		migrationCfg = postgres.Config{
 			Username: "migration",
@@ -84,11 +87,6 @@ func (r *databaseRunner) Start(ctx context.Context) (ConnectionInfo, error) {
 		panic("failed to get current dir")
 	}
 
-	scriptsDir, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(file), "scripts"))
-	if err != nil {
-		return ConnectionInfo{}, err
-	}
-
 	dbDir, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(file), "testdata", "db"))
 	if err != nil {
 		return ConnectionInfo{}, err
@@ -111,41 +109,6 @@ func (r *databaseRunner) Start(ctx context.Context) (ConnectionInfo, error) {
 			{
 				HostFilePath:      filepath.Join(dbDir, "01-init.sh"),
 				ContainerFilePath: "/docker-entrypoint-initdb.d/01-init.sh",
-				FileMode:          initScriptDirPermissions,
-			},
-			{
-				HostFilePath:      filepath.Join(scriptsDir, "001-create-tables.sql"),
-				ContainerFilePath: "/docker-entrypoint-initdb.d/02-create-tables.sql",
-				FileMode:          initScriptDirPermissions,
-			},
-			{
-				HostFilePath:      filepath.Join(scriptsDir, "002-update-enums.sql"),
-				ContainerFilePath: "/docker-entrypoint-initdb.d/02b-update-enums.sql",
-				FileMode:          initScriptDirPermissions,
-			},
-			{
-				HostFilePath:      filepath.Join(scriptsDir, "003-update-enums.sql"),
-				ContainerFilePath: "/docker-entrypoint-initdb.d/02c-update-enums.sql",
-				FileMode:          initScriptDirPermissions,
-			},
-			{
-				HostFilePath:      filepath.Join(scriptsDir, "004-update-hashfields.sql"),
-				ContainerFilePath: "/docker-entrypoint-initdb.d/02d-update-hashfields.sql",
-				FileMode:          initScriptDirPermissions,
-			},
-			{
-				HostFilePath:      filepath.Join(scriptsDir, "005-card-image-face-index.sql"),
-				ContainerFilePath: "/docker-entrypoint-initdb.d/02e-card-image-face-index.sql",
-				FileMode:          initScriptDirPermissions,
-			},
-			{
-				HostFilePath:      filepath.Join(scriptsDir, "006-drop-card-image-hashes-index.sql"),
-				ContainerFilePath: "/docker-entrypoint-initdb.d/02f-drop-card-image-hashes-index.sql",
-				FileMode:          initScriptDirPermissions,
-			},
-			{
-				HostFilePath:      filepath.Join(dbDir, "03-data.sql"),
-				ContainerFilePath: "/docker-entrypoint-initdb.d/03-data.sql",
 				FileMode:          initScriptDirPermissions,
 			},
 		},
@@ -202,6 +165,22 @@ func (r *databaseRunner) Stop(ctx context.Context) error {
 	}
 
 	return r.container.Terminate(ctx)
+}
+
+// setupSchemaAndData creates the tables like the service does, then loads the test data.
+func setupSchemaAndData(ctx context.Context, con *postgres.DBConnection) error {
+	if err := postgres.NewMigrator(con, postgres.Scripts).Run(ctx); err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile("testdata/db/03-data.sql")
+	if err != nil {
+		return err
+	}
+
+	_, err = con.Conn.Exec(ctx, string(data))
+
+	return err
 }
 
 func Connect(ctx context.Context, cfg postgres.Config) *postgres.DBConnection {

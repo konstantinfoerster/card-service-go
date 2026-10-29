@@ -34,7 +34,7 @@ func TestMigrate_CanBeRunMultipleTimes(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	expectedMigrations := []string{"01-migration.sql", "02-migration.sql"}
+	expectedMigrations := append(appliedMigrations(t), "01-migration.sql", "02-migration.sql")
 	ctx := t.Context()
 	rawSQL01, err := os.ReadFile("testdata/scripts/01-migration.sql")
 	require.NoError(t, err)
@@ -92,11 +92,12 @@ func TestMigrate_ErrorDoesNotRevertAppliedScripts(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	expectedMigrations := []string{
+	expectedMigrations := append(
+		appliedMigrations(t),
 		"01-migration.sql",
 		"02-migration.sql",
 		"03-migration.sql",
-	}
+	)
 	ctx := t.Context()
 	rawSQL03, err := os.ReadFile("testdata/scripts/03-migration.sql")
 	require.NoError(t, err)
@@ -115,6 +116,19 @@ func TestMigrate_ErrorDoesNotRevertAppliedScripts(t *testing.T) {
 	assert.False(t, tableExists(t, ctx, connection, "test_collection"), "expected table lang3 to be rolled back")
 	assert.False(t, tableExists(t, ctx, connection, "withError"), "expected table withError to not exist")
 	assert.Equal(t, expectedMigrations, migrationEntrys(t, ctx, connection))
+}
+
+// appliedMigrations returns the names of the migration scripts TestMain applied to the test database.
+func appliedMigrations(t *testing.T) []string {
+	files, err := fs.ReadDir(postgres.Scripts, "scripts")
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(files))
+	for _, f := range files {
+		names = append(names, f.Name())
+	}
+
+	return names
 }
 
 func tableExists(t *testing.T, ctx context.Context, con *postgres.DBConnection, name string) bool {
