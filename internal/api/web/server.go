@@ -20,7 +20,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -108,7 +108,7 @@ func NewServer(cfg Config) (*Server, error) {
 		ErrorHandler: RespondWithProblemJSON,
 	})
 
-	app.Use(recover.New(recover.Config{
+	app.Use(fiberrecover.New(fiberrecover.Config{
 		EnableStackTrace: false,
 	}))
 	app.Use(favicon.New())
