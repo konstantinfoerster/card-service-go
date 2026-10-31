@@ -228,7 +228,7 @@ func (s *Server) Run(ctx context.Context) error {
 			return nil
 		}
 
-		return s.shutdown()
+		return s.shutdown(ctx)
 	})
 	errg.Go(func() error {
 		if s.Cfg.TLS.Enabled {
@@ -245,11 +245,11 @@ func (s *Server) IsRunning() bool {
 	return s.running.Load()
 }
 
-func (s *Server) shutdown() error {
+func (s *Server) shutdown(ctx context.Context) error {
 	addr := s.Cfg.Addr()
 	s.log.Info("shutdown server waiting to close open connections ...", slog.String("addr", addr))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer cancel()
 
 	if err := s.app.ShutdownWithContext(ctx); err != nil {
