@@ -51,6 +51,10 @@ func (d *DBConnection) Close() error {
 	return nil
 }
 
+func (d *DBConnection) Ping(ctx context.Context) error {
+	return d.pgxCon.Ping(ctx)
+}
+
 func (d *DBConnection) WithTransaction(ctx context.Context, f func(conn *DBConnection) error) error {
 	opts := pgx.TxOptions{AccessMode: pgx.ReadWrite, IsoLevel: pgx.ReadCommitted}
 

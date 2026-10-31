@@ -9,10 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -61,9 +59,6 @@ func NewProbeServer(cfg Config,
 		DisableStartupMessage: true,
 		BodyLimit:             cfg.MaxBodySize,
 	})
-	app.Use(logger.New(logger.Config{
-		Format: "[${time}] ${ip}  ${status} - ${latency} ${method} ${path}\n",
-	}))
 	app.Use(healthcheck.New(healthcheck.Config{
 		LivenessProbe:     livenessProbe,
 		LivenessEndpoint:  "/livez",
@@ -96,7 +91,7 @@ func NewServer(cfg Config) (*Server, error) {
 		"asset": static.url,
 	})
 
-	// avoid 0 and negative values, 0 = unlimited
+	// avoid 0 and negative values, fiber would silently fall back to its 4MB default
 	if cfg.MaxBodySize <= 0 {
 		cfg.MaxBodySize = DefaultMaxBodySize
 	}
@@ -215,53 +210,32 @@ func (s *Server) Test(req *http.Request) (*http.Response, error) {
 	return s.app.Test(req, noTimeout)
 }
 
+// Run serves requests until ctx is canceled, then shuts the server down gracefully.
 func (s *Server) Run(ctx context.Context) error {
 	addr := s.Cfg.Addr()
+	s.app.Hooks().OnListen(func(fiber.ListenData) error {
+		s.log.Info("started listening", slog.String("addr", addr))
+		s.running.Store(true)
+
+		return nil
+	})
+	defer s.running.Store(false)
 
 	errg, ctx := errgroup.WithContext(ctx)
 	errg.Go(func() error {
-		if ctx.Err() != nil {
-			return ctx.Err()
+		<-ctx.Done()
+		if !s.IsRunning() {
+			return nil
 		}
 
-		nCtx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
-		defer stop()
-
-		<-nCtx.Done()
-
-		return s.shutdown(ctx)
+		return s.shutdown()
 	})
-
 	errg.Go(func() error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		s.app.Hooks().OnListen(func(ld fiber.ListenData) error {
-			s.log.Info("started listening", slog.String("addr", addr))
-
-			s.running.Store(true)
-
-			return nil
-		})
-		s.app.Hooks().OnShutdown(func() error {
-			s.running.Store(false)
-
-			return nil
-		})
-
 		if s.Cfg.TLS.Enabled {
-			if err := s.app.ListenTLS(addr, s.Cfg.TLS.CertFile, s.Cfg.TLS.KeyFile); err != nil {
-				return fmt.Errorf("failed to start server at %s, %w", addr, err)
-			}
-		}
-		if err := s.app.Listen(addr); err != nil {
-			return fmt.Errorf("failed to start server at %s, %w", addr, err)
+			return s.app.ListenTLS(addr, s.Cfg.TLS.CertFile, s.Cfg.TLS.KeyFile)
 		}
 
-		s.log.Info("stopped listening", slog.String("addr", addr))
-
-		return nil
+		return s.app.Listen(addr)
 	})
 
 	return errg.Wait()
@@ -271,18 +245,15 @@ func (s *Server) IsRunning() bool {
 	return s.running.Load()
 }
 
-func (s *Server) shutdown(ctx context.Context) error {
+func (s *Server) shutdown() error {
 	addr := s.Cfg.Addr()
 	s.log.Info("shutdown server waiting to close open connections ...", slog.String("addr", addr))
 
-	timeout := time.Second * time.Duration(15)
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, timeout)
-	defer shutdownCancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
-	if err := s.app.ShutdownWithContext(shutdownCtx); err != nil {
-		s.log.Error("shutdown server failed", slog.String("addr", addr), slog.Any("error", err))
-
-		return err
+	if err := s.app.ShutdownWithContext(ctx); err != nil {
+		return fmt.Errorf("shutdown server at %s failed, %w", addr, err)
 	}
 
 	s.log.Info("shutdown server successfully", slog.String("addr", addr))

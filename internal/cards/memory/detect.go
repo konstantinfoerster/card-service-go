@@ -29,7 +29,6 @@ func (r *InMemDetectRepository) Top5MatchesByHash(_ context.Context, hashes ...d
 	// best image per card name, the faces of a split card share one image
 	best := make(map[string]cards.Score)
 	for _, img := range r.images {
-		// the best hash counts, e.g. upright or upside down
 		score := detection.MaxScore
 		for _, h := range hashes {
 			score = min(score, h.Distance(img.Hash))

@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/konstantinfoerster/card-service-go/internal/aio"
@@ -101,7 +104,11 @@ func main() {
 }
 
 func run(cfg config.Config) error {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	// restore default signal handling after the first signal, a second one kills the process
+	context.AfterFunc(ctx, stop)
+
 	dbCon, err := postgres.Connect(ctx, cfg.Database)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database, %w", err)
@@ -138,24 +145,31 @@ func run(cfg config.Config) error {
 		cardsapi.DetectRoutes(r, cfg.Auth, cfg.Server, detectSvc)
 	})
 
-	errg, ctx := errgroup.WithContext(context.Background())
-	// start web-server
+	errg, ctx := errgroup.WithContext(ctx)
 	errg.Go(func() error {
 		return srv.Run(ctx)
 	})
 
 	readinessProbe := func(c *fiber.Ctx) bool {
-		// TODO: implement readiness probe
+		if !srv.IsRunning() {
+			return false
+		}
+
+		pingCtx, cancel := context.WithTimeout(c.UserContext(), 2*time.Second)
+		defer cancel()
+
+		if err := dbCon.Ping(pingCtx); err != nil {
+			slog.Warn("readiness probe failed to ping database", slog.Any("error", err))
+
+			return false
+		}
+
 		return true
 	}
 	livenessProbe := func(c *fiber.Ctx) bool {
-		// TODO: implement liveness probe
-		return true
+		return srv.IsRunning()
 	}
-	// TODO: rethink that second server, maybe just add probes to
-	// main server
 	probeSrv := web.NewProbeServer(cfg.Probes, livenessProbe, readinessProbe)
-	// start probe-server
 	errg.Go(func() error {
 		return probeSrv.Run(ctx)
 	})

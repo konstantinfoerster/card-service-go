@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http/httptest"
 	"os"
-	"syscall"
 	"testing"
 	"time"
 
@@ -102,18 +101,17 @@ func TestNewServer_ServesFingerprintedAssetsOnProd(t *testing.T) {
 	assert.Equal(t, "public, max-age=31536000, immutable", resp.Header.Get(fiber.HeaderCacheControl))
 }
 
-func TestNewServer_ShutdownOnInteruptSignal(t *testing.T) {
+func TestNewServer_ShutdownOnContextCancel(t *testing.T) {
 	srv := web.NewTestServer()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	errg, ctx := errgroup.WithContext(ctx)
+	var errg errgroup.Group
 	errg.Go(func() error {
 		return srv.Run(ctx)
 	})
 	waitForStartup(t, srv)
 
-	killErr := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
-	require.NoError(t, killErr)
+	cancel()
 	err := errg.Wait()
 
 	require.NoError(t, err)
