@@ -3,61 +3,34 @@ const videoEl = document.getElementById("videoInput");
 const overlayEl = document.getElementById("overlay");
 const detectResultEl = document.querySelector("detect-result");
 
-// the detected object is drawn here to encode it as image for the api call
+// encodes the detected card as JPEG for the api call
 const uploadCanvas = document.createElement("canvas");
 
-// output size a detected object is warped to
-const OBJECT_WARP_WIDTH = 350;
-const OBJECT_WARP_HEIGHT = 490;
-const OBJECT_RATIO = OBJECT_WARP_WIDTH / OBJECT_WARP_HEIGHT;
-
-// detection runs on a copy of the frame whose longer side is at most this long,
-// the warp uses the full frame
-const DETECT_MAX_SIZE = 800;
-// smallest object area in pixels, measured on the full frame
-const MIN_OBJECT_AREA = 10000;
-// allowed difference between a quad's aspect ratio and OBJECT_RATIO
-const ASPECT_RATIO_TOLERANCE = 0.15;
-// share of a contour that must run along its quad, rejects clutter joined to the object
-const MIN_EDGE_COVERAGE = 0.8;
-// the found quad usually misses the low-contrast outer border, so it is grown by this share
-const BORDER_EXPANSION = 0.06;
-// an aftermath card measured in sizes of its bottom half: the top half lies above it,
-// a small border below and on the sides
-const AFTERMATH_LAYOUT = Object.freeze({ above: 1.5, below: 0.22, side: 0.08 });
-// height to width of the bottom half, about 0.6,
-// the title and art of a normal card measure 0.73 and more
-const AFTERMATH_HALF_RATIO =
-  (1 + 2 * AFTERMATH_LAYOUT.side) /
-  ((AFTERMATH_LAYOUT.above + 1 + AFTERMATH_LAYOUT.below) * OBJECT_RATIO);
-// allowed difference between a landscape quad's ratio and AFTERMATH_HALF_RATIO
-const AFTERMATH_HALF_TOLERANCE = 0.06;
-// the guide box the card is held into, as share of the frame size
-const GUIDE_SIZE = 0.8;
-// share of the guide box area a detected object must cover
-const MIN_GUIDE_FILL = 0.3;
-// share of the guide box size the searched area reaches beyond the box on every side
-const GUIDE_MARGIN = 0.1;
+// size of the extracted card image
+const CARD_WIDTH = 350;
+const CARD_HEIGHT = 490;
+const CARD_RATIO = CARD_WIDTH / CARD_HEIGHT;
 
 const DETECT_TIMEOUT_MILLIS = 5000;
+// pause after an api call starts
 const API_COOLDOWN_MILLIS = 500;
+// pause after the dialog closes
 const RESUME_DELAY_MILLIS = 1000;
-// time between two detection starts, the rest of it leaves the main thread free for the UI
+// min time between two detections
 const DETECT_INTERVAL_MILLIS = 100;
 
 const CONTENT_TYPE_JPEG = "image/jpeg";
 
-const txtSelectCamera = "Please select a camera ...";
+const TXT_SELECT_CAMERA = "Please select a camera ...";
 
 /**
- * OpenCV.js namespace. Module-scoped (shadows the global `cv`), assigned in the load handler.
+ * OpenCV.js namespace, set once ready.
  * @type {any}
  */
 let cv;
 
 /**
- * Shows the given parts in the status line, errors as their message.
- * textContent doesn't force a layout like innerText does.
+ * Shows the parts in the status line, errors as their message.
  * @param {...(string|Error)} txt
  */
 function updateStatusline(...txt) {
@@ -78,7 +51,7 @@ cameraEl.addEventListener("change", async function (e) {
 
   if (!deviceId) {
     stopStream();
-    updateStatusline(txtSelectCamera);
+    updateStatusline(TXT_SELECT_CAMERA);
 
     return;
   }
@@ -86,7 +59,7 @@ cameraEl.addEventListener("change", async function (e) {
   updateStatusline("Starting stream...");
   try {
     videoEl.srcObject = await camera.start(deviceId);
-    // resolves once playback runs, so the video dimensions are known
+    // waits until the video dimensions are known
     await videoEl.play();
 
     scanner.start();
@@ -96,15 +69,15 @@ cameraEl.addEventListener("change", async function (e) {
 });
 
 class DetectResultComponent extends HTMLElement {
-  /** @type {Array<{id: string}>} Matches returned by the api. */
+  /** @type {Array<{id: string}>} */
   #matches = [];
-  /** @type {number} Index of the currently shown match. */
+  /** @type {number} Index of the shown match. */
   #index = 0;
   #dialogEl;
   #cardEl;
   #prevEl;
   #nextEl;
-  /** @type {AbortController|null} Removes the listeners when the element is disconnected. */
+  /** @type {AbortController|null} Removes the listeners on disconnect. */
   #abort = null;
 
   connectedCallback() {
@@ -124,14 +97,14 @@ class DetectResultComponent extends HTMLElement {
         } else if (e.target.closest(".match-next")) {
           this.#show(this.#index + 1);
         } else if (e.target === this.#dialogEl || e.target.closest(".close")) {
-          // a click on the backdrop targets the dialog itself
+          // a backdrop click targets the dialog itself
           this.#dialogEl.close();
         }
       },
       { signal },
     );
 
-    // the card was added
+    // card added with quick add
     this.#dialogEl.addEventListener(
       "htmx:afterRequest",
       (e) => {
@@ -142,7 +115,6 @@ class DetectResultComponent extends HTMLElement {
       { signal },
     );
 
-    // closed by backdrop, close button, quick add or escape key
     this.#dialogEl.addEventListener(
       "close",
       () => {
@@ -163,9 +135,8 @@ class DetectResultComponent extends HTMLElement {
   }
 
   /**
-   * Opens the overlay with the given matches, does nothing for an empty list.
-   * @param {Array<{id: string}>} matches - The detected matches.
-   * @returns {void}
+   * Opens the dialog with the matches, ignores an empty list.
+   * @param {Array<{id: string}>} matches
    */
   showMatches(matches) {
     if (matches.length === 0) {
@@ -180,7 +151,7 @@ class DetectResultComponent extends HTMLElement {
 
   /**
    * @param {string} selector
-   * @returns {HTMLElement} The first matching element inside, throws if there is none.
+   * @returns {HTMLElement} First matching element, throws if none.
    */
   #find(selector) {
     const el = this.querySelector(selector);
@@ -194,9 +165,8 @@ class DetectResultComponent extends HTMLElement {
   }
 
   /**
-   * Loads the card detail of the match at the given index into the overlay.
-   * @param {number} index - Index of the match to show.
-   * @returns {Promise<void>} Resolves once the card is loaded or an error is shown, never rejects.
+   * Loads the card of the match at index into the dialog, never rejects.
+   * @param {number} index
    */
   async #show(index) {
     if (index < 0 || index >= this.#matches.length) {
@@ -213,10 +183,10 @@ class DetectResultComponent extends HTMLElement {
     this.#nextEl.disabled = index >= this.#matches.length - 1;
 
     const nav = { quickAdd: true };
-    // htmx inherits hx-vals, so print links inside the card detail keep the controls
+    // htmx inherits hx-vals, so links inside the card keep quick add
     this.#cardEl.setAttribute("hx-vals", JSON.stringify(nav));
 
-    // don't keep showing the previous card if loading this one fails
+    // clear the previous card in case loading fails
     this.#cardEl.replaceChildren();
 
     const id = this.#matches[index].id;
@@ -230,13 +200,13 @@ class DetectResultComponent extends HTMLElement {
       console.error("Failed to load card", err);
     }
 
-    // htmx doesn't swap error responses, so nothing was loaded
+    // htmx doesn't swap error responses
     if (!this.#cardEl.hasChildNodes()) {
       this.#cardEl.textContent = "Could not load the card.";
     }
   }
 
-  /** Resets inner state and removes the inner overlay elements. */
+  /** Resets the state and clears the card. */
   #reset() {
     this.#cardEl.replaceChildren();
 
@@ -247,14 +217,13 @@ class DetectResultComponent extends HTMLElement {
 
 customElements.define("detect-result", DetectResultComponent);
 
-// overlay closed, continue scanning
 detectResultEl.addEventListener("close", () => scanner.resume());
 
 class Camera {
-  /** @type {MediaStream|null} The active camera stream. */
+  /** @type {MediaStream|null} */
   #stream = null;
 
-  /** Asks for the camera permission, the camera labels are empty without it. */
+  /** Asks for the camera permission, without it the camera labels are empty. */
   async requestPermission() {
     try {
       this.#stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -264,8 +233,8 @@ class Camera {
   }
 
   /**
-   * Stops the current stream and opens a new one.
-   * @param {string} deviceId - Camera to use.
+   * Stops the current stream and opens the given camera.
+   * @param {string} deviceId
    * @returns {Promise<MediaStream>}
    */
   async start(deviceId) {
@@ -273,7 +242,7 @@ class Camera {
 
     this.#stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        // exact: don't silently fall back to another camera
+        // no fallback to another camera
         deviceId: { exact: deviceId },
         width: { ideal: 1280 },
         height: { ideal: 720 },
@@ -291,17 +260,13 @@ class Camera {
 
 const camera = new Camera();
 
-// requestVideoFrameCallback fires once per new video frame instead of once per screen refresh
-const HAS_VIDEO_FRAME_CALLBACK =
-  "requestVideoFrameCallback" in HTMLVideoElement.prototype;
-
-/** Owns the OpenCV buffers for the frames of the video element. */
-class FrameBuffers {
+/** Reads the video frames into an OpenCV Mat. */
+class FrameReader {
   /** @type {HTMLVideoElement} */
   #video;
-  /** @type {cv.VideoCapture|null} The video capture instance. */
+  /** @type {cv.VideoCapture|null} */
   #vidCap = null;
-  /** @type {cv.Mat|null} Source matrix (RGBA). */
+  /** @type {cv.Mat|null} RGBA */
   #src = null;
 
   /** @param {HTMLVideoElement} video */
@@ -309,26 +274,20 @@ class FrameBuffers {
     this.#video = video;
   }
 
-  /** @returns {cv.Mat|null} The last frame that was read (RGBA). */
+  /** @returns {cv.Mat|null} Last read frame (RGBA). */
   get frame() {
     return this.#src;
   }
 
-  /**
-   * Reads current video frame into the source matrix, the buffers follow the stream resolution.
-   * @returns {boolean} true if the frame contains image data.
-   */
   read() {
     if (this.#needsSync()) {
       this.#sync();
     }
 
     this.#vidCap.read(this.#src);
-
-    return this.#hasImage();
   }
 
-  /** @returns {boolean} true on the first read and when the stream resolution changed. */
+  /** @returns {boolean} true on the first read or a resolution change. */
   #needsSync() {
     return (
       !this.#src ||
@@ -337,10 +296,7 @@ class FrameBuffers {
     );
   }
 
-  /**
-   * Matches the video element and the buffers to the stream resolution, frees the old buffers.
-   * @returns {void}
-   */
+  /** Resizes the video element and the frame Mat to the stream resolution. */
   #sync() {
     const { videoWidth: w, videoHeight: h } = this.#video;
     this.#video.width = w;
@@ -354,29 +310,9 @@ class FrameBuffers {
     this.#vidCap = vidCap;
     this.#src = src;
   }
-
-  /**
-   * Checks if the source matrix contains image data, by sampling a few bytes.
-   * @returns {boolean} false if the frame looks empty/black, true otherwise.
-   */
-  #hasImage() {
-    const data = this.#src.data;
-    const samples = 12;
-    const step = Math.floor(data.length / samples / 4) * 4;
-
-    for (let i = 0; i < data.length; i += step) {
-      if (data[i] !== 0) {
-        return true;
-      }
-    }
-    return false;
-  }
 }
 
-/**
- * Draws the guide box and the outline of the detected object on a canvas that lies over
- * the video.
- */
+/** Draws the guide box and the card outline over the video. */
 class Outline {
   /** @type {HTMLCanvasElement} */
   #canvas;
@@ -395,12 +331,9 @@ class Outline {
     this.#video = video;
   }
 
-  /**
-   * @param {Array<{x: number, y: number}>} corners - In pixels of the video frame.
-   * @returns {void}
-   */
+  /** @param {Array<{x: number, y: number}>} corners - In pixels of the video frame. */
   draw(corners) {
-    this.clear();
+    this.showGuide();
 
     const [first, ...rest] = corners;
     this.#ctx.beginPath();
@@ -411,16 +344,16 @@ class Outline {
     this.#ctx.stroke();
   }
 
-  /** Removes the outline, the guide box stays. */
-  clear() {
-    // the canvas has the pixel size of the frame, css scales it together with the video
+  /** Shows only the guide box. */
+  showGuide() {
+    // canvas has the frame's pixel size, css scales it with the video
     const { videoWidth: w, videoHeight: h } = this.#video;
     if (this.#canvas.width !== w || this.#canvas.height !== h) {
       this.#canvas.width = w;
       this.#canvas.height = h;
     }
 
-    this.hide();
+    this.clear();
 
     const box = guideBox(w, h);
     this.#ctx.lineWidth = Math.max(2, w / 150);
@@ -430,86 +363,72 @@ class Outline {
     this.#ctx.setLineDash([]);
   }
 
-  /** Removes everything. */
-  hide() {
+  /** Clears the canvas. */
+  clear() {
     this.#ctx.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
   }
 }
 
-/** Runs the frame loop, finds objects and asks the api what they are. */
+/** Runs the frame loop, detects cards and identifies them with the api. */
 class Scanner {
   /** @type {HTMLVideoElement} */
   #video;
-  /** @type {FrameBuffers} */
-  #buffers;
+  /** @type {FrameReader} */
+  #reader;
   /** @type {Outline} */
   #outline;
-  /** @type {boolean} false while a request runs or the result overlay is open. */
+  /** @type {boolean} false while a request runs or the dialog is open. */
   #scanning = true;
-  /** @type {number} No api call before this time (performance.now() timebase). */
+  /** @type {number} No detection before this time. */
   #resumeAt = 0;
-  /** @type {number} Time of the last object detection, it runs less often than frames arrive. */
+  /** @type {number} Time of the last detection. */
   #lastDetection = 0;
-  /** @type {number|null} Pending frame callback of the processing loop. */
+  /** @type {number|null} Pending video frame callback. */
   #frameRequest = null;
 
   /**
    * @param {HTMLVideoElement} video
-   * @param {FrameBuffers} buffers
+   * @param {FrameReader} reader
    * @param {Outline} outline
    */
-  constructor(video, buffers, outline) {
+  constructor(video, reader, outline) {
     this.#video = video;
-    this.#buffers = buffers;
+    this.#reader = reader;
     this.#outline = outline;
   }
 
-  /**
-   * Starts the processing loop, a still running loop (e.g. of the previous camera) is stopped,
-   * otherwise both loops would process every frame. Call after the video is playing.
-   * @returns {void}
-   */
+  /** Starts the frame loop, replaces a running one. Call after the video plays. */
   start() {
     this.stop();
     this.#processVideo();
   }
 
-  /** Cancels the scheduled #processVideo call, if any. */
+  /** Stops the frame loop and clears the overlay. */
   stop() {
-    this.#outline.hide();
+    this.#outline.clear();
 
     if (this.#frameRequest === null) {
       return;
     }
 
-    if (HAS_VIDEO_FRAME_CALLBACK) {
-      this.#video.cancelVideoFrameCallback(this.#frameRequest);
-    } else {
-      cancelAnimationFrame(this.#frameRequest);
-    }
+    this.#video.cancelVideoFrameCallback(this.#frameRequest);
     this.#frameRequest = null;
   }
 
-  /** Continues scanning after a short delay, so the same card isn't detected again. */
+  /** Continues scanning after a delay, so the same card isn't detected again. */
   resume() {
     this.#resumeAt = performance.now() + RESUME_DELAY_MILLIS;
     this.#scanning = true;
-    this.#outline.clear();
+    this.#outline.showGuide();
     updateStatusline("");
   }
 
-  /** Schedules #processVideo for the next video frame. */
   #scheduleNextFrame() {
-    if (HAS_VIDEO_FRAME_CALLBACK) {
-      this.#frameRequest = this.#video.requestVideoFrameCallback(
-        this.#processVideo,
-      );
-    } else {
-      this.#frameRequest = requestAnimationFrame(this.#processVideo);
-    }
+    this.#frameRequest = this.#video.requestVideoFrameCallback(
+      this.#processVideo,
+    );
   }
 
-  /** Processes the current video frame. */
   #processVideo = () => {
     if (this.#video.paused || this.#video.ended) {
       return;
@@ -519,7 +438,8 @@ class Scanner {
       try {
         this.#scanFrame();
       } catch (err) {
-        console.error("Camera video error:", err);
+        console.error("Card detection failed:", err);
+        updateStatusline("Error: card detection failed.", err);
       }
     }
 
@@ -527,8 +447,7 @@ class Scanner {
   };
 
   #scanFrame() {
-    // no detection while paused (api cooldown, resume delay) and not more often than needed,
-    // the video itself plays natively
+    // skip while paused and throttle the detection
     const now = performance.now();
     if (
       now < this.#resumeAt ||
@@ -538,13 +457,10 @@ class Scanner {
     }
     this.#lastDetection = now;
 
-    if (!this.#buffers.read()) {
-      return;
-    }
-
-    const detection = detectObjectFromImage(this.#buffers.frame);
+    this.#reader.read();
+    const detection = detectCard(this.#reader.frame);
     if (!detection) {
-      this.#outline.clear();
+      this.#outline.showGuide();
       return;
     }
 
@@ -553,15 +469,13 @@ class Scanner {
   }
 
   /**
-   * Fetches object metadata based on the found image.
-   * @param {cv.Mat} imgMat - The detected image.
-   * @returns {Promise<void>}
+   * Identifies the card with the api and shows the matches.
+   * @param {cv.Mat} imgMat - Card image, deleted here.
    */
   async #identify(imgMat) {
     this.#scanning = false;
-    // also throttles retries after a failed request or an empty result
     this.#resumeAt = performance.now() + API_COOLDOWN_MILLIS;
-    // an error of the previous request is outdated now
+    // clear the previous error
     updateStatusline("");
 
     try {
@@ -583,7 +497,7 @@ class Scanner {
     } finally {
       imgMat.delete();
 
-      // the overlay decides what comes next
+      // an open dialog resumes scanning when closed
       this.#scanning = !detectResultEl.isOpen;
     }
   }
@@ -591,21 +505,21 @@ class Scanner {
 
 const scanner = new Scanner(
   videoEl,
-  new FrameBuffers(videoEl),
+  new FrameReader(videoEl),
   new Outline(overlayEl, videoEl),
 );
 
 /**
- * The OpenCV namespace, wrapped in an object: it has a then() method, so a promise resolved
- * with it directly never settles.
+ * Waits until OpenCV.js is ready.
  * @returns {Promise<{cv: any}>}
  */
-async function loadOpenCV() {
+async function waitForOpenCV() {
   const instance = globalThis.cv;
   if (!instance) {
     throw new Error("OpenCV.js is not loaded");
   }
 
+  // wrapped, cv has a then() method
   if (instance.calledRun && instance.Mat && instance.getBuildInformation) {
     return { cv: instance };
   }
@@ -615,7 +529,7 @@ async function loadOpenCV() {
   });
 }
 
-// "load" (not DOMContentLoaded) also waits for the async opencv.js script
+// after load, so the page is visible before the camera prompt
 window.addEventListener("load", async () => {
   try {
     updateStatusline("Checking camera API permissions...");
@@ -626,17 +540,17 @@ window.addEventListener("load", async () => {
   }
 
   try {
-    const result = await loadOpenCV();
+    const result = await waitForOpenCV();
     cv = result.cv;
   } catch (err) {
     updateStatusline("Error: OpenCV not available.", err);
     return;
   }
 
-  updateStatusline(txtSelectCamera);
+  updateStatusline(TXT_SELECT_CAMERA);
   fillCameraList();
 
-  // a camera was plugged in or removed
+  // camera plugged in or removed
   navigator.mediaDevices.addEventListener("devicechange", fillCameraList);
 });
 
@@ -646,11 +560,10 @@ function stopStream() {
   videoEl.pause();
 }
 
-// stop stream on page leave (pagehide also fires on mobile and with the back/forward cache)
+// pagehide also fires on mobile and for the back/forward cache
 window.addEventListener("pagehide", stopStream);
 
-// stop camera on htmx swap, e.g. navigating to another page,
-// but not for swaps inside the detect result like loading the card detail
+// stop on htmx navigation, but not for swaps inside the detect result
 document.addEventListener("htmx:beforeSwap", (e) => {
   if (detectResultEl.contains(e.detail.target)) {
     return;
@@ -659,17 +572,14 @@ document.addEventListener("htmx:beforeSwap", (e) => {
   stopStream();
 });
 
-/**
- * Fills the camera select, also called when a camera is plugged in or removed.
- * Keeps the current selection if that camera is still there.
- */
+/** Fills the camera select, keeps the selection if that camera still exists. */
 async function fillCameraList() {
   const selected = cameraEl.value;
 
   const devices = await navigator.mediaDevices.enumerateDevices();
   const vDevices = devices.filter((dev) => dev.kind === "videoinput");
 
-  // an empty value keeps the "no camera selected"
+  // empty value -> no camera selected
   const placeholder = new Option("Select camera", "");
   const cameraOptions = vDevices.map((dev, index) => {
     const label = dev.label || `Camera ${index + 1}`;
@@ -686,16 +596,13 @@ async function fillCameraList() {
   if (vDevices.some((dev) => dev.deviceId === selected)) {
     cameraEl.value = selected;
   } else {
-    // the active camera was removed
+    // the selected camera was removed
     stopStream();
-    updateStatusline(txtSelectCamera);
+    updateStatusline(TXT_SELECT_CAMERA);
   }
 }
 
-/**
- * Tracks OpenCV objects (Mat, MatVector, ...) and frees them all in one place.
- * Use `try { ... } finally { scope.dispose(); }`.
- */
+/** Deletes the tracked OpenCV objects together. */
 class MatScope {
   /** @type {Array<{delete: () => void}>} */
   #items = [];
@@ -703,7 +610,7 @@ class MatScope {
   /**
    * @template {{delete: () => void}} T
    * @param {T} item
-   * @returns {T} the same item, for inline use
+   * @returns {T}
    */
   track(item) {
     this.#items.push(item);
@@ -719,27 +626,22 @@ class MatScope {
 }
 
 /**
- * @param {cv.Mat} src - The raw camera frame
- * @returns {{image: cv.Mat, corners: Array<{x: number, y: number}>}|null} - The warped object
- *   (caller owns `image`) and its corners in pixels of the frame, or null
+ * Finds a card in the frame.
+ * @param {cv.Mat} src - Camera frame (RGBA).
+ * @returns {{image: cv.Mat, corners: Array<{x: number, y: number}>}|null} The card image and
+ *   its corners in frame pixels. The caller must delete the image.
  */
-function detectObjectFromImage(src) {
+function detectCard(src) {
   const scope = new MatScope();
-  let warpedObject = null;
-  let corners = null;
 
   try {
-    // only the guide box with a margin is searched, so neighbouring objects
-    // (e.g. the other cards of a binder page) can't join the object's outline
-    const area = detectionArea(src.cols, src.rows);
+    // search only around the guide box, so neighbouring cards can't join the outline
+    const area = searchArea(src.cols, src.rows);
     const searched = scope.track(src.roi(area));
 
-    // the edge detection cost grows with the pixel count, so search on a smaller copy,
-    // converted to gray first, resizing one channel moves a quarter of the data
-    const scale = Math.min(
-      1,
-      DETECT_MAX_SIZE / Math.max(searched.cols, searched.rows),
-    );
+    // edge detection on a smaller gray copy is much faster
+    const maxSize = 800;
+    const scale = Math.min(1, maxSize / Math.max(searched.cols, searched.rows));
     const fullGray = scope.track(new cv.Mat());
     cv.cvtColor(searched, fullGray, cv.COLOR_RGBA2GRAY);
 
@@ -753,13 +655,9 @@ function detectObjectFromImage(src) {
       cv.resize(fullGray, gray, size, 0, 0, cv.INTER_AREA);
     }
 
-    const blurred = scope.track(new cv.Mat());
-    const edged = scope.track(new cv.Mat());
+    const edged = findEdges(gray, scope);
     const contours = scope.track(new cv.MatVector());
     const hierarchy = scope.track(new cv.Mat());
-
-    findObjectEdges(gray, blurred, edged);
-
     cv.findContours(
       edged,
       contours,
@@ -768,168 +666,149 @@ function detectObjectFromImage(src) {
       cv.CHAIN_APPROX_SIMPLE,
     );
 
-    const candidates = findObjectCandidates(
+    const bestQuad = findLargestQuad(
       contours,
       gray.cols,
       gray.rows,
       scale,
       scope,
     );
-    const bestApprox = selectBestCandidate(candidates);
-
-    if (bestApprox) {
-      // the corners are mapped back to the full frame, the warp keeps the full resolution
-      const found = quadCorners(bestApprox, scale);
-      const card = extendAftermathHalf(found, searched.cols, searched.rows);
-      if (card) {
-        const inFrame = card.map((p) => ({
-          x: p.x + area.x,
-          y: p.y + area.y,
-        }));
-        corners = expandCorners(inFrame, src.cols, src.rows);
-      }
+    if (!bestQuad) {
+      return null;
     }
 
-    if (corners && fitsGuideBox(corners, src.cols, src.rows)) {
-      warpedObject = transformPerspective(src, corners);
-
-      // reject blank/featureless candidates (e.g. compression noise on an out-of-focus frame)
-      if (!hasEnoughDetail(warpedObject)) {
-        warpedObject.delete();
-        warpedObject = null;
-      }
+    const card = toWholeCard(orderCorners(bestQuad), gray.cols, gray.rows);
+    if (!card) {
+      return null;
     }
-  } catch (err) {
-    warpedObject?.delete();
-    warpedObject = null;
 
-    updateStatusline("Error: object detection failed.", err);
+    // gray pixels to frame pixels, the extraction uses the full resolution
+    const toFrame = (p) => ({
+      x: p.x / scale + area.x,
+      y: p.y / scale + area.y,
+    });
+    const corners = expandCorners(card.map(toFrame), src.cols, src.rows);
+    if (!fitsGuideBox(corners, src.cols, src.rows)) {
+      return null;
+    }
+
+    const image = extractCard(src, corners);
+    // reject blank surfaces
+    if (!hasEnoughDetail(image)) {
+      image.delete();
+      return null;
+    }
+
+    return { image, corners };
   } finally {
     scope.dispose();
   }
-
-  if (!warpedObject) {
-    return null;
-  }
-
-  return { image: warpedObject, corners };
 }
 
 /**
- * Writes an edge map of the gray image into the given (caller-owned) blurred/edged Mats.
- * @param {cv.Mat} gray - Gray image, possibly scaled down from the full frame.
- * @param {cv.Mat} blurred
- * @param {cv.Mat} edged
- * @returns {void}
+ * Edge map of the gray image.
+ * @param {cv.Mat} gray
+ * @param {MatScope} scope - Owns the created Mats, including the result.
+ * @returns {cv.Mat}
  */
-function findObjectEdges(gray, blurred, edged) {
-  const scope = new MatScope();
+function findEdges(gray, scope) {
+  // reduces noise and fine texture
+  const blurred = scope.track(new cv.Mat());
+  cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
 
-  try {
-    // a wide blur suppresses background texture noise while keeping the object's own edges
-    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+  // thresholds follow the image brightness (auto Canny)
+  const median = medianGray(blurred);
+  const thresholdSpread = 0.33;
+  const lower = Math.max(0, (1 - thresholdSpread) * median);
+  const upper = Math.min(255, (1 + thresholdSpread) * median);
+  const edged = scope.track(new cv.Mat());
+  cv.Canny(blurred, edged, lower, upper);
 
-    // adaptive ("auto Canny") thresholds handle both bright and dark/textured backgrounds
-    const median = medianGray(blurred);
-    const sigma = 0.33;
-    const lower = Math.max(0, (1 - sigma) * median);
-    const upper = Math.min(255, (1 + sigma) * median);
-    cv.Canny(blurred, edged, lower, upper);
+  // closes small gaps in the edges, a bigger kernel would merge background texture
+  const kernel = scope.track(
+    cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3)),
+  );
+  cv.morphologyEx(edged, edged, cv.MORPH_CLOSE, kernel);
 
-    // small kernel: a wider one merges background texture into one frame-sized blob
-    const kernel = scope.track(
-      cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3)),
-    );
-    cv.morphologyEx(edged, edged, cv.MORPH_CLOSE, kernel);
-  } finally {
-    scope.dispose();
-  }
+  return edged;
 }
 
 /**
- * Contours with a plausible object-like aspect ratio.
+ * Largest contour that simplifies to a quad with the card's aspect ratio, so inner regions
+ * like the text box lose.
  * @param {cv.MatVector} contours
- * @param {number} frameWidth
- * @param {number} frameHeight
- * @param {number} scale - Size of the frame relative to the full frame, 1 for the full frame.
- * @param {MatScope} scope - Owns every Mat created here, including each `approx`.
- * @returns {Array<{approx: cv.Mat, area: number}>}
+ * @param {number} imageWidth
+ * @param {number} imageHeight
+ * @param {number} scale - Size relative to the full frame.
+ * @param {MatScope} scope - Owns the created Mats.
+ * @returns {Array<{x: number, y: number}>|null} The quad's corners in contour pixels,
+ *   unordered, or null if no contour fits.
  */
-function findObjectCandidates(contours, frameWidth, frameHeight, scale, scope) {
-  const minArea = MIN_OBJECT_AREA * scale * scale;
-  // reject near-full-frame blobs (over-aggressive edge merging in findObjectEdges)
-  const maxAllowedArea = frameWidth * frameHeight * 0.9;
+function findLargestQuad(contours, imageWidth, imageHeight, scale, scope) {
+  // in pixels of the full frame
+  const minCardArea = 10000;
+  // allowed difference to CARD_RATIO
+  const aspectRatioTolerance = 0.15;
+  // fraction of a contour that must lie on its quad
+  const minEdgeCoverage = 0.8;
 
-  const candidates = [];
+  // smaller contours can't win, so they skip the checks
+  let bestArea = minCardArea * scale * scale;
+  // rejects blobs of merged background edges
+  const maxAllowedArea = imageWidth * imageHeight * 0.9;
+
+  let best = null;
   for (let i = 0; i < contours.size(); ++i) {
-    // the hull closes an outer border with gaps (dark border on dark background), otherwise
-    // only a closed inner region like one half of a two-part card is found
+    // the hull closes borders with gaps
     const cnt = scope.track(contours.get(i));
     const hull = scope.track(new cv.Mat());
     cv.convexHull(cnt, hull);
     const area = cv.contourArea(hull);
-
-    // filter by minimum size
-    if (area > minArea && area <= maxAllowedArea) {
-      const epsilon = 0.02 * cv.arcLength(hull, true);
-      const approx = scope.track(new cv.Mat());
-
-      // simplify contour / count corners
-      cv.approxPolyDP(hull, approx, epsilon, true);
-
-      if (approx.rows !== 4) {
-        continue;
-      }
-
-      const rect = cv.minAreaRect(approx);
-      if (
-        objectAspectRatioDiff(rect) <= ASPECT_RATIO_TOLERANCE &&
-        edgeCoverage(cnt, approx, epsilon) >= MIN_EDGE_COVERAGE
-      ) {
-        candidates.push({ approx, area });
-      }
+    if (area <= bestArea || area > maxAllowedArea) {
+      continue;
     }
+
+    const epsilon = 0.02 * cv.arcLength(hull, true);
+    const approx = scope.track(new cv.Mat());
+    cv.approxPolyDP(hull, approx, epsilon, true);
+    if (
+      approx.rows !== 4 ||
+      cardAspectRatioDiff(cv.minAreaRect(approx)) > aspectRatioTolerance ||
+      edgeCoverage(cnt, approx, epsilon) < minEdgeCoverage
+    ) {
+      continue;
+    }
+
+    bestArea = area;
+    best = matToPoints(approx);
   }
 
-  return candidates;
+  return best;
 }
 
 /**
- * Picks the largest candidate, it wins over a smaller inner region like the text box or a
- * piece of a neighbouring object in the margin of the searched area. Does not free any Mat,
- * the scope passed to findObjectCandidates owns them.
- * @param {Array<{approx: cv.Mat, area: number}>} candidates
- * @returns {cv.Mat|null}
+ * @param {cv.Mat} mat - CV_32SC2
+ * @returns {Array<{x: number, y: number}>}
  */
-function selectBestCandidate(candidates) {
-  let best = null;
-  for (const c of candidates) {
-    if (!best || c.area > best.area) {
-      best = c;
-    }
+function matToPoints(mat) {
+  const d = mat.data32S;
+  const pts = [];
+  for (let i = 0; i < d.length; i += 2) {
+    pts.push({ x: d[i], y: d[i + 1] });
   }
 
-  if (!best) {
-    return null;
-  }
-
-  return best.approx;
+  return pts;
 }
 
 /**
- * Share of the contour's length that runs along the quad's edges. A border with gaps runs
- * along its hull, clutter joined to the object (e.g. a neighbouring card) runs away from it.
- * @param {cv.Mat} contour - CV_32SC2.
- * @param {cv.Mat} quad - 4-point approximation of the contour's hull (CV_32SC2).
- * @param {number} maxDist - Distance in pixels up to which a point lies on an edge.
+ * Fraction of the contour's length on the quad's edges, low for clutter joined to the card.
+ * @param {cv.Mat} contour - CV_32SC2
+ * @param {cv.Mat} quad - CV_32SC2
+ * @param {number} maxDist - Max distance of a point on an edge.
  * @returns {number} 0 to 1.
  */
 function edgeCoverage(contour, quad, maxDist) {
-  const d = contour.data32S;
-  const pts = [];
-  for (let i = 0; i < d.length; i += 2) {
-    pts.push(new cv.Point(d[i], d[i + 1]));
-  }
+  const pts = matToPoints(contour);
   const onEdge = pts.map(
     (p) => Math.abs(cv.pointPolygonTest(quad, p, true)) <= maxDist,
   );
@@ -937,7 +816,7 @@ function edgeCoverage(contour, quad, maxDist) {
   let total = 0;
   let along = 0;
   for (let i = 0; i < pts.length; i++) {
-    // the segment from the last point back to the first closes the contour
+    // the last segment closes the contour
     const next = (i + 1) % pts.length;
     const len = dist(pts[i], pts[next]);
     total += len;
@@ -954,18 +833,15 @@ function edgeCoverage(contour, quad, maxDist) {
 }
 
 /**
- * Of an aftermath card often only the bottom half has a closed contour. The half is a landscape
- * quad, so with the card held upright a landscape quad with the half's ratio is extended to the
- * whole card. Other landscape quads, like the title and art of a normal card whose outline
- * wasn't found, are rejected.
+ * Of an aftermath card often only the landscape bottom half is found. Extends such a half to
+ * the whole card.
  * @param {Array<{x: number, y: number}>} corners - top-left, top-right, bottom-right, bottom-left
- * @param {number} frameWidth
- * @param {number} frameHeight
- * @returns {Array<{x: number, y: number}>|null} The corners of the whole card (may reach out of
- *   the frame by its border), the given ones for a portrait quad, null for a landscape quad
- *   that is no aftermath half or whose top half is out of the frame.
+ * @param {number} imageWidth
+ * @param {number} imageHeight
+ * @returns {Array<{x: number, y: number}>|null} The given corners for a portrait quad, the whole
+ *   card for an aftermath half, null for other landscape quads or a top half out of the image.
  */
-function extendAftermathHalf(corners, frameWidth, frameHeight) {
+function toWholeCard(corners, imageWidth, imageHeight) {
   const [tl, tr, br, bl] = corners;
   const width = dist(tl, tr) + dist(bl, br);
   const height = dist(tl, bl) + dist(tr, br);
@@ -973,9 +849,14 @@ function extendAftermathHalf(corners, frameWidth, frameHeight) {
     return corners;
   }
 
-  if (
-    Math.abs(height / width - AFTERMATH_HALF_RATIO) > AFTERMATH_HALF_TOLERANCE
-  ) {
+  // aftermath card in units of its bottom half
+  const above = 1.5;
+  const below = 0.22;
+  const side = 0.08;
+  // height to width of the bottom half, about 0.6
+  const halfRatio = (1 + 2 * side) / ((above + 1 + below) * CARD_RATIO);
+  const halfTolerance = 0.06;
+  if (Math.abs(height / width - halfRatio) > halfTolerance) {
     return null;
   }
 
@@ -983,13 +864,12 @@ function extendAftermathHalf(corners, frameWidth, frameHeight) {
     x: a.x + (b.x - a.x) * t,
     y: a.y + (b.y - a.y) * t,
   });
-  // point of the half extrapolated beyond 0..1, u along the top edge, v along the left edge
+  // point relative to the half, u along the top edge, v along the left edge
   const at = (u, v) => lerp(lerp(tl, tr, u), lerp(bl, br, u), v);
-  const { above, below, side } = AFTERMATH_LAYOUT;
 
-  const inFrame = (p) =>
-    p.x >= 0 && p.y >= 0 && p.x < frameWidth && p.y < frameHeight;
-  if (!inFrame(at(0, -above)) || !inFrame(at(1, -above))) {
+  const inImage = (p) =>
+    p.x >= 0 && p.y >= 0 && p.x < imageWidth && p.y < imageHeight;
+  if (!inImage(at(0, -above)) || !inImage(at(1, -above))) {
     return null;
   }
 
@@ -1002,9 +882,8 @@ function extendAftermathHalf(corners, frameWidth, frameHeight) {
 }
 
 /**
- * Median pixel value of a grayscale Mat, used for adaptive Canny thresholds.
- * @param {cv.Mat} mat - Grayscale image (CV_8UC1).
- * @returns {number} Median pixel value (0-255).
+ * @param {cv.Mat} mat - CV_8UC1
+ * @returns {number} Median pixel value.
  */
 function medianGray(mat) {
   const data = mat.data;
@@ -1026,7 +905,6 @@ function medianGray(mat) {
 }
 
 /**
- * Euclidean distance between two points.
  * @param {{x: number, y: number}} a
  * @param {{x: number, y: number}} b
  * @returns {number}
@@ -1036,23 +914,22 @@ function dist(a, b) {
 }
 
 /**
- * How far a detected quad's aspect ratio is from an object's (~0.71, portrait).
  * @param {{size: {width: number, height: number}}} rect - minAreaRect of the quad.
- * @returns {number} Difference from the target ratio, or Infinity if degenerate.
+ * @returns {number} Difference to CARD_RATIO, Infinity for an empty rect.
  */
-function objectAspectRatioDiff({ size: { width, height } }) {
+function cardAspectRatioDiff({ size: { width, height } }) {
   if (width === 0 || height === 0) {
     return Infinity;
   }
 
   const ratio = Math.min(width, height) / Math.max(width, height);
 
-  return Math.abs(ratio - OBJECT_RATIO);
+  return Math.abs(ratio - CARD_RATIO);
 }
 
 /**
- * Whether a candidate has enough pixel variation to plausibly be a real object.
- * @param {cv.Mat} mat - Warped candidate object image.
+ * Whether the image has enough contrast to be a card.
+ * @param {cv.Mat} mat - RGBA
  * @returns {boolean}
  */
 function hasEnoughDetail(mat) {
@@ -1066,7 +943,7 @@ function hasEnoughDetail(mat) {
     cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
     cv.meanStdDev(gray, mean, stddev);
 
-    const minStdDev = 20; // blank frames measure near 0
+    const minStdDev = 20; // blank surfaces measure near 0
     return stddev.data64F[0] >= minStdDev;
   } finally {
     scope.dispose();
@@ -1074,40 +951,32 @@ function hasEnoughDetail(mat) {
 }
 
 /**
- * Corners of a quad in pixels of the full frame, ordered clockwise from the top left.
- * @param {cv.Mat} quad - 4-point contour approximation (CV_32SC2).
- * @param {number} scale - Size of the frame the quad was found in, relative to the full frame.
+ * @param {Array<{x: number, y: number}>} quad - 4 points in any order.
  * @returns {Array<{x: number, y: number}>} top-left, top-right, bottom-right, bottom-left
  */
-function quadCorners(quad, scale) {
-  const d = quad.data32S;
-  const pts = [0, 2, 4, 6].map((i) => ({
-    x: d[i] / scale,
-    y: d[i + 1] / scale,
-  }));
-
+function orderCorners(quad) {
   // sort corners by sum and difference of the coordinates
-  const sums = pts.map((p) => p.x + p.y);
-  const diffs = pts.map((p) => p.y - p.x);
+  const sums = quad.map((p) => p.x + p.y);
+  const diffs = quad.map((p) => p.y - p.x);
 
-  const tl = pts[sums.indexOf(Math.min(...sums))]; // top-left (smallest sum)
-  const tr = pts[diffs.indexOf(Math.min(...diffs))]; // top-right (smallest difference)
-  const br = pts[sums.indexOf(Math.max(...sums))]; // bottom-right (largest sum)
-  const bl = pts[diffs.indexOf(Math.max(...diffs))]; // bottom-left (largest difference)
+  const tl = quad[sums.indexOf(Math.min(...sums))]; // top-left (smallest sum)
+  const tr = quad[diffs.indexOf(Math.min(...diffs))]; // top-right (smallest difference)
+  const br = quad[sums.indexOf(Math.max(...sums))]; // bottom-right (largest sum)
+  const bl = quad[diffs.indexOf(Math.max(...diffs))]; // bottom-left (largest difference)
 
   return [tl, tr, br, bl];
 }
 
 /**
- * Grows the corners around their center by BORDER_EXPANSION to reach the object's outer
- * border, and clamps them to the frame. The order is kept.
+ * Grows the corners around their center, clamped to the frame.
  * @param {Array<{x: number, y: number}>} corners
  * @param {number} frameWidth
  * @param {number} frameHeight
  * @returns {Array<{x: number, y: number}>}
  */
 function expandCorners(corners, frameWidth, frameHeight) {
-  const grow = 1 + BORDER_EXPANSION;
+  // the quad misses the card's outer border
+  const grow = 1.06;
   const c = centerOf(corners);
   const clamp = (v, size) => Math.min(Math.max(v, 0), size - 1);
 
@@ -1118,7 +987,6 @@ function expandCorners(corners, frameWidth, frameHeight) {
 }
 
 /**
- * Mean point of the corners.
  * @param {Array<{x: number, y: number}>} corners
  * @returns {{x: number, y: number}}
  */
@@ -1130,14 +998,16 @@ function centerOf(corners) {
 }
 
 /**
- * The centered box with the object's aspect ratio the user holds the object into.
+ * Centered box with the card's aspect ratio.
  * @param {number} frameWidth
  * @param {number} frameHeight
  * @returns {{x: number, y: number, width: number, height: number}}
  */
 function guideBox(frameWidth, frameHeight) {
-  const height = Math.min(frameHeight, frameWidth / OBJECT_RATIO) * GUIDE_SIZE;
-  const width = height * OBJECT_RATIO;
+  // relative to the largest card-shaped box that fits in the frame
+  const size = 0.8;
+  const height = Math.min(frameHeight, frameWidth / CARD_RATIO) * size;
+  const width = height * CARD_RATIO;
 
   return {
     x: (frameWidth - width) / 2,
@@ -1148,16 +1018,17 @@ function guideBox(frameWidth, frameHeight) {
 }
 
 /**
- * The part of the frame that is searched for the object: the guide box grown by GUIDE_MARGIN
- * of its size on every side, cut to the frame.
+ * Guide box grown by a margin on every side, clamped to the frame.
  * @param {number} frameWidth
  * @param {number} frameHeight
  * @returns {cv.Rect}
  */
-function detectionArea(frameWidth, frameHeight) {
+function searchArea(frameWidth, frameHeight) {
+  // fraction of the box size
+  const margin = 0.1;
   const box = guideBox(frameWidth, frameHeight);
-  const marginX = box.width * GUIDE_MARGIN;
-  const marginY = box.height * GUIDE_MARGIN;
+  const marginX = box.width * margin;
+  const marginY = box.height * margin;
 
   const left = Math.max(0, Math.floor(box.x - marginX));
   const top = Math.max(0, Math.floor(box.y - marginY));
@@ -1168,14 +1039,14 @@ function detectionArea(frameWidth, frameHeight) {
 }
 
 /**
- * Whether the object lies in the guide box: its center is inside and it covers at least
- * MIN_GUIDE_FILL of the box. Rejects e.g. the text box of a card held too close.
+ * Whether the quad's center lies in the guide box and it covers enough of the box.
  * @param {Array<{x: number, y: number}>} corners - In order around the quad.
  * @param {number} frameWidth
  * @param {number} frameHeight
  * @returns {boolean}
  */
 function fitsGuideBox(corners, frameWidth, frameHeight) {
+  const minFill = 0.3;
   const box = guideBox(frameWidth, frameHeight);
 
   // shoelace formula
@@ -1187,13 +1058,11 @@ function fitsGuideBox(corners, frameWidth, frameHeight) {
   area = Math.abs(area) / 2;
 
   return (
-    isInside(centerOf(corners), box) &&
-    area >= box.width * box.height * MIN_GUIDE_FILL
+    isInside(centerOf(corners), box) && area >= box.width * box.height * minFill
   );
 }
 
 /**
- * Whether the point lies in the box.
  * @param {{x: number, y: number}} p
  * @param {{x: number, y: number, width: number, height: number}} box
  * @returns {boolean}
@@ -1208,19 +1077,24 @@ function isInside(p, box) {
 }
 
 /**
- * Warps the object into a straightened, fixed-size image.
+ * Cuts the card out of the frame, straightened to a CARD_WIDTH x CARD_HEIGHT image.
  * @param {cv.Mat} sourceMat
  * @param {Array<{x: number, y: number}>} corners - top-left, top-right, bottom-right, bottom-left
- * @returns {cv.Mat} The warped image, the caller owns it.
+ * @returns {cv.Mat} The caller must delete it.
  */
-function transformPerspective(sourceMat, corners) {
-  const w = OBJECT_WARP_WIDTH;
-  const h = OBJECT_WARP_HEIGHT;
+function extractCard(sourceMat, corners) {
+  const w = CARD_WIDTH;
+  const h = CARD_HEIGHT;
 
   const scope = new MatScope();
   try {
     const srcCoords = scope.track(
-      cv.matFromArray(4, 1, cv.CV_32FC2, corners.flatMap((p) => [p.x, p.y])),
+      cv.matFromArray(
+        4,
+        1,
+        cv.CV_32FC2,
+        corners.flatMap((p) => [p.x, p.y]),
+      ),
     );
     const dstCoords = scope.track(
       cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]),
@@ -1237,9 +1111,8 @@ function transformPerspective(sourceMat, corners) {
 }
 
 /**
- * Sends the given image to the detect api.
- * @param {Blob} image - JPEG encoded image, sent as raw body.
- * @returns {Promise<{data: Array<{id: string}>}>} The matches, best match first.
+ * @param {Blob} image - JPEG
+ * @returns {Promise<{data: Array<{id: string}>}>} The matches, best first.
  */
 async function fetchMatchesByImage(image) {
   const response = await fetch("/detect", {
