@@ -688,13 +688,13 @@ function detectCard(src) {
       y: p.y / scale + area.y,
     });
     const corners = expandCorners(card.map(toFrame), src.cols, src.rows);
-    if (!fitsGuideBox(corners, src.cols, src.rows)) {
+    if (!fillsGuideBox(corners, src.cols, src.rows)) {
       return null;
     }
 
-    const image = extractCard(src, corners);
+    const image = extractCard(src, corners, scope);
     // reject blank surfaces
-    if (!hasEnoughDetail(image)) {
+    if (!hasEnoughDetail(image, scope)) {
       image.delete();
       return null;
     }
@@ -930,24 +930,19 @@ function cardAspectRatioDiff({ size: { width, height } }) {
 /**
  * Whether the image has enough contrast to be a card.
  * @param {cv.Mat} mat - RGBA
+ * @param {MatScope} scope - Owns the created Mats.
  * @returns {boolean}
  */
-function hasEnoughDetail(mat) {
-  const scope = new MatScope();
+function hasEnoughDetail(mat, scope) {
+  const gray = scope.track(new cv.Mat());
+  const mean = scope.track(new cv.Mat());
+  const stddev = scope.track(new cv.Mat());
 
-  try {
-    const gray = scope.track(new cv.Mat());
-    const mean = scope.track(new cv.Mat());
-    const stddev = scope.track(new cv.Mat());
+  cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+  cv.meanStdDev(gray, mean, stddev);
 
-    cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
-    cv.meanStdDev(gray, mean, stddev);
-
-    const minStdDev = 20; // blank surfaces measure near 0
-    return stddev.data64F[0] >= minStdDev;
-  } finally {
-    scope.dispose();
-  }
+  const minStdDev = 20; // blank surfaces measure near 0
+  return stddev.data64F[0] >= minStdDev;
 }
 
 /**
@@ -1039,13 +1034,13 @@ function searchArea(frameWidth, frameHeight) {
 }
 
 /**
- * Whether the quad's center lies in the guide box and it covers enough of the box.
+ * Whether the quad covers enough of the guide box.
  * @param {Array<{x: number, y: number}>} corners - In order around the quad.
  * @param {number} frameWidth
  * @param {number} frameHeight
  * @returns {boolean}
  */
-function fitsGuideBox(corners, frameWidth, frameHeight) {
+function fillsGuideBox(corners, frameWidth, frameHeight) {
   const minFill = 0.3;
   const box = guideBox(frameWidth, frameHeight);
 
@@ -1057,57 +1052,37 @@ function fitsGuideBox(corners, frameWidth, frameHeight) {
   });
   area = Math.abs(area) / 2;
 
-  return (
-    isInside(centerOf(corners), box) && area >= box.width * box.height * minFill
-  );
-}
-
-/**
- * @param {{x: number, y: number}} p
- * @param {{x: number, y: number, width: number, height: number}} box
- * @returns {boolean}
- */
-function isInside(p, box) {
-  return (
-    p.x >= box.x &&
-    p.x <= box.x + box.width &&
-    p.y >= box.y &&
-    p.y <= box.y + box.height
-  );
+  return area >= box.width * box.height * minFill;
 }
 
 /**
  * Cuts the card out of the frame, straightened to a CARD_WIDTH x CARD_HEIGHT image.
  * @param {cv.Mat} sourceMat
  * @param {Array<{x: number, y: number}>} corners - top-left, top-right, bottom-right, bottom-left
+ * @param {MatScope} scope - Owns the created Mats, except the result.
  * @returns {cv.Mat} The caller must delete it.
  */
-function extractCard(sourceMat, corners) {
+function extractCard(sourceMat, corners, scope) {
   const w = CARD_WIDTH;
   const h = CARD_HEIGHT;
 
-  const scope = new MatScope();
-  try {
-    const srcCoords = scope.track(
-      cv.matFromArray(
-        4,
-        1,
-        cv.CV_32FC2,
-        corners.flatMap((p) => [p.x, p.y]),
-      ),
-    );
-    const dstCoords = scope.track(
-      cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]),
-    );
+  const srcCoords = scope.track(
+    cv.matFromArray(
+      4,
+      1,
+      cv.CV_32FC2,
+      corners.flatMap((p) => [p.x, p.y]),
+    ),
+  );
+  const dstCoords = scope.track(
+    cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]),
+  );
 
-    const M = scope.track(cv.getPerspectiveTransform(srcCoords, dstCoords));
-    const result = new cv.Mat();
-    cv.warpPerspective(sourceMat, result, M, new cv.Size(w, h));
+  const M = scope.track(cv.getPerspectiveTransform(srcCoords, dstCoords));
+  const result = new cv.Mat();
+  cv.warpPerspective(sourceMat, result, M, new cv.Size(w, h));
 
-    return result;
-  } finally {
-    scope.dispose();
-  }
+  return result;
 }
 
 /**
